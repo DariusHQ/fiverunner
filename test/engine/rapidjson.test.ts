@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { MsgpackObject } from '../../src/core/engine/msgpack.ts'
-import { msgpackOfJson } from '../../src/core/engine/rapidjson.ts'
+import { msgpackOfJson, rewriteJson } from '../../src/core/engine/rapidjson.ts'
 
 const encoder = new TextEncoder()
 
@@ -237,5 +237,64 @@ describe('JSON read as RapidJSON reads it', () => {
     ]) {
       expect(read(json)).toBeUndefined()
     }
+  })
+})
+
+/** JSON rewritten as RapidJSON writes what its reader reads, or the code of its error. */
+function rewrite(json: string): { readonly json: string } | { readonly error: number } {
+  return rewriteJson(encoder.encode(json))
+}
+
+describe('JSON rewritten as RapidJSON writes it', () => {
+  it('has no whitespace, and the members of objects in the order they came, those of a name too', () => {
+    expect([
+      rewrite(' { "b" : 1 , "a" : [ true , false , null , { } , [ ] ] , "b" : "x" } '),
+      rewrite(`{ "a${u('0000')}b" : 1 , "a" : 2 }`),
+    ]).toEqual([
+      { json: '{"b":1,"a":[true,false,null,{},[]],"b":"x"}' },
+      { json: `{"a${u('0000')}b":1,"a":2}` },
+    ])
+  })
+
+  it('writes numbers as RapidJSON read them', () => {
+    expect(
+      rewrite('[1, -2, 18446744073709551615, -9223372036854775808, 1.5, 1e2, -0.0, 6e-245]'),
+    ).toEqual({
+      json: '[1,-2,18446744073709551615,-9223372036854775808,1.5,100.0,-0.0,5.9999999999999996e-245]',
+    })
+  })
+
+  it('writes strings with the escapes of RapidJSON', () => {
+    expect(rewrite(String.raw`"\/\b\f\n\r\t\"\\" `)).toEqual({
+      json: String.raw`"/\b\f\n\r\t\"\\"`,
+    })
+    expect(rewrite(`"${u('00e9')}${u('001f')}"`)).toEqual({ json: `"é${u('001F')}"` })
+  })
+
+  it('gives the code of the error that the reader stops with', () => {
+    const errors = [
+      '',
+      ' \n',
+      '1 2',
+      'nul',
+      '{1:2}',
+      '{"a" 2}',
+      '{"a":1 "b":2}',
+      '[1 2]',
+      `"${u('zz00')}"`,
+      `"${u('d800')}x"`,
+      `"${u('d800')}${u('0041')}"`,
+      String.raw`"\x"`,
+      '"abc',
+      `"a${String.fromCharCode(1)}"`,
+      '2e308',
+      '1e400',
+      '1.',
+      '1e',
+      '-',
+    ].map((json) => rewrite(json))
+    expect(errors).toEqual(
+      [1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 10, 11, 12, 13, 13, 14, 15, 3].map((error) => ({ error })),
+    )
   })
 })

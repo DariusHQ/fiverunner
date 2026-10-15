@@ -1,4 +1,5 @@
 import { compareUtf8 } from '../libc.ts'
+import { writeDouble, writeString } from './rapidjson.ts'
 
 /**
  * A msgpack extension: a type and its bytes, as FiveM packs references to
@@ -428,10 +429,10 @@ export function toJson(object: MsgpackObject): string | undefined {
       return String(object.value)
     case 'float32':
     case 'float64':
-      return jsonDouble(object.value)
+      return writeDouble(object.value)
     case 'str':
     case 'bin':
-      return jsonString(object.bytes)
+      return writeString(object.bytes)
     case 'array': {
       const items = object.items.map(toJson)
       return items.includes(undefined) ? undefined : `[${items.join(',')}]`
@@ -440,7 +441,7 @@ export function toJson(object: MsgpackObject): string | undefined {
       const members = jsonMembers(object.entries)
       const written = members.map(([key, value]) => {
         const json = toJson(value)
-        return json === undefined ? undefined : `${jsonString(utf8.encode(key))}:${json}`
+        return json === undefined ? undefined : `${writeString(utf8.encode(key))}:${json}`
       })
       return written.includes(undefined) ? undefined : `{${written.join(',')}}`
     }
@@ -472,33 +473,3 @@ function intKey(key: MsgpackObject): string | undefined {
   if (key.value < -0x80000000n || key.value > 0x7fffffffn) return undefined
   return String(key.value)
 }
-
-/** A double as RapidJSON writes it: its shortest digits, with .0 for integers and e for exponents. */
-function jsonDouble(value: number): string | undefined {
-  if (!Number.isFinite(value)) return undefined
-  const text = Object.is(value, -0) ? '-0' : String(value).replace('e+', 'e')
-  return /[.e]/.test(text) ? text : `${text}.0`
-}
-
-/** A string as RapidJSON writes it, which escapes quotes, backslashes and control characters. */
-function jsonString(bytes: Uint8Array): string {
-  let text = '"'
-  for (const char of decoder.decode(bytes)) {
-    const code = char.codePointAt(0)!
-    const short = JSON_ESCAPES.get(char)
-    if (short !== undefined) text += short
-    else if (code < 0x20) text += `\\u00${code.toString(16).toUpperCase().padStart(2, '0')}`
-    else text += char
-  }
-  return `${text}"`
-}
-
-const JSON_ESCAPES = new Map([
-  ['"', '\\"'],
-  ['\\', '\\\\'],
-  ['\b', '\\b'],
-  ['\f', '\\f'],
-  ['\n', '\\n'],
-  ['\r', '\\r'],
-  ['\t', '\\t'],
-])
