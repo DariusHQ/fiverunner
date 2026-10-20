@@ -39,9 +39,10 @@ describe('Projects', () => {
     const bank = openProject(write('bank', { 'fxmanifest.lua': MANIFEST, 'server.lua': '' }))!
     const old = openProject(write('old', { '__resource.lua': '' }))!
     const files = bank.files()
-    expect([bank.kind, bank.name, bank.commands, old.kind, old.commands]).toEqual([
+    expect([bank.kind, bank.name, bank.mount, bank.commands, old.kind, old.commands]).toEqual([
       'resource',
       'bank',
+      'resources/bank',
       ['ensure "bank"'],
       'resource',
       ['ensure "old"'],
@@ -57,13 +58,14 @@ describe('Projects', () => {
       write('server', { 'server.cfg': 'ensure bank', 'resources/bank/fxmanifest.lua': MANIFEST }),
     )!
     const bare = openProject(write('bare', { 'resources/readme.txt': '' }))!
-    expect([server.kind, server.name, server.commands, bare.kind, bare.commands]).toEqual([
-      'server',
-      undefined,
-      ['exec server.cfg'],
-      'server',
-      [],
-    ])
+    expect([
+      server.kind,
+      server.name,
+      server.mount,
+      server.commands,
+      bare.kind,
+      bare.commands,
+    ]).toEqual(['server', undefined, '', ['exec server.cfg'], 'server', []])
     expect(decode(server.files().read('resources/bank/fxmanifest.lua'))).toBe(MANIFEST)
   })
 
@@ -89,7 +91,9 @@ describe('Projects', () => {
     )!
     const files = bank.files()
     const listed = files.list('resources/bank/tests')!.map(({ name }) => name)
-    expect([listed.sort(), decode(bank.source.read('tests/a.test.lua'))]).toEqual([
+    const visible = bank.visible.list('tests').map(({ name }) => name)
+    expect([listed.sort(), visible.sort(), decode(bank.source.read('tests/a.test.lua'))]).toEqual([
+      ['data.test.lua', 'helper.lua'],
       ['data.test.lua', 'helper.lua'],
       '',
     ])

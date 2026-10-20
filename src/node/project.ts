@@ -13,6 +13,10 @@ export interface LocalProject extends Project {
   readonly name?: string
   /** The files of the directory, test files too, which it reads as they are first needed. */
   readonly source: DiskSource
+  /** The files of the directory that servers see: all but its test files. */
+  readonly visible: FileSource
+  /** Where servers have the files: resources/ and the name of the resource, or their root for a server. */
+  readonly mount: string
 }
 
 /** Test files end in this. */
@@ -33,14 +37,17 @@ export function openProject(root: string): LocalProject | undefined {
   const entries = source.list('')
   const has = (name: string, directory: boolean) =>
     entries.some((entry) => entry.name === name && entry.directory === directory)
-  const project = withoutTests(source)
+  const visible = withoutTests(source)
   if (has('fxmanifest.lua', false) || has('__resource.lua', false)) {
     const name = basename(root)
+    const mount = `resources/${name}`
     return {
       kind: 'resource',
       name,
       source,
-      files: () => mounted(`resources/${name}`, project),
+      visible,
+      mount,
+      files: () => mounted(mount, visible),
       commands: [`ensure "${name}"`],
     }
   }
@@ -48,7 +55,9 @@ export function openProject(root: string): LocalProject | undefined {
     return {
       kind: 'server',
       source,
-      files: () => mounted('', project),
+      visible,
+      mount: '',
+      files: () => mounted('', visible),
       commands: has('server.cfg', false) ? ['exec server.cfg'] : [],
     }
   }
