@@ -34,7 +34,7 @@ Run your project in your browser:
 npx fiverunner dev
 ```
 
-The dev UI has the console of your server, where you run commands, and its resources, which you start, stop and restart. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI runs your project anew, with the players it had. [docs/dev.md](docs/dev.md) tells all that it does.
+The dev UI has the console of your server, where you run commands, its resources, which you start, stop and restart, the events that the server and the players send each other, which you trigger too, and its state bags. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI runs your project anew, with the players it had. [docs/dev.md](docs/dev.md) tells all that it does.
 
 ## Planned
 

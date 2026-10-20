@@ -23,6 +23,16 @@ The console shows what the server prints, with the colors of `^1` to `^9`, its L
 
 The resources list shows each resource of the server and its state, with buttons that start, stop and restart it.
 
+## Events
+
+The events panel shows the events that the server and the clients send each other, as they get them: those of `TriggerServerEvent` and `TriggerClientEvent`, latent ones too, and those that FiveM sends of its own, such as `onPlayerJoining`, each with where it came from, where it went, and its arguments, written as Lua would write them.
+
+The form under it triggers an event as the network would: on the server, as a player does with `TriggerServerEvent`, so that `source` is the player, or on the client of a player, or of every player, as the server does with `TriggerClientEvent`. Give the arguments as a JSON array, such as `[100, "cash"]`. Handlers get the event at the next tick, and only those of `RegisterNetEvent` take it, as in FiveM.
+
+## State bags
+
+The state bags panel shows the state bags of the server that have keys, such as `global`, which `GlobalState` sets, and `player:<id>`, which `Player(id).state` sets, with the values of their keys, as they change.
+
 ## Players
 
 **Connect a player** starts a client and connects it to the server with the name in the box. It joins as a FiveM client does: the server's `playerConnecting` handlers and deferrals run, then the client downloads its resources and starts them. While deferrals present an adaptive card, the player shows it, with a box for the JSON that its `Action.Submit` would give, which **Submit card** submits. **Disconnect** quits the client, as the player leaving the game does.
