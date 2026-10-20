@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FiveRunner</title>
+  </head>
+  <body>
+    <header class="top">
+      <h1>FiveRunner</h1>
+      <span id="project"></span>
+      <span id="status" class="starting">Starting</span>
+      <button id="restart" type="button">Restart</button>
+    </header>
+    <main>
+      <section class="server">
+        <h2>Server</h2>
+        <div id="console" class="console" role="log" aria-live="polite"></div>
+        <form id="command">
+          <input
+            id="command-line"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="A command for the server console, such as restart bank"
+            aria-label="Command"
+          />
+        </form>
+      </section>
+      <aside class="resources">
+        <h2>Resources</h2>
+        <ul id="resources-list"></ul>
+      </aside>
+      <section class="players">
+        <div class="toolbar">
+          <h2>Players</h2>
+          <form id="connect">
+            <input id="player-name" value="Player" aria-label="Name of the player" />
+            <button type="submit">Connect a player</button>
+          </form>
+        </div>
+        <div id="player-list"></div>
+      </section>
+    </main>
+    <div id="bridges" hidden></div>
+    <script type="module" src="./ui/main.ts"></script>
+  </body>
+</html>

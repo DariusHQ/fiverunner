@@ -32,7 +32,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && vite build -c vite.ui.config.ts && vite build -c vite.sw.config.ts",
     "prepack": "npm run build",
     "build:wasm": "node scripts/build-wasm.ts",
     "build:natives": "node scripts/generate-natives.ts",
