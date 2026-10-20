@@ -2,7 +2,7 @@
 
 Run FiveM resources in your browser and in CI. No GTA V, no FXServer, no restarts.
 
-> **Status:** early development. `npx fiverunner test` runs the Lua tests of FiveM resources in Node; `npx fiverunner dev` comes next. Watch the repository to follow along.
+> **Status:** early development. `npx fiverunner test` runs the Lua tests of FiveM resources in Node, and `npx fiverunner dev` runs resources and their NUI in your browser. Watch the repository to follow along.
 
 ## Testing resources
 
@@ -26,9 +26,19 @@ npx fiverunner test
 
 Each test gets a server of its own, with your resources started, and players whose clients run your client scripts. Time moves as fast as it can, so tests that wait take no time. [docs/testing.md](docs/testing.md) tells all that tests can do, and [examples/bank](examples/bank) is a resource with tests.
 
+## Developing resources
+
+Run your project in your browser:
+
+```bash
+npx fiverunner dev
+```
+
+The dev UI has the console of your server, where you run commands, and its resources, which you start, stop and restart. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI runs your project anew, with the players it had. [docs/dev.md](docs/dev.md) tells all that it does.
+
 ## Planned
 
-- `npx fiverunner dev` loads your resources (client Lua, server Lua and NUI) into a browser page. Join fake players, fire events, inspect state and click through your NUI without launching the game.
+- A playground in the browser, which runs resources without installing anything.
 
 ## How it works
 

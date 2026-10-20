@@ -50,6 +50,16 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 - Callbacks that answer with what FiveM fails to convert leave their requests unanswered, with a diagnosis, where FiveM throws.
 - Requests and files of resources whose names differ only in case go to the one added last, where FiveM's pick follows the order of its hash map of resources.
 
+## The dev UI
+
+- Pages run in the browser that shows the dev UI, rather than in FiveM's Chromium, at `http://<host>.c<player>.<tab>.fiverunner.localhost:<port>`, where FiveM has them at `https://cfx-nui-<resource>` or `nui://<resource>`, which `location` tells pages.
+- The names of the headers of the requests of pages come capitalized word by word, as in `Content-Type`, as browsers do not tell service workers their case. Requests carry the `Origin` of their frames whatever their methods and schemes.
+- Responses with statuses outside 200 to 599, which browsers do not take, fail their requests.
+- Absolute `nui://` URLs in pages do not load, and frames in pages at `https://cfx-nui-` URLs load from the web, which has no such hosts: pages load the files of their own resources by relative URLs.
+- Pages at URLs of the web, which `ui_page` can name, load from the web, as do their requests to resources.
+- There is no game view: `CfxGameViewRenderer` and `application/x-cfx-game-view` objects are not there.
+- As files change, the whole project runs anew, with its players, rather than the resources that changed restarting.
+
 ## os and io (servers)
 
 - Names of local time zones come from `Intl`, which can differ from Windows' names for `%Z`.
