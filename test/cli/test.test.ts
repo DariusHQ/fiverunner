@@ -119,7 +119,7 @@ Duration: 0.63 s
 end
 it('fails deep', function()
     warn('careful')
-    GetEntityCoords(0)
+    ProfilerIsRecording()
     ExecuteCommand('restart bank')
     CreateThread(function() error('oops') end)
     local ann = fiverunner.connect()
@@ -134,7 +134,7 @@ end)`,
     at tests/bank.test.lua:10
   Output:
     [fiverunner] Lua warning: careful
-    [fiverunner] FiveRunner: GetEntityCoords is not implemented in FiveRunner yet: it does nothing and returns zero values.
+    [fiverunner] FiveRunner: ProfilerIsRecording is not implemented in FiveRunner yet: it does nothing and returns zero values.
     [script:fiverunner] SCRIPT ERROR: @fiverunner/tests/bank.test.lua:8: oops
     client 1 [script:bank] client of bank`)
   })

@@ -131,10 +131,13 @@ export function stateBagNatives(side: Side): NativeDefinition<NativeContext>[] {
     ),
     defineNative(
       { name: 'GET_ENTITY_FROM_STATE_BAG_NAME', result: 'int', params: ['char* bagName'] },
-      (_ctx: NativeContext, bagName) => {
-        checkArgument(bagName, 0)
-        // FiveRunner has no entities, which FiveM's bags of entities name.
-        return 0
+      (ctx: NativeContext, bagName) => {
+        const name = checkArgument(bagName, 0)
+        if (!name.startsWith('entity:')) return 0
+        // FiveM finds entities by the net ids that atoi reads, those that are being deleted too.
+        const gameState = ctx.manager.gameState!
+        const entity = gameState.byObjectId(atoi(name.slice(7)))
+        return entity === undefined ? 0 : gameState.handleOf(entity)
       },
     ),
   ]

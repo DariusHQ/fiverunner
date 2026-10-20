@@ -32,10 +32,16 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 - A client that fails to start a resource goes on, with a diagnosis, where FiveM's client stops with "Couldn't start resource".
 - A client that leaves resets its resources at its next tick, where FiveM's does once its game session ends. A start that the client had pending for a resource that it removed meanwhile does not happen, where FiveM's race would start a destroyed resource.
 
+## Entities
+
+- Servers create vehicles, peds and objects with `CreateVehicleServerSetter`, `CreatePed` and `CreateObjectNoOffset`, but clients have no world yet: no client knows of the entities of the server or owns them, so `NetworkGetEntityOwner` gives -1, and `CreateVehicle` and `CreateObject`, which FiveM's server has a client run, are not implemented.
+- `GetGamePool`, `GetAllVehicles`, `GetAllPeds` and `GetAllObjects` list entities in the order they were created, where FiveM lists them in the order of their addresses in its memory.
+- The ticks of the server stand for those of FiveM's sync thread: an entity that a script deletes exists until the next tick, and goes at its end, after `entityRemoved`, where FiveM's sync thread gets to it a few milliseconds later, whatever the main thread does meanwhile.
+
 ## Events and state bags
 
 - Latent events arrive by a deadline: the end of the sender's tick, plus the latency in whole milliseconds for each fragment after the first. Nothing is acknowledged or sent again, and pending events have no limit: `sv_netEventReassemblyMaxPendingEvents` is defined but not enforced.
-- There are no entities, so no state bags of entities (`GetEntityFromStateBagName` gives 0) and no scopes. The state bags of players reach only their own clients, as in OneSync's big mode. Their packets have no size limit, and arrive at the start of the other side's next tick.
+- Entities have no state bags yet, though `GetEntityFromStateBagName` finds them by the names their bags have, and there are no scopes. The state bags of players reach only their own clients, as in OneSync's big mode. Their packets have no size limit, and arrive at the start of the other side's next tick.
 
 ## HTTP
 

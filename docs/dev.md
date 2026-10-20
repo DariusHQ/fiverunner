@@ -56,7 +56,7 @@ As files of the project change, the dev UI runs the project anew: a new server, 
 
 ## What it does not do
 
-There is no game: the natives of GTA V, such as `PlayerPedId` and `GetEntityCoords`, do nothing and return zero values, as they do in tests, and FiveRunner tells you of the first time a resource calls each. The `PerformHttpRequest` of the server sends real requests, through the dev server, where tests send none.
+There is no game: most natives of GTA V, such as `PlayerPedId` and the `GetEntityCoords` of clients, do nothing and return zero values, as they do in tests, and FiveRunner tells you of the first time a resource calls each. The server keeps the entities that its scripts create, as [the differences from FiveM](differences.md#entities) tell. The `PerformHttpRequest` of the server sends real requests, through the dev server, where tests send none.
 
 [differences.md](differences.md) lists where FiveRunner differs from FiveM, the dev UI too.
 

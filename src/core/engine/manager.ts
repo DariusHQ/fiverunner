@@ -51,6 +51,7 @@ import { ResourceScanner } from './scan.ts'
 import type { Player, Session } from './session.ts'
 import { StateBags } from './statebags.ts'
 import { OpenFiles } from './streams.ts'
+import { ServerGameState } from './world/server.ts'
 
 /** Where a process writes what it reports. */
 export interface ProcessOutput {
@@ -159,6 +160,8 @@ export class ResourceManager {
   readonly nui: Nui | undefined
   /** On servers, whether OneSync is on. */
   readonly oneSync: boolean
+  /** On servers, their game state: the entities of the session. */
+  readonly gameState: ServerGameState | undefined
   readonly natives = new NativeRegistry<NativeContext>()
   readonly events = new EventManager(this)
   /** The latent events that the process sends. */
@@ -249,6 +252,17 @@ export class ResourceManager {
       this.consoleBuffer = undefined
     }
     this.httpServer = server ? new HttpServer(this) : undefined
+    // FiveM's big mode, which OneSync is in when it is on, has the length hack.
+    this.gameState = server
+      ? new ServerGameState(
+          {
+            queue: (name, args) => this.events.queue(name, pack(args)),
+            trigger: (name, args) => this.events.trigger(name, pack(args)),
+            onMainThread: (fn) => this.enqueue(fn),
+          },
+          this.oneSync,
+        )
+      : undefined
     this.nui = server ? undefined : new Nui(this)
     const consoleOptions = {
       security: this.security,
@@ -693,6 +707,7 @@ export class ResourceManager {
 
   /**
    * Runs a tick as FiveM does: it takes what the network gave the process,
+   * on servers runs a tick of the game state, as their sync thread does,
    * runs the commands of the console's buffer as the console, triggers
    * the queued events, then resumes the threads
    * that are due in all runtimes. It takes the due threads of every runtime
@@ -708,6 +723,7 @@ export class ResourceManager {
   tick(): void {
     this.#player?.touch()
     for (const fn of this.#received.splice(0)) fn()
+    this.gameState?.tick()
     this.security.runAs('system.console', () => this.console.executeBuffer())
     this.events.tick()
     const ticking = this.#ticking.map((resource) => ({ resource, runtime: resource.runtime! }))
