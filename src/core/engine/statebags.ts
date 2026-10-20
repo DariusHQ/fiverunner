@@ -153,6 +153,11 @@ export class StateBags {
     return [...this.#targets]
   }
 
+  /** The bags, in the order they were created. */
+  get bags(): IterableIterator<StateBag> {
+    return this.#bags.values()
+  }
+
   /** The bag named `name`, if there is one. */
   get(name: string): StateBag | undefined {
     return this.#bags.get(name)

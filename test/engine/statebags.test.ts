@@ -160,6 +160,14 @@ describe('StateBags', () => {
   }
   const one = () => pack(1)
 
+  it('list the bags they have, in the order they were created', () => {
+    const { states } = bags()
+    for (const name of ['global', 'player:1', 'entity:2']) states.register(name)
+    states.register('global')
+    states.remove('player:1')
+    expect([...states.bags].map(({ name }) => name)).toEqual(['global', 'entity:2'])
+  })
+
   it('replicate the changes that change something, to the peers that bags route to in order, or to all', () => {
     const { states, sent } = bags()
     states.registerTarget(7)
