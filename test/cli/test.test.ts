@@ -48,6 +48,9 @@ async function test(
     },
     color: false,
     cfxlua,
+    wasm: () => new Uint8Array(),
+    assets: '',
+    interrupted: () => Promise.resolve(),
     // The run takes a second and a quarter.
     now: () => (time += 625),
     ...host,

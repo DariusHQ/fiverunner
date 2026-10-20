@@ -1,4 +1,5 @@
 import packageJson from '../../package.json' with { type: 'json' }
+import { dev } from './dev.ts'
 import { test } from './test.ts'
 
 /** What the command line tool runs with: where it runs, what it writes to, and cfxlua.wasm. */
@@ -13,6 +14,12 @@ export interface CliHost {
   readonly color: boolean
   /** Compiles cfxlua.wasm. */
   readonly cfxlua: () => Promise<WebAssembly.Module>
+  /** Reads the bytes of cfxlua.wasm, which the dev UI gets. */
+  readonly wasm: () => Uint8Array
+  /** The directory of the built dev UI. */
+  readonly assets: string
+  /** Resolves once the user interrupts the tool, as with Ctrl+C, which it then takes as a request to stop. */
+  readonly interrupted: () => Promise<void>
   /** Milliseconds by a clock that only moves on, which times the run. */
   readonly now: () => number
 }
@@ -21,6 +28,7 @@ const USAGE = `Usage: fiverunner <command> [options]
 
 Commands:
   test [paths...]  Run the tests of the project in this directory
+  dev              Run the project in this directory in the dev UI, in the browser
 
 Options:
   -h, --help       Show this help
@@ -35,6 +43,7 @@ Options:
 export async function main(args: readonly string[], host: CliHost): Promise<number> {
   const [first, ...rest] = args
   if (first === 'test') return test(rest, host)
+  if (first === 'dev') return dev(rest, host)
   if (rest.length === 0 && (first === undefined || first === '-h' || first === '--help')) {
     host.stdout(`FiveRunner ${packageJson.version}\n\n${USAGE}`)
     return 0

@@ -19,6 +19,9 @@ async function run(...args: string[]): Promise<{ code: number; stdout: string; s
     },
     color: false,
     cfxlua,
+    wasm: () => new Uint8Array(),
+    assets: '',
+    interrupted: () => Promise.resolve(),
     now: () => 0,
   })
   return { code, stdout, stderr }
@@ -28,6 +31,7 @@ const usage = `Usage: fiverunner <command> [options]
 
 Commands:
   test [paths...]  Run the tests of the project in this directory
+  dev              Run the project in this directory in the dev UI, in the browser
 
 Options:
   -h, --help       Show this help
