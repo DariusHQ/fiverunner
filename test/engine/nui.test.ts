@@ -789,3 +789,25 @@ describe('NUI files', () => {
     expect(proc.manager.nui).toBe(undefined)
   })
 })
+
+describe('NUI hosts', () => {
+  it('are those of the resources that started, whatever their manifests, which requests to others pass', async () => {
+    const { proc, nui, bank } = await clientWithBank('', { entries: '' })
+    proc.add('idle', { 'client.lua': '' })
+    proc.add('Shop', { 'client.lua': '' }).start()
+    const before = nui.takes('https', 'bank')
+    bank.start()
+    bank.stop()
+    expect([
+      before,
+      nui.takes('https', 'bank'),
+      nui.takes('http', 'BANK'),
+      nui.takes('https', 'cfx-nui-bank'),
+      nui.takes('http', 'cfx-nui-bank'),
+      nui.takes('https', 'idle'),
+      nui.takes('https', 'cfx-nui-idle'),
+      nui.takes('https', 'example.com'),
+      nui.takes('http', 'shop'),
+    ]).toEqual([false, true, true, true, false, false, false, false, true])
+  })
+})

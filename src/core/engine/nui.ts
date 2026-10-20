@@ -98,6 +98,8 @@ export class Nui {
   readonly #focusVotes = new Set<string>()
   readonly #cursorVotes = new Set<string>()
   readonly #keepInputVotes = new Set<string>()
+  /** The names of the resources that started, in lower case, which FiveM's NUI takes the requests to the hosts of. */
+  readonly #hosts = new Set<string>()
   #focus = false
   #cursorShown = false
   #keepInput = false
@@ -288,6 +290,19 @@ export class Nui {
     this.onZIndex.run(resource.name, zIndex)
   }
 
+  /**
+   * Whether FiveM's NUI takes the requests of pages to `host`, which it does
+   * for the hosts of the resources that started, whatever their manifests:
+   * the name of the resource in lower case, over HTTP and HTTPS, for its
+   * callbacks, and cfx-nui- and the name, over HTTPS, for its files. The
+   * requests to other hosts go to the web.
+   */
+  takes(scheme: 'http' | 'https', host: string): boolean {
+    const lower = lowerAscii(host)
+    const name = scheme === 'https' && lower.startsWith('cfx-nui-') ? lower.slice(8) : lower
+    return this.#hosts.has(name)
+  }
+
   /** The resource named `name` whatever its case, the last of them, as FiveM finds them. */
   #find(name: string): Resource | undefined {
     let found: Resource | undefined
@@ -300,6 +315,7 @@ export class Nui {
   /** Gives a resource that starts its frame, as FiveM creates them, if its manifest has one ui_page. */
   #create(resource: Resource, ui: ResourceUi): void {
     ui.dead = false
+    this.#hosts.add(lowerAscii(resource.name))
     const pages = resource.entries('ui_page')
     if (pages.length === 0) return
     if (pages.length > 1) {
