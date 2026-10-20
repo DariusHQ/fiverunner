@@ -20,6 +20,9 @@ import { defineNative } from '../core/natives/index.ts'
 import { UTC } from '../core/scripting/time.ts'
 import client from './lua/client.lua?raw'
 import harness from './lua/harness.lua?raw'
+import { LineOutput, type OutputLine } from './output.ts'
+
+export type { OutputLine } from './output.ts'
 
 /** The name of the resource that runs the tests, which projects cannot have one of. */
 export const TEST_RESOURCE = 'fiverunner'
@@ -62,21 +65,6 @@ export interface TestFile {
   /** Its path in the project, with slashes, which ends in .test.lua. */
   readonly path: string
   readonly source: string | Uint8Array
-}
-
-/** What a process printed or reported. */
-export interface OutputLine {
-  /** server, or the client that printed it: client 1, client 2 and on, in the order they connected. */
-  readonly process: string
-  /**
-   * console for what the process printed on its console, warning for the
-   * warnings of Lua, and diagnostic for what FiveRunner noticed of how a
-   * resource uses FiveM.
-   */
-  readonly kind: 'console' | 'warning' | 'diagnostic'
-  /** The channel of the console, such as script:name, or the resource that warned or was diagnosed. */
-  readonly channel: string
-  readonly text: string
 }
 
 /** A line of the test file that a failure came through, and the function that was there, if Lua knows its name. */
@@ -447,41 +435,16 @@ class World<T> {
 /** What the processes of a server printed and reported, line by line. */
 class Output {
   readonly #lines: OutputLine[] = []
-  /** What each process printed on each channel since its last line break. */
-  readonly #partial = new Map<string, { process: string; channel: string; text: string }>()
+  readonly #writer = new LineOutput((line) => this.#lines.push(line))
 
   /** Where the process `process` writes. */
   of(process: string): ProcessOutput {
-    return {
-      write: (channel, text) => {
-        const key = `${process}\n${channel}`
-        const pieces = ((this.#partial.get(key)?.text ?? '') + text).split('\n')
-        this.#partial.set(key, { process, channel, text: pieces.pop()! })
-        for (const piece of pieces) {
-          this.#lines.push({ process, kind: 'console', channel, text: piece })
-        }
-      },
-      warn: (resource, message) => {
-        this.#lines.push({ process, kind: 'warning', channel: resource, text: message })
-      },
-      diagnose: (resource, message) => {
-        this.#lines.push({ process, kind: 'diagnostic', channel: resource, text: message })
-      },
-    }
+    return this.#writer.of(process)
   }
 
   /** The lines, then what the processes printed after their last line breaks, as lines of their own. */
   get lines(): readonly OutputLine[] {
-    const unended = [...this.#partial.values()].filter(({ text }) => text !== '')
-    return [
-      ...this.#lines,
-      ...unended.map(({ process, channel, text }) => ({
-        process,
-        kind: 'console' as const,
-        channel,
-        text,
-      })),
-    ]
+    return [...this.#lines, ...this.#writer.unended]
   }
 }
 
