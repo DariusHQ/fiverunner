@@ -40,6 +40,7 @@ import { fetchHttpClient, type HttpClient } from './http.ts'
 import { HttpServer } from './httpserver.ts'
 import { KvpStore } from './kvp.ts'
 import { LatentEvents } from './latent.ts'
+import { Nui } from './nui.ts'
 import { atoi, compareUtf8, strtoull } from '../libc.ts'
 import { isFxVersionAtLeast } from './manifest.ts'
 import { arrayLength, pack } from './msgpack.ts'
@@ -154,6 +155,8 @@ export class ResourceManager {
   readonly http: HttpClient
   /** On servers, the HTTP server, which takes the requests to the resources. */
   readonly httpServer: HttpServer | undefined
+  /** On clients, NUI: the frames of the resources, and the callbacks of their pages. */
+  readonly nui: Nui | undefined
   /** On servers, whether OneSync is on. */
   readonly oneSync: boolean
   readonly natives = new NativeRegistry<NativeContext>()
@@ -246,6 +249,7 @@ export class ResourceManager {
       this.consoleBuffer = undefined
     }
     this.httpServer = server ? new HttpServer(this) : undefined
+    this.nui = server ? undefined : new Nui(this)
     const consoleOptions = {
       security: this.security,
       output: this.printer,

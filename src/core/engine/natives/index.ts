@@ -6,6 +6,7 @@ import { eventNatives } from './events.ts'
 import { httpNatives } from './http.ts'
 import { kvpNatives } from './kvp.ts'
 import { networkNatives } from './network.ts'
+import { nuiNatives } from './nui.ts'
 import { playerNatives } from './players.ts'
 import { refNatives } from './refs.ts'
 import { resourceNatives } from './resources.ts'
@@ -25,6 +26,6 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...networkNatives(side),
     ...playerNatives(side),
     ...stateBagNatives(side),
-    ...(side === 'server' ? httpNatives() : []),
+    ...(side === 'server' ? httpNatives() : nuiNatives()),
   ]
 }

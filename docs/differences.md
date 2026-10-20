@@ -42,6 +42,14 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 - `PerformHttpRequest` sends requests with `fetch` by default. Header names come back in lower case, repeated headers are joined but `Set-Cookie`, GET and HEAD send no body, TLS certificates are verified, which FiveM does not do, requests use HTTP/1.1 only, and curl's error texts are approximated. Browsers also hide redirects. `PerformHttpRequestInternal`, the JSON variant, is not implemented.
 - The HTTP server listens nowhere by itself: embedders hand it requests through `HttpServer.request`. Of FiveM's own endpoints, only `/` exists, with no `/info.json`, `/players.json`, `/dynamic.json`, `/client`, `/files/` or `/perf/`. Requests come whole, so FiveM's loss of chunked bodies sent before `setDataHandler` does not happen. The server speaks HTTP/1.1 only, leaves `Date` and `Connection` to the transport, and writes nothing after a response ends, where FiveM writes past it.
 
+## NUI
+
+- Clients keep the frames of NUI, its focus and its callbacks, but show no pages themselves: embedders show frames, hand the requests of pages to `Nui.request` and `Nui.file`, and pass messages on. `ui_page_preload` changes nothing.
+- There is no loading screen, so `SendLoadingScreenMessage` always fails, as it does in FiveM once the loading screen shut down. There is no DUI: `CreateDui` and the other DUI natives do nothing, as natives FiveRunner does not implement do.
+- Pages get 404 for manifests and for client scripts that no `file` entry names, where FiveM serves the game's `gameconfig.xml` in their place.
+- Callbacks that answer with what FiveM fails to convert leave their requests unanswered, with a diagnosis, where FiveM throws.
+- Requests and files of resources whose names differ only in case go to the one added last, where FiveM's pick follows the order of its hash map of resources.
+
 ## os and io (servers)
 
 - Names of local time zones come from `Intl`, which can differ from Windows' names for `%Z`.
