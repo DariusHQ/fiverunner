@@ -38,6 +38,7 @@
     "build:natives": "node scripts/generate-natives.ts",
     "build:mime": "node scripts/generate-mime.ts",
     "test": "vitest run",
+    "test:e2e": "vitest run -c vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
