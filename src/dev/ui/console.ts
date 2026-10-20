@@ -16,12 +16,17 @@ export class Console {
 
   /** Shows `line`, keeping the view at the end if it was there. */
   add(line: OutputLine): void {
+    this.entry(line.channel, line.text, `kind-${line.kind}`)
+  }
+
+  /** Shows `text` on `channel`, with the colors of its codes, as a line of the class `kind`. */
+  entry(channel: string, text: string, kind: string): void {
     const element = document.createElement('div')
-    element.className = `line kind-${line.kind}`
-    const channel = document.createElement('span')
-    channel.className = 'channel'
-    channel.textContent = `[${line.channel}] `
-    element.append(channel, ...colored(line.text))
+    element.className = `line ${kind}`
+    const label = document.createElement('span')
+    label.className = 'channel'
+    label.textContent = `[${channel}] `
+    element.append(label, ...colored(text))
     this.#append(element)
   }
 

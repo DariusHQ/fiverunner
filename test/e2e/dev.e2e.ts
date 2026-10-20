@@ -21,6 +21,8 @@ ui_page 'html/index.html'
 files { 'html/index.html', 'html/app.js' }
 `,
   'server.lua': `print('bank server started')
+GlobalState.bank = 'open'
+RegisterNetEvent('bank:ping', function(value) print('ping', source, value) end)
 RegisterCommand('open', function()
     TriggerClientEvent('bank:open', -1, 'Opened by the server')
 end, false)
@@ -153,6 +155,29 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
         `document.querySelector('.player .console').innerText.includes('closed with') && document.querySelector('.player .console').innerText`,
       ),
     ]).toEqual(['{"closed":true}', expect.stringContaining('[script:bank] closed with\tclick')])
+  })
+
+  it('triggers events as the network does, which it shows with the state bags of the server', async () => {
+    await page.evaluate(`(() => {
+      const form = document.getElementById('emit')
+      form.elements.target.value = 'from:1'
+      form.elements.name.value = 'bank:ping'
+      form.elements.args.value = '[7]'
+      form.requestSubmit()
+    })()`)
+    expect([
+      await page.until<string>(
+        `document.getElementById('console').innerText.includes('ping') && document.getElementById('console').innerText`,
+      ),
+      await page.until<string>(
+        `document.getElementById('events').innerText.includes('bank:ping') && document.getElementById('events').innerText`,
+      ),
+      await page.evaluate<string>(`document.getElementById('bags').innerText`),
+    ]).toEqual([
+      expect.stringContaining('[script:bank] ping\t1\t7'),
+      expect.stringContaining('[Player -> server] bank:ping(7)'),
+      expect.stringMatching(/global\s+bank\s+"open"/),
+    ])
   })
 
   it('runs the project anew as its files change, with the players it had, whose frames keep their storage', async () => {

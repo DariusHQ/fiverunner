@@ -30,6 +30,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
   color: inherit;
@@ -93,13 +94,15 @@ h2 {
 main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
-  grid-template-rows: 340px auto;
+  grid-template-rows: 340px 300px auto;
   gap: 12px;
   padding: 12px 16px;
 }
 
 .server,
 .resources,
+.events,
+.state,
 .players {
   display: flex;
   flex-direction: column;
@@ -145,6 +148,55 @@ main {
 
 .line.note {
   color: var(--accent);
+}
+
+.line.kind-event .channel {
+  color: var(--cyan);
+}
+
+#emit {
+  display: flex;
+  gap: 6px;
+}
+
+#emit input[name='name'] {
+  flex: 1;
+}
+
+#emit input[name='args'] {
+  flex: 2;
+}
+
+#bags {
+  overflow: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+#bags h3 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+#bags dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 10px;
+  margin: 0;
+}
+
+#bags dt {
+  color: var(--muted);
+}
+
+#bags dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+#bags .empty {
+  color: var(--muted);
 }
 
 .color-red {
@@ -316,7 +368,7 @@ main {
 @media (max-width: 800px) {
   main {
     grid-template-columns: 1fr;
-    grid-template-rows: 300px auto auto;
+    grid-template-rows: 300px auto 300px auto auto;
   }
 
   #player-list {

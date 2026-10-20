@@ -1,6 +1,8 @@
 /**
- * The dev UI: the console of the server, its resources, and the players
- * that connect to it, each with a screen that shows the frames of its NUI.
+ * The dev UI: the console of the server, its resources, the events that
+ * the server and its clients send each other, its state bags, and the
+ * players that connect to it, each with a screen that shows the frames of
+ * its NUI.
  * Its worker runs the engine, and the bridges of the origins of frames
  * pass the requests of their pages on to it.
  */
@@ -13,6 +15,7 @@ import { API } from '../remote.ts'
 import { DEV_PATH } from '../routes.ts'
 import type { DevPlayer, DevState, NuiEvent } from '../session.ts'
 import { Console } from './console.ts'
+import { Events, showBags } from './inspect.ts'
 import { Screen } from './screen.ts'
 
 /** The element with the id `id`, which the page has. */
@@ -44,6 +47,10 @@ const project = byId<HTMLElement>('project')
 const server = new Console(byId('console'))
 const resources = byId<HTMLUListElement>('resources-list')
 const playerList = byId<HTMLElement>('player-list')
+const events = new Events(byId('events'), byId<HTMLFormElement>('emit'), {
+  emit: (name, args, target) => send({ type: 'emit', name, args, target }),
+})
+const bags = byId<HTMLElement>('bags')
 
 /** What the dev UI shows of a player. */
 interface PlayerView {
@@ -164,6 +171,8 @@ function showState(state: DevState): void {
       return item
     }),
   )
+  events.players(state.players)
+  showBags(bags, state.bags)
   for (const player of state.players) {
     const view = playerView(player.client)
     const gone = player.state === 'dropped' || player.state === 'rejected'
@@ -210,6 +219,7 @@ function showLine(line: OutputLine): void {
 function restart(why: string): void {
   setStatus('Starting', 'starting')
   server.note(why)
+  events.note(why)
   for (const view of players.values()) view.element.remove()
   players.clear()
   send({ type: 'start' })
@@ -232,6 +242,7 @@ worker.addEventListener('message', (event: MessageEvent<FromWorker>) => {
       if (devEvent.type === 'output') showLine(devEvent.line)
       else if (devEvent.type === 'state') showState(devEvent.state)
       else if (devEvent.type === 'nui') showNui(devEvent.client, devEvent.event)
+      else if (devEvent.type === 'net') events.add(devEvent.event)
       else {
         setStatus('Crashed', 'failed')
         server.note(devEvent.message)

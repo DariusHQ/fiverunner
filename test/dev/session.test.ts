@@ -84,7 +84,7 @@ describe('Dev sessions', () => {
         'server: [script:bank] bank started',
         'server: [resources] Started resource bank',
       ],
-      [{ resources: [{ name: 'bank', state: 'started' }], players: [] }],
+      [{ resources: [{ name: 'bank', state: 'started' }], players: [], bags: [] }],
       [],
     ])
   })
@@ -104,7 +104,7 @@ describe('Dev sessions', () => {
         'server: [resources] Stopping resource bank',
         'server: [cmd] No such command nope.',
       ],
-      [{ resources: [{ name: 'bank', state: 'stopped' }], players: [] }],
+      [{ resources: [{ name: 'bank', state: 'stopped' }], players: [], bags: [] }],
     ])
   })
 
@@ -196,6 +196,140 @@ end)`,
       ['dropped'],
       ['server: [script:bank] dropped\tExiting'],
       undefined,
+    ])
+  })
+
+  it('tell of the events that the server and clients send each other, which they trigger as the network does', async () => {
+    const { session, told } = await sessionOf(
+      `RegisterNetEvent('bank:deposit', function(amount)
+    print('deposit', source, amount)
+    TriggerClientEvent('bank:balance', source, 600)
+end)`,
+      `RegisterNetEvent('bank:balance', function(balance) print('balance', balance) end)
+RegisterNetEvent('bank:hello', function(text) print('hello', text) end)
+CreateThread(function() TriggerServerEvent('bank:deposit', 100) end)`,
+    )
+    const ann = await session.connect({ name: 'Ann' })
+    const bo = await session.connect({ name: 'Bo' })
+    session.advance(1000)
+    const sent = told()
+    session.emit('bank:deposit', [5], { from: ann })
+    session.emit('bank:hello', ['all'], { to: 'everyone' })
+    session.emit('bank:hello', ['you'], { to: bo })
+    session.emit('bank:hello', ['nobody'], { to: 9 })
+    session.emit('bank:deposit', [1], { from: 9 })
+    session.advance(100)
+    const emitted = told()
+    const net = (events: DevEvent[]) =>
+      events.flatMap((event) => (event.type === 'net' ? [event.event] : []))
+    const event = (from: 'server' | number, to: 'server' | number, name: string, args: string) => ({
+      from,
+      to,
+      name,
+      args,
+    })
+    expect([
+      net(sent),
+      printed(sent).filter((line) => line.includes('[script:bank]')),
+      net(emitted),
+      printed(emitted),
+    ]).toEqual([
+      [
+        event('server', 1, 'onPlayerJoining', '1, "Ann", 128'),
+        event('server', 2, 'onPlayerJoining', '2, "Bo", 128'),
+        event(1, 'server', 'bank:deposit', '100'),
+        event(2, 'server', 'bank:deposit', '100'),
+        event('server', 1, 'bank:balance', '600'),
+        event('server', 2, 'bank:balance', '600'),
+      ],
+      [
+        'server: [script:bank] deposit\t1\t100',
+        'server: [script:bank] deposit\t2\t100',
+        'client 1: [script:bank] balance\t600',
+        'client 2: [script:bank] balance\t600',
+      ],
+      [
+        event('server', 1, 'bank:hello', '"all"'),
+        event('server', 2, 'bank:hello', '"all"'),
+        event('server', 2, 'bank:hello', '"you"'),
+        event(1, 'server', 'bank:deposit', '5'),
+        event('server', 1, 'bank:balance', '600'),
+      ],
+      [
+        'client 1: [script:bank] hello\tall',
+        'client 2: [script:bank] hello\tall',
+        'client 2: [script:bank] hello\tyou',
+        'server: [script:bank] deposit\t1\t5',
+        'client 1: [script:bank] balance\t600',
+      ],
+    ])
+  })
+
+  it('tell of latent events, both ways', async () => {
+    const { session, told } = await sessionOf(
+      `RegisterNetEvent('bank:up', function(text)
+    TriggerLatentClientEvent('bank:down', source, 10000, text .. '!')
+end)`,
+      `RegisterNetEvent('bank:down', function(text) print('down', text) end)
+CreateThread(function() TriggerLatentServerEvent('bank:up', 10000, 'hi') end)`,
+    )
+    await session.connect({ name: 'Ann' })
+    session.advance(2000)
+    const events = told()
+    expect([
+      events.flatMap((event) =>
+        event.type === 'net' && event.event.name.startsWith('bank:') ? [event.event] : [],
+      ),
+      printed(events).filter((line) => line.includes('down')),
+    ]).toEqual([
+      [
+        { from: 1, to: 'server', name: 'bank:up', args: '"hi"' },
+        { from: 'server', to: 1, name: 'bank:down', args: '"hi!"' },
+      ],
+      ['client 1: [script:bank] down\thi!'],
+    ])
+  })
+
+  it('trigger events on the clients of players that joined alone', async () => {
+    const { session, told } = await sessionOf(
+      `AddEventHandler('playerConnecting', function(name, setKickReason, deferrals) deferrals.defer() end)`,
+      `RegisterNetEvent('bank:hello', function() print('hello') end)`,
+    )
+    const ann = await session.connect({ name: 'Ann' })
+    session.advance(1000)
+    told()
+    session.emit('bank:hello', [], { to: ann })
+    session.emit('bank:hello', [], { to: 'everyone' })
+    session.advance(100)
+    expect(told().filter(({ type }) => type === 'net' || type === 'output')).toEqual([])
+  })
+
+  it('tell the state bags of the server, with the values of their keys', async () => {
+    const { session, told } = await sessionOf(`GlobalState.open = true
+GlobalState.rates = { cash = 1, card = 1.5 }
+RegisterNetEvent('bank:deposit', function(amount)
+    Player(source).state.deposits = amount
+    GlobalState.open = nil
+end)`)
+    const ann = await session.connect({ name: 'Ann' })
+    session.advance(1000)
+    const opened = states(told()).at(-1)!.bags
+    session.emit('bank:deposit', [5], { from: ann })
+    session.advance(100)
+    expect([opened, states(told()).at(-1)!.bags]).toEqual([
+      [
+        {
+          name: 'global',
+          keys: [
+            { key: 'open', value: 'true' },
+            { key: 'rates', value: '{ card = 1.5, cash = 1 }' },
+          ],
+        },
+      ],
+      [
+        { name: 'global', keys: [{ key: 'rates', value: '{ card = 1.5, cash = 1 }' }] },
+        { name: 'player:1', keys: [{ key: 'deposits', value: '5' }] },
+      ],
     ])
   })
 

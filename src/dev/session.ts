@@ -8,10 +8,13 @@ import {
   type PlayerState,
   type ResourceManager,
   type ResourceState,
+  SERVER_NET_ID,
 } from '../core/engine/index.ts'
+import { pack, type PackedValue } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
 import type { Project } from '../runner/index.ts'
 import { LineOutput, type OutputLine } from '../runner/output.ts'
+import { describeArgs, describeValue } from './values.ts'
 
 /** Interrupts the scripts that run for 5 seconds without returning, which would hang the session. */
 const WATCHDOG: WatchdogOptions = { timeoutMs: 5000 }
@@ -42,11 +45,32 @@ export interface DevPlayer {
   readonly rejection?: string
 }
 
-/** How the resources of the server and the players of a session are. */
+/** A state bag of the server, with its keys and their values, as describe writes them. */
+export interface DevBag {
+  readonly name: string
+  readonly keys: readonly { readonly key: string; readonly value: string }[]
+}
+
+/** How the resources, the players and the state bags of the server of a session are. */
 export interface DevState {
   readonly resources: readonly { readonly name: string; readonly state: ResourceState }[]
   readonly players: readonly DevPlayer[]
+  /** The state bags of the server that have keys, in the order they were created, with their keys in the order of their bytes. */
+  readonly bags: readonly DevBag[]
 }
+
+/** An event that the server and a client sent each other, which the server or the client got. */
+export interface NetEvent {
+  /** Where the event came from: the server, or the number of the client. */
+  readonly from: 'server' | number
+  readonly to: 'server' | number
+  readonly name: string
+  /** The arguments, as describe writes them. */
+  readonly args: string
+}
+
+/** Where an event that a session triggers goes: to the server from a client, or to a client or all of them from the server. */
+export type EventTarget = { readonly from: number } | { readonly to: number | 'everyone' }
 
 /** What a session tells as it happens. */
 export type DevEvent =
@@ -54,6 +78,7 @@ export type DevEvent =
   | { readonly type: 'state'; readonly state: DevState }
   | { readonly type: 'crash'; readonly message: string }
   | { readonly type: 'nui'; readonly client: number; readonly event: NuiEvent }
+  | { readonly type: 'net'; readonly event: NetEvent }
 
 export interface DevSessionOptions {
   /** cfxlua.wasm, compiled. */
@@ -86,6 +111,8 @@ export class DevSession {
   readonly #clients: Client[] = []
   /** The JSON of the state that the session last told. */
   #told = ''
+  /** The descriptions of the values of the keys of state bags, by the bytes that bags keep, which they replace as keys change. */
+  readonly #values = new WeakMap<Uint8Array, string>()
   #crash: string | undefined
 
   private constructor(engine: Engine, options: DevSessionOptions) {
@@ -106,6 +133,14 @@ export class DevSession {
       },
     })
     const session = new DevSession(engine, options)
+    engine.server.events.onTrigger.connect((name, payload, source) => {
+      // The events of clients come from net: and the net ids of their players.
+      const id = /^net:(\d+)$/.exec(source)?.[1]
+      const from = id === undefined ? undefined : session.#clientOf(Number(id))
+      if (from !== undefined) {
+        session.#net({ from, to: 'server', name, args: describeArgs(payload) })
+      }
+    })
     session.#survive(() => {
       const { server } = engine
       server.scanResources()
@@ -150,6 +185,11 @@ export class DevSession {
     const { client, player } = await this.#engine.connect(identity, { watchdog })
     this.#clients.push({ manager: client, player })
     const number = this.#clients.length
+    client.events.onTrigger.connect((name, payload, source) => {
+      // Clients get the events of the network from the server alone, whose latent ones come from net:0.
+      if (!source.startsWith('net:')) return
+      this.#net({ from: 'server', to: number, name, args: describeArgs(payload) })
+    })
     const tell = (event: NuiEvent) => this.#options.onEvent({ type: 'nui', client: number, event })
     const nui = client.nui!
     nui.onCreate.connect((frame) => tell({ type: 'create', frame }))
@@ -181,6 +221,30 @@ export class DevSession {
     this.#tell()
   }
 
+  /**
+   * Triggers `name` with `args` as the network does: on the server, as the
+   * player of the client `from` does with TriggerServerEvent, or on the
+   * client `to`, or on every client of a player that joined, as the server
+   * does with TriggerClientEvent. Handlers get it at the next tick.
+   */
+  emit(name: string, args: readonly PackedValue[], target: EventTarget): void {
+    if (this.#crash !== undefined) return
+    const payload = pack(args)
+    if ('from' in target) {
+      const player = this.#clients[target.from - 1]?.player
+      if (player !== undefined) {
+        this.#engine.server.events.queue(name, payload, `net:${player.netId}`)
+      }
+      return
+    }
+    const clients = target.to === 'everyone' ? this.#clients : [this.#clients[target.to - 1]]
+    for (const client of clients) {
+      if (client?.player.state === 'joined') {
+        client.manager.events.queue(name, payload, `net:${SERVER_NET_ID}`)
+      }
+    }
+  }
+
   /** The NUI of the client `client`, which pages make their requests of. */
   nui(client: number): Nui | undefined {
     return this.#clients[client - 1]?.manager.nui
@@ -188,6 +252,7 @@ export class DevSession {
 
   /** Tells the state of the session, if it changed since it last told it. */
   #tell(): void {
+    const bags = [...this.#engine.server.states.bags].filter((bag) => bag.keys().length > 0)
     const state: DevState = {
       resources: [...this.#engine.server.resources].map(({ name, state }) => ({ name, state })),
       players: this.#clients.map(({ player }, index) => ({
@@ -199,11 +264,35 @@ export class DevSession {
         ...(player.card === undefined ? {} : { card: player.card }),
         ...(player.rejection === undefined ? {} : { rejection: player.rejection }),
       })),
+      bags: bags.map((bag) => ({
+        name: bag.name,
+        keys: bag.keys().map((key) => ({ key, value: this.#describe(bag.get(key)!) })),
+      })),
     }
     const json = JSON.stringify(state)
     if (json === this.#told) return
     this.#told = json
     this.#options.onEvent({ type: 'state', state })
+  }
+
+  /** The value of a key of a state bag, as describe writes it, which it keeps while the key keeps the bytes. */
+  #describe(bytes: Uint8Array): string {
+    let described = this.#values.get(bytes)
+    if (described === undefined) {
+      described = describeValue(bytes)
+      this.#values.set(bytes, described)
+    }
+    return described
+  }
+
+  /** The number of the client whose player has the net id `id`. */
+  #clientOf(id: number): number | undefined {
+    const index = this.#clients.findIndex(({ player }) => player.netId === id)
+    return index === -1 ? undefined : index + 1
+  }
+
+  #net(event: NetEvent): void {
+    this.#options.onEvent({ type: 'net', event })
   }
 
   /** Runs `fn`, and stops the session if a runtime crashed as it ran. */

@@ -1,5 +1,6 @@
+import type { PackedValue } from '../core/engine/msgpack.ts'
 import type { Answer, Ask } from './answers.ts'
-import type { DevEvent } from './session.ts'
+import type { DevEvent, EventTarget } from './session.ts'
 
 /** What the dev server tells the dev UI of its project. */
 export interface ProjectInfo {
@@ -21,6 +22,13 @@ export type ToWorker =
   | { readonly type: 'connect'; readonly name: string }
   | { readonly type: 'disconnect'; readonly client: number }
   | { readonly type: 'submitCard'; readonly client: number; readonly json: string }
+  /** Triggers an event as the network does, to the server from a client, or to clients from the server. */
+  | {
+      readonly type: 'emit'
+      readonly name: string
+      readonly args: readonly PackedValue[]
+      readonly target: EventTarget
+    }
   /** Where the cursor is in the game window of a client, in pixels. */
   | { readonly type: 'cursor'; readonly client: number; readonly x: number; readonly y: number }
   /** What the service worker of the frames of a client at a host of FiveM's asks, which the worker answers by `id`. */

@@ -112,6 +112,9 @@ addEventListener('message', (event: MessageEvent<ToWorker>) => {
     case 'submitCard':
       session?.submitCard(message.client, message.json)
       break
+    case 'emit':
+      session?.emit(message.name, message.args, message.target)
+      break
     case 'cursor': {
       const nui = session?.nui(message.client)
       if (nui !== undefined) nui.cursor = { x: message.x, y: message.y }

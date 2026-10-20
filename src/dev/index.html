@@ -30,6 +30,32 @@
         <h2>Resources</h2>
         <ul id="resources-list"></ul>
       </aside>
+      <section class="events">
+        <h2>Events</h2>
+        <div id="events" class="console" role="log" aria-live="polite"></div>
+        <form id="emit">
+          <select name="target" aria-label="Where the event goes"></select>
+          <input
+            name="name"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="An event, such as bank:deposit"
+            aria-label="Event"
+          />
+          <input
+            name="args"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder='Its arguments, as JSON, such as [100, "cash"]'
+            aria-label="Arguments"
+          />
+          <button type="submit">Trigger</button>
+        </form>
+      </section>
+      <aside class="state">
+        <h2>State bags</h2>
+        <div id="bags"></div>
+      </aside>
       <section class="players">
         <div class="toolbar">
           <h2>Players</h2>
