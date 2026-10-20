@@ -28,6 +28,8 @@ jobs:
       - run: npm run format:check
       - name: Check that the native catalog matches the typings
         run: npm run build:natives -- --check
+      - name: Check that the NUI file types match the mime package
+        run: npm run build:mime -- --check
       - name: Build the command line tool
         run: npm run build
       - name: Check that the command line tool runs
