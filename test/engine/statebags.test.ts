@@ -524,6 +524,24 @@ describe('State bags across a session', () => {
     expect(states.get('global')?.keys()).toEqual(['alone'])
   })
 
+  it('of players are on their clients with OneSync as they join, which set keys of them before their servers send any', async () => {
+    for (const oneSync of [true, false]) {
+      const { server, session } = await serverWithBags(oneSync)
+      const ann = await joined(session)
+      runCommand(ann.manager, 'rset player:1 mine 5', 'system.console')
+      runCommand(ann.manager, 'read player:1 mine', 'system.console')
+      server.manager.tick()
+      expect([scripts(ann), scripts(server)]).toEqual(
+        oneSync
+          ? [
+              ['[script:a] change\tplayer:1\tmine\t5\t0\ttrue', '[script:a] read\t5'],
+              ['[script:a] server\tplayer:1\tmine\t5\t2048\ttrue'],
+            ]
+          : [['[script:a] read\tnil'], []],
+      )
+    }
+  })
+
   it('reach no client of servers without OneSync, which have no bags of players', async () => {
     const { server, session } = await serverWithBags(false)
     const ann = await joined(session)

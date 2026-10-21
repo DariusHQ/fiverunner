@@ -519,12 +519,17 @@ export class ResourceManager {
   /**
    * @internal Called by the session that the process joins. A client that
    * left a session resets its resources first, as FiveM's did before they
-   * could connect again.
+   * could connect again. A client whose player joins a server with
+   * OneSync has the bag of its player from then on, as FiveM's set up
+   * their local players, which sends its server what it sets.
    */
   joinSession(session: Session, player?: Player): void {
     this.#resetLeftResources()
     this.#session = session
     this.#player = player
+    if (player !== undefined && session.server.oneSync) {
+      this.states.register(`player:${player.netId}`, true)
+    }
   }
 
   /**
