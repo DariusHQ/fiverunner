@@ -140,10 +140,28 @@ describe('Statements', () => {
     const script = parseScript(
       'CREATE TABLE t (a INT);\n\nINSERT INTO t VALUES (1); ;\n/*!40101 SET NAMES utf8 */;',
     )
-    expect(script.map(({ statement, text }) => [statement.kind, text])).toEqual([
+    expect(
+      script.map((entry) => ['statement' in entry && entry.statement.kind, entry.text]),
+    ).toEqual([
       ['createTable', 'CREATE TABLE t (a INT)'],
       ['insert', 'INSERT INTO t VALUES (1)'],
       ['set', 'SET NAMES utf8'],
+    ])
+  })
+
+  it('go on in scripts past statements that fail, which give the errors they give alone', () => {
+    const script = parseScript('SELECT 1;\nSELECT 1 2 3;\nNOPE x;SELECT 2')
+    expect(
+      script.map((entry) => [
+        'error' in entry ? entry.error.message : entry.statement.kind,
+        entry.text,
+        entry.start,
+      ]),
+    ).toEqual([
+      ['select', 'SELECT 1', 0],
+      [syntax('2 3'), 'SELECT 1 2 3', 10],
+      [syntax('NOPE x'), 'NOPE x', 24],
+      ['select', 'SELECT 2', 31],
     ])
   })
 

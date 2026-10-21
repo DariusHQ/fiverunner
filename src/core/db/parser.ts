@@ -153,24 +153,43 @@ export function parseStatement(sql: string): Statement {
   return statement
 }
 
+/** A statement of a script, with its text and where it starts, or the error it gives. */
+export type ScriptStatement =
+  | { readonly statement: Statement; readonly text: string; readonly start: number }
+  | { readonly error: SqlError; readonly text: string; readonly start: number }
+
 /**
  * The statements of SQL that semicolons separate, such as those of an .sql
  * file, with the text of each, from its first token to its last. The
  * statements' offsets are in the whole SQL, which runs them, as their
- * texts may start or end in comments that MariaDB runs.
+ * texts may start or end in comments that MariaDB runs. A statement that
+ * MariaDB cannot read goes on to the next semicolon, and gives the error
+ * it gives alone, as the mysql client sends each statement of a file on
+ * its own.
  */
-export function parseScript(
-  sql: string,
-): { readonly statement: Statement; readonly text: string }[] {
-  const statements: { statement: Statement; text: string }[] = []
+export function parseScript(sql: string): ScriptStatement[] {
+  const statements: ScriptStatement[] = []
   const parser = new Parser(sql)
   for (;;) {
     while (parser.acceptOp(';'));
     if (parser.peek().kind === 'end') return statements
     const start = parser.peek().start
-    const statement = parser.statement()
-    statements.push({ statement, text: sql.slice(start, parser.last) })
-    if (parser.peek().kind !== 'end') parser.expectOp(';')
+    try {
+      const statement = parser.statement()
+      if (parser.peek().kind !== 'end' && !parser.isOp(';')) parser.fail()
+      statements.push({ statement, text: sql.slice(start, parser.last), start })
+    } catch (error) {
+      if (!(error instanceof SqlError)) throw error
+      while (parser.peek().kind !== 'end' && !parser.isOp(';')) parser.next()
+      const text = sql.slice(start, parser.position).trimEnd()
+      let alone = error
+      try {
+        parseStatement(text)
+      } catch (failure) {
+        if (failure instanceof SqlError) alone = failure
+      }
+      statements.push({ error: alone, text, start })
+    }
   }
 }
 
