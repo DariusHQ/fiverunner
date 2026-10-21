@@ -22,7 +22,7 @@ import {
   quaternionRotation,
   radiansToDegrees,
 } from '../world/quantize.ts'
-import type { ClientEntity } from '../world/client.ts'
+import { ClientEntity } from '../world/client.ts'
 import { apply, fromEuler, fromHeading, headingOf, toEuler } from '../world/rotation.ts'
 import type { ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
@@ -100,6 +100,54 @@ function vector([x, y, z]: readonly [number, number, number]): Vector3Like {
 }
 
 const ZERO: Vector3Like = { x: 0, y: 0, z: 0 }
+
+/** How many searches of the pools of clients FiveM's FIND_FIRST natives keep at once. */
+const FIND_HANDLES = 64
+
+/** The pools of the games of clients that GET_GAME_POOL names, by the entity types of their entities. */
+const CLIENT_POOLS: ReadonlyMap<string, number> = new Map([
+  ['CPed', EntityType.ped],
+  ['CVehicle', EntityType.vehicle],
+  ['CObject', EntityType.object],
+  ['CNetObject', EntityType.object],
+  ['CPickup', EntityType.none],
+])
+
+/**
+ * Creates an entity of a client, as GTA V does for scripts: owned by their
+ * script as a mission entity, networked in network games if they ask, and
+ * turned to a heading. Returns its handle, or 0 when its model is not
+ * loaded, which GTA V creates nothing of.
+ */
+function createOnClient(
+  ctx: NativeContext,
+  native: string,
+  type: NetObjType,
+  model: number,
+  [x, y, z]: readonly [number, number, number],
+  heading: number,
+  isNetwork: boolean,
+): number {
+  const world = ctx.manager.world!
+  if (!world.loaded(model)) {
+    ctx.diagnose(
+      `${native} was given a model that is not loaded, so it created nothing and returned 0, as GTA V does: request it with RequestModel, then wait until HasModelLoaded says it loaded.`,
+    )
+    return 0
+  }
+  const entity = new ClientEntity(type, model)
+  entity.moveTo(x, y, z)
+  entity.rotation = fromHeading(heading)
+  entity.networked = isNetwork && inSession(ctx)
+  entity.script = ctx.resource.name
+  world.add(entity)
+  return entity.handle
+}
+
+/** Whether an entity of a client has a network object: the ped of the player has one in network games. */
+function networkedOnClient(ctx: NativeContext, entity: ClientEntity): boolean {
+  return entity === ctx.manager.world!.playerPed ? inSession(ctx) : entity.networked
+}
 
 /** Natives of entities: those of the game state on servers, and those of the world on clients. */
 export function entityNatives(side: Side): NativeDefinition<NativeContext>[] {
@@ -324,12 +372,277 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
       { name: 'NETWORK_GET_ENTITY_OWNER', result: 'int', params: ['Entity entity'] },
       (ctx: NativeContext, entity) => {
         const found = clientEntityOf(ctx, entity)
-        // Out of network games, entities have no network objects, which their owners own.
-        if (found === undefined || !inSession(ctx)) return -1
+        // Entities with no network objects have no owners.
+        if (found === undefined || !networkedOnClient(ctx, found)) return -1
         return localPlayerIndex(ctx)
       },
     ),
+    defineNative(
+      {
+        name: 'CREATE_VEHICLE',
+        hash: 0xaf35d0d2583051b0n,
+        result: 'Vehicle',
+        params: [
+          'Hash modelHash',
+          'float x',
+          'float y',
+          'float z',
+          'float heading',
+          'BOOL isNetwork',
+          'BOOL netMissionEntity',
+        ],
+      },
+      (ctx: NativeContext, modelHash, x, y, z, heading, isNetwork) =>
+        createOnClient(
+          ctx,
+          'CreateVehicle',
+          NetObjType.automobile,
+          modelHash,
+          [x, y, z],
+          heading,
+          isNetwork,
+        ),
+    ),
+    defineNative(
+      {
+        name: 'CREATE_PED',
+        hash: 0xd49f9b0955c367den,
+        result: 'Ped',
+        params: [
+          'int pedType',
+          'Hash modelHash',
+          'float x',
+          'float y',
+          'float z',
+          'float heading',
+          'BOOL isNetwork',
+          'BOOL bScriptHostPed',
+        ],
+      },
+      (ctx: NativeContext, _pedType, modelHash, x, y, z, heading, isNetwork) =>
+        createOnClient(ctx, 'CreatePed', NetObjType.ped, modelHash, [x, y, z], heading, isNetwork),
+    ),
+    ...(
+      [
+        ['CREATE_OBJECT', 0x509d5878eb39e842n, 'CreateObject'],
+        ['CREATE_OBJECT_NO_OFFSET', 0x9a294b2138abb884n, 'CreateObjectNoOffset'],
+      ] as const
+    ).map(([name, hash, shown]) =>
+      defineNative(
+        {
+          name,
+          hash,
+          result: 'Object',
+          params: [
+            'Hash modelHash',
+            'float x',
+            'float y',
+            'float z',
+            'BOOL isNetwork',
+            'BOOL netMissionEntity',
+            'BOOL doorFlag',
+          ],
+        },
+        (ctx: NativeContext, modelHash, x, y, z, isNetwork) =>
+          createOnClient(ctx, shown, NetObjType.object, modelHash, [x, y, z], 0, isNetwork),
+      ),
+    ),
+    ...(
+      [
+        ['DELETE_ENTITY', 0xae3cbe5bf394c9c9n, 'Entity* entity', undefined, 'DeleteEntity'],
+        [
+          'DELETE_VEHICLE',
+          0xea386986e786a54fn,
+          'Vehicle* vehicle',
+          EntityType.vehicle,
+          'DeleteVehicle',
+        ],
+        ['DELETE_PED', 0x9614299dcb53e54bn, 'Ped* ped', EntityType.ped, 'DeletePed'],
+        ['DELETE_OBJECT', 0x539e0ae3e6634b9fn, 'Object* object', EntityType.object, 'DeleteObject'],
+      ] as const
+    ).map(([name, hash, param, type, shown]) =>
+      defineNative(
+        { name, hash, result: 'void', params: [param] },
+        (ctx: NativeContext, pointer) => {
+          const world = ctx.manager.world!
+          const found = clientEntityOf(ctx, pointer.get())
+          if (found === undefined || (type !== undefined && entityTypeOf(found.type) !== type))
+            return
+          if (found === world.playerPed) return
+          if (found.script === undefined) {
+            ctx.diagnose(
+              `${shown} was given an entity that is no mission entity, which GTA V does not delete: make it one with SetEntityAsMissionEntity(entity, true, true) first.`,
+            )
+            return
+          }
+          world.remove(found)
+          pointer.set(0)
+        },
+      ),
+    ),
+    defineNative(
+      {
+        name: 'SET_ENTITY_AS_MISSION_ENTITY',
+        hash: 0xad738c3085fe7e11n,
+        result: 'void',
+        params: ['Entity entity', 'BOOL scriptHostObject', 'BOOL bGrabFromOtherScript'],
+      },
+      (ctx: NativeContext, entity, _scriptHostObject, bGrabFromOtherScript) => {
+        const found = clientEntityOf(ctx, entity)
+        if (found === undefined || (found.script !== undefined && !bGrabFromOtherScript)) return
+        found.script = ctx.resource.name
+      },
+    ),
+    defineNative(
+      {
+        name: 'IS_ENTITY_A_MISSION_ENTITY',
+        hash: 0x0a7b270912999b3cn,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.script !== undefined,
+    ),
+    ...(
+      [
+        ['SET_ENTITY_AS_NO_LONGER_NEEDED', 0xb736a491e64a32cfn, 'Entity* entity', undefined],
+        [
+          'SET_VEHICLE_AS_NO_LONGER_NEEDED',
+          0x629bfa74418d6239n,
+          'Vehicle* vehicle',
+          EntityType.vehicle,
+        ],
+        ['SET_PED_AS_NO_LONGER_NEEDED', 0x2595dd4236549ce3n, 'Ped* ped', EntityType.ped],
+        [
+          'SET_OBJECT_AS_NO_LONGER_NEEDED',
+          0x3ae22deb5ba5a3e6n,
+          'Object* object',
+          EntityType.object,
+        ],
+      ] as const
+    ).map(([name, hash, param, type]) =>
+      defineNative(
+        { name, hash, result: 'void', params: [param] },
+        (ctx: NativeContext, pointer) => {
+          const found = clientEntityOf(ctx, pointer.get())
+          if (found === undefined || (type !== undefined && entityTypeOf(found.type) !== type))
+            return
+          // Scripts let go of the entities that they own.
+          if (found.script === ctx.resource.name) found.script = undefined
+        },
+      ),
+    ),
+    defineNative(
+      {
+        name: 'GET_ENTITY_SCRIPT',
+        hash: 0xa6e9c38db51d7748n,
+        result: 'char*',
+        params: ['Entity entity', 'ScrHandle* script'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.script ?? null,
+    ),
+    defineNative(
+      { name: 'GET_GAME_POOL', result: 'object', params: ['char* poolName'] },
+      (ctx: NativeContext, poolName) => {
+        const name = checkArgument(poolName, 0)
+        const type = CLIENT_POOLS.get(name)
+        if (type === undefined) throw new NativeError(`Invalid pool: ${name}`)
+        const handles: number[] = []
+        for (const entity of ctx.manager.world!.entities) {
+          if (entityTypeOf(entity.type) !== type) continue
+          // CNetObject is the pool of the objects that have network objects.
+          if (name === 'CNetObject' && !networkedOnClient(ctx, entity)) continue
+          handles.push(entity.handle)
+        }
+        return pack(handles)
+      },
+    ),
+    ...findNatives(),
+    defineNative(
+      {
+        name: 'HAS_COLLISION_LOADED_AROUND_ENTITY',
+        hash: 0xe9676f61bc0b3321n,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      // There is no collision to stream in.
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity) !== undefined,
+    ),
   ]
+}
+
+/**
+ * FiveM's natives that search the pools of clients for entities of a type,
+ * a search at a time for each of its 64 handles: from the first to the
+ * last, as they were when the search began, but for those that went since.
+ */
+function findNatives(): NativeDefinition<NativeContext>[] {
+  const searches: ({ readonly entities: ClientEntity[]; index: number } | undefined)[] = []
+  /** The next entity of a search that is still in the world, which it gives the handle of, or -1. */
+  const next = (
+    ctx: NativeContext,
+    search: { readonly entities: ClientEntity[]; index: number },
+  ) => {
+    const world = ctx.manager.world!
+    while (++search.index < search.entities.length) {
+      const entity = search.entities[search.index]!
+      if (world.byHandle(entity.handle) === entity) return entity.handle
+    }
+    return -1
+  }
+  return (
+    [
+      ['PED', EntityType.ped],
+      ['VEHICLE', EntityType.vehicle],
+      ['OBJECT', EntityType.object],
+      ['PICKUP', EntityType.none],
+    ] as const
+  ).flatMap(([kind, type]) => [
+    defineNative(
+      { name: `FIND_FIRST_${kind}`, result: 'int', params: ['Entity* outEntity'] },
+      (ctx: NativeContext, outEntity) => {
+        let slot = 0
+        while (slot < FIND_HANDLES && searches[slot] !== undefined) slot++
+        if (slot === FIND_HANDLES) return -1
+        const entities = [...ctx.manager.world!.entities].filter(
+          (entity) => entityTypeOf(entity.type) === type,
+        )
+        const search = { entities, index: -1 }
+        const found = next(ctx, search)
+        outEntity.set(found)
+        if (found === -1) return -1
+        searches[slot] = search
+        return slot
+      },
+    ),
+    defineNative(
+      {
+        name: `FIND_NEXT_${kind}`,
+        result: 'BOOL',
+        params: ['int findHandle', 'Entity* outEntity'],
+      },
+      (ctx: NativeContext, findHandle, outEntity) => {
+        const slot = findHandle >>> 0
+        if (slot >= FIND_HANDLES) return false
+        const search = searches[slot]
+        if (search === undefined) {
+          ctx.diagnose(
+            `FindNext${kind[0]}${kind.slice(1).toLowerCase()} was given the handle of a search that ended, which FiveM's game reads past and crashes on. FiveRunner returns false.`,
+          )
+          return false
+        }
+        const found = next(ctx, search)
+        outEntity.set(found)
+        return found !== -1
+      },
+    ),
+    defineNative(
+      { name: `END_FIND_${kind}`, result: 'void', params: ['int findHandle'] },
+      (_ctx: NativeContext, findHandle) => {
+        const slot = findHandle >>> 0
+        if (slot < FIND_HANDLES) searches[slot] = undefined
+      },
+    ),
+  ])
 }
 
 /** Natives of the entities of servers, which their game state keeps. */

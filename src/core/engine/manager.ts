@@ -396,6 +396,9 @@ export class ResourceManager {
       resource.onStart.connect(() => this.#checkManifest(resource), INT32_MIN)
       resource.onStart.connect(() => this.#reportStart(resource), 99_999_999)
       resource.onStop.connect(() => this.#reportStop(resource), -1000)
+    } else {
+      // FiveM's clients detach the script of a resource last as it stops, which lets go of its entities.
+      resource.onStop.connect(() => this.#world?.release(name), 10_000)
     }
     this.#resources.set(name, resource)
     for (const provided of resource.entries('provide')) {
@@ -718,6 +721,7 @@ export class ResourceManager {
   /**
    * Runs a tick as FiveM does: it takes what the network gave the process,
    * on servers runs a tick of the game state, as their sync thread does,
+   * and on clients one of their world, as their game streams models,
    * runs the commands of the console's buffer as the console, triggers
    * the queued events, then resumes the threads
    * that are due in all runtimes. It takes the due threads of every runtime
@@ -734,6 +738,7 @@ export class ResourceManager {
     this.#player?.touch()
     for (const fn of this.#received.splice(0)) fn()
     this.gameState?.tick()
+    this.#world?.tick()
     this.security.runAs('system.console', () => this.console.executeBuffer())
     this.events.tick()
     const ticking = this.#ticking.map((resource) => ({ resource, runtime: resource.runtime! }))

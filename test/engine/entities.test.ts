@@ -441,3 +441,259 @@ print(Citizen.InvokeNative(0x3FEF770D40960D5A, ped, true, Citizen.ResultAsVector
     expect(client.manager.world?.playerPed.handle).toBe(1)
   })
 })
+
+/** Runs Lua code on a client that joined a server, and returns what it printed as it started and over `ticks` ticks. */
+async function onClient(code: string, ticks = 1) {
+  const test = await clientOf()
+  const lines = test.run(code)
+  for (let tick = 0; tick < ticks; tick++) {
+    test.client.tickAt(test.client.time + 10)
+    for (const line of test.client.take()) {
+      if (line.startsWith('[script:run0] ')) lines.push(line.slice('[script:run0] '.length))
+    }
+  }
+  return { ...test, lines }
+}
+
+/** Lua that loads the model of adder, then runs `code` in a thread. */
+function withAdder(code: string): string {
+  return `local adder = GetHashKey('adder')
+RequestModel(adder)
+CreateThread(function()
+    while not HasModelLoaded(adder) do Wait(0) end
+${code}
+end)`
+}
+
+describe('Entities that scripts of clients create', () => {
+  it('are of models that are loaded, which load at the next tick once scripts request them', async () => {
+    const { lines, client } = await onClient(`local adder = GetHashKey('adder')
+print(HasModelLoaded(adder), CreateVehicle(adder, 1.0, 2.0, 3.0, 90.0, true, false))
+RequestModel(adder)
+print(HasModelLoaded(adder))
+CreateThread(function()
+    print(HasModelLoaded(adder))
+    local vehicle = CreateVehicle(adder, 1.0, 2.0, 3.0, 90.0, true, false)
+    print(vehicle, DoesEntityExist(vehicle), GetEntityModel(vehicle) == adder, GetEntityCoords(vehicle), GetEntityHeading(vehicle))
+    print(GetEntityType(vehicle), IsEntityAVehicle(vehicle), IsEntityAMissionEntity(vehicle), GetEntityScript(vehicle), NetworkGetEntityOwner(vehicle))
+end)`)
+    expect(lines).toEqual([
+      'false\t0',
+      'false',
+      '1',
+      '257\t1\ttrue\tvec3(1.000000, 2.000000, 3.000000)\t90.0',
+      '2\t1\t1\trun0\t128',
+    ])
+    expect(client.diagnostics).toEqual([
+      'run0: CreateVehicle was given a model that is not loaded, so it created nothing and returned 0, as GTA V does: request it with RequestModel, then wait until HasModelLoaded says it loaded.',
+    ])
+  })
+
+  it('are peds and objects too, networked if scripts ask', async () => {
+    const { lines } = await onClient(
+      withAdder(`local ped = CreatePed(4, adder, 1.0, 2.0, 3.0, 180.0, false, false)
+    local object = CreateObject(adder, 4.0, 5.0, 6.0, true, false, false)
+    local placed = CreateObjectNoOffset(adder, 7.0, 8.0, 9.0, false, false, false)
+    print(ped, GetEntityType(ped), GetEntityHeading(ped), NetworkGetEntityOwner(ped))
+    print(object, GetEntityType(object), GetEntityCoords(object), GetEntityHeading(object), NetworkGetEntityOwner(object))
+    print(placed, GetEntityType(placed), GetEntityCoords(placed), NetworkGetEntityOwner(placed))`),
+    )
+    expect(lines).toEqual([
+      '257\t1\t180.0\t-1',
+      '513\t3\tvec3(4.000000, 5.000000, 6.000000)\t0.0\t128',
+      '769\t3\tvec3(7.000000, 8.000000, 9.000000)\t-1',
+    ])
+  })
+
+  it('have no network objects out of network games', async () => {
+    const client = await createProcess({ side: 'client' })
+    client
+      .add('alone', {
+        'main.lua': withAdder(
+          `print(NetworkGetEntityOwner(CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, true, false)))`,
+        ),
+      })
+      .start()
+    client.tickAt(10)
+    expect(client.take().filter((line) => line.startsWith('[script:'))).toEqual([
+      '[script:alone] -1',
+    ])
+  })
+
+  it('are in the pools of the game of their clients, as GetGamePool names them', async () => {
+    const { lines } = await onClient(
+      withAdder(`local vehicle = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, true, false)
+    local ped = CreatePed(4, adder, 0.0, 0.0, 0.0, 0.0, true, false)
+    local object = CreateObject(adder, 0.0, 0.0, 0.0, false, false, false)
+    local networked = CreateObject(adder, 0.0, 0.0, 0.0, true, false, false)
+    print(json.encode(GetGamePool('CVehicle')), json.encode(GetGamePool('CPed')), json.encode(GetGamePool('CObject')))
+    print(json.encode(GetGamePool('CNetObject')), json.encode(GetGamePool('CPickup')))
+    print(pcall(GetGamePool, 'CNetVehicle'))`),
+    )
+    expect(lines).toEqual([
+      '[257]\t[1,513]\t[769,1025]',
+      '[1025]\t[]',
+      'false\tnative 000000002b9d4f50: Invalid pool: CNetVehicle',
+    ])
+  })
+
+  it('are searched for, a pool at a time, as they were when searches began', async () => {
+    const { lines, client } = await onClient(
+      withAdder(`local a = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    local b = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    local c = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    local search, first = FindFirstVehicle()
+    DeleteEntity(b)
+    CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    print(search, first == a, FindNextVehicle(search))
+    print(FindNextVehicle(search))
+    EndFindVehicle(search)
+    print(FindNextVehicle(search), FindNextVehicle(64), FindNextVehicle(-1))
+    local peds, ped = FindFirstPed()
+    print(peds, ped == PlayerPedId(), FindNextPed(peds))
+    print(FindFirstPickup())`),
+    )
+    expect(lines).toEqual([
+      '0\ttrue\t1\t769',
+      'false\t-1',
+      // Searches that ended, or that no handle has, leave the entities scripts gave them.
+      'false\tfalse\tfalse\t0',
+      '0\ttrue\tfalse\t-1',
+      '-1\t-1',
+    ])
+    expect(client.diagnostics).toEqual([
+      "run0: FindNextVehicle was given the handle of a search that ended, which FiveM's game reads past and crashes on. FiveRunner returns false.",
+    ])
+  })
+
+  it('are searched for 64 searches at a time', async () => {
+    const { lines } = await onClient(`local searches = {}
+for i = 1, 64 do searches[i] = FindFirstPed() end
+print(searches[1], searches[64], FindFirstPed(5))
+EndFindPed(searches[10])
+print(FindFirstPed())
+EndFindPed(64)`)
+    expect(lines).toEqual(['0\t63\t-1\t5', '9\t1'])
+  })
+
+  it('are deleted by scripts as mission entities, which their handles become 0 for', async () => {
+    const { lines, client } = await onClient(
+      withAdder(`local vehicle = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    print(DeleteEntity(vehicle), DoesEntityExist(vehicle))
+    local released = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    SetEntityAsNoLongerNeeded(released)
+    print(IsEntityAMissionEntity(released), DeleteVehicle(released) == released, DoesEntityExist(released))
+    SetEntityAsMissionEntity(released, true, false)
+    print(IsEntityAMissionEntity(released), DeleteVehicle(released), DoesEntityExist(released))
+    local ped = CreatePed(4, adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    print(DeleteVehicle(ped) == ped, DeleteObject(ped) == ped, DoesEntityExist(ped), DeletePed(ped), DoesEntityExist(ped))
+    local object = CreateObject(adder, 0.0, 0.0, 0.0, false, false, false)
+    print(DeleteObject(object), DoesEntityExist(object))
+    print(DeleteEntity(PlayerPedId()) == PlayerPedId(), DoesEntityExist(PlayerPedId()), DeleteEntity(0))
+    print(json.encode(GetGamePool('CVehicle')), json.encode(GetGamePool('CPed')), json.encode(GetGamePool('CObject')))`),
+    )
+    expect(lines).toEqual([
+      '0\tfalse',
+      'false\ttrue\t1',
+      '1\t0\tfalse',
+      'true\ttrue\t1\t0\tfalse',
+      '0\tfalse',
+      'true\t1\t0',
+      '[]\t[1]\t[]',
+    ])
+    expect(client.diagnostics).toEqual([
+      'run0: DeleteVehicle was given an entity that is no mission entity, which GTA V does not delete: make it one with SetEntityAsMissionEntity(entity, true, true) first.',
+    ])
+  })
+
+  it('are let go of by the natives of their types', async () => {
+    const { lines } = await onClient(
+      withAdder(`local ped = CreatePed(4, adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    SetVehicleAsNoLongerNeeded(ped)
+    SetObjectAsNoLongerNeeded(ped)
+    print(IsEntityAMissionEntity(ped))
+    SetPedAsNoLongerNeeded(ped)
+    print(IsEntityAMissionEntity(ped), DoesEntityExist(ped))
+    local vehicle = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    local object = CreateObject(adder, 0.0, 0.0, 0.0, false, false, false)
+    SetVehicleAsNoLongerNeeded(vehicle)
+    SetObjectAsNoLongerNeeded(object)
+    print(IsEntityAMissionEntity(vehicle), IsEntityAMissionEntity(object))`),
+    )
+    expect(lines).toEqual(['1', 'false\t1', 'false\tfalse'])
+  })
+
+  it('take the handles of those that were deleted, with new ids', async () => {
+    const { lines } = await onClient(
+      withAdder(`local vehicle = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    DeleteEntity(vehicle)
+    print(vehicle, CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false))`),
+    )
+    expect(lines).toEqual(['257\t258'])
+  })
+
+  it('belong to the scripts of their resources until those let go of them or stop', async () => {
+    const test = await clientOf()
+    test.run(`local adder = GetHashKey('adder')
+RequestModel(adder)
+exports('create', function() return CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false) end)`)
+    test.client.tickAt(10)
+    expect(
+      test.run(`local mine = exports.run0:create()
+print(GetEntityScript(mine), IsEntityAMissionEntity(mine))
+SetEntityAsNoLongerNeeded(mine)
+SetEntityAsMissionEntity(mine, true, false)
+print(GetEntityScript(mine))
+SetEntityAsMissionEntity(mine, true, true)
+print(GetEntityScript(mine))
+local theirs = exports.run0:create()
+print(GetEntityScript(theirs))
+print(mine, theirs)`),
+    ).toEqual(['run0\t1', 'run0\t0', 'run1\t0', 'run0\t0', '257\t513'])
+    test.client.manager.getResource('run0')!.stop()
+    expect(
+      test.run(
+        `print(GetEntityScript(513), IsEntityAMissionEntity(513), DoesEntityExist(513), GetEntityScript(257))`,
+      ),
+    ).toEqual(['nil\tfalse\t1\trun1\t0'])
+  })
+
+  it('have collision around them, as there is none to load', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(
+        `print(HasCollisionLoadedAroundEntity(PlayerPedId()), HasCollisionLoadedAroundEntity(0), HasCollisionLoadedAroundEntity(5))`,
+      ),
+    ).toEqual(['1\tfalse\tfalse'])
+  })
+})
+
+describe('Models of the games of clients', () => {
+  it('are all in the CD image but 0, which never loads', async () => {
+    const { lines } = await onClient(`RequestModel(0)
+print(IsModelInCdimage(GetHashKey('anything')), IsModelValid(GetHashKey('anything')), IsModelInCdimage(0), IsModelValid(0))
+CreateThread(function() print(HasModelLoaded(0)) end)`)
+    expect(lines).toEqual(['1\t1\tfalse\tfalse', 'false'])
+  })
+
+  it('stay loaded once scripts no longer need them, as those of entities are', async () => {
+    const { lines } = await onClient(
+      withAdder(`SetModelAsNoLongerNeeded(adder)
+    print(HasModelLoaded(adder), HasModelLoaded(GetEntityModel(PlayerPedId())), HasModelLoaded(GetHashKey('player_one')))`),
+    )
+    expect(lines).toEqual(['1\t1\tfalse'])
+  })
+
+  it('are of the kinds of the entities that scripts created of them, which FiveRunner knows no others of', async () => {
+    const { lines, client } = await onClient(
+      withAdder(`print(IsModelAVehicle(adder), IsModelAVehicle(adder), IsModelAPed(adder), IsModelAVehicle(0))
+    CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    print(IsModelAVehicle(adder), IsModelAPed(adder), IsModelAPed(GetEntityModel(PlayerPedId())))`),
+    )
+    expect(lines).toEqual(['false\tfalse\tfalse\tfalse', '1\tfalse\t1'])
+    expect(client.diagnostics).toEqual([
+      'run0: IsModelAVehicle was asked of the model 0xb779a091, of which FiveRunner knows nothing: it has no list of the models of GTA V, so it says false. Models are vehicles, peds or objects once scripts created entities of them.',
+      'run0: IsModelAPed was asked of the model 0xb779a091, of which FiveRunner knows nothing: it has no list of the models of GTA V, so it says false. Models are vehicles, peds or objects once scripts created entities of them.',
+    ])
+  })
+})

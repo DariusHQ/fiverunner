@@ -13,6 +13,7 @@ import { refNatives } from './refs.ts'
 import { resourceNatives } from './resources.ts'
 import { scriptingNatives } from './scripting.ts'
 import { stateBagNatives } from './states.ts'
+import { streamingNatives } from './streaming.ts'
 
 /** The natives FiveRunner implements for a side, which replace those of the catalog. */
 export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
@@ -28,6 +29,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...playerNatives(side),
     ...stateBagNatives(side),
     ...entityNatives(side),
+    ...streamingNatives(side),
     ...(side === 'server' ? httpNatives() : nuiNatives()),
   ]
 }
