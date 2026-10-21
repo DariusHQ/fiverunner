@@ -32,9 +32,8 @@ type Ok = Extract<Result, { kind: 'ok' }>
  * a savepoint.
  */
 function atomically<T>(connection: Connection, run: () => T): T {
-  const { inTransaction } = connection
-  const sqlite = connection.database.db
-  if (!inTransaction) sqlite.exec('PRAGMA foreign_keys = OFF')
+  const { inTransaction, database } = connection
+  database.foreignKeys(false)
   connection.run(inTransaction ? 'SAVEPOINT fr_table' : 'BEGIN')
   try {
     const result = run()
@@ -45,7 +44,7 @@ function atomically<T>(connection: Connection, run: () => T): T {
     if (inTransaction) connection.run('RELEASE fr_table')
     throw error
   } finally {
-    if (!inTransaction && connection.foreignKeyChecks) sqlite.exec('PRAGMA foreign_keys = ON')
+    database.foreignKeys(connection.foreignKeyChecks)
   }
 }
 

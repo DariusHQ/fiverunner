@@ -254,6 +254,14 @@ describe('Inserts', () => {
     ok(db, "INSERT INTO vehicles VALUES ('ABC', 'A1')")
     ok(db, "DELETE FROM players WHERE citizenid = 'A1'")
     expect(value(db, 'SELECT COUNT(*) FROM vehicles')).toBe(0)
+    // foreign_key_checks is of the session that sets it.
+    const other = db.database.connect()
+    ok(other, 'SET foreign_key_checks = 0')
+    ok(other, "INSERT INTO vehicles VALUES ('XYZ', 'nobody')")
+    ok(db, "INSERT INTO players (citizenid, name, money) VALUES ('B2', 'b', '')")
+    ok(db, "INSERT INTO vehicles VALUES ('DEF', 'B2')")
+    ok(db, "DELETE FROM players WHERE citizenid = 'B2'")
+    expect(value(db, "SELECT COUNT(*) FROM vehicles WHERE plate = 'DEF'")).toBe(0)
   })
 })
 

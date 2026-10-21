@@ -184,6 +184,8 @@ export class MariaDb implements Catalog, SqliteAccess {
   transactionOwner: Connection | undefined
   /** The error a function of FiveRunner's failed the statement with, which SQLite reports as its own. */
   pendingError: SqlError | undefined
+  /** Whether SQLite checks foreign keys, as the session whose statement runs has foreign_key_checks. */
+  #foreignKeys = true
 
   private constructor(sqlite: Sqlite, options: DatabaseOptions) {
     this.sqlite = sqlite
@@ -243,6 +245,17 @@ export class MariaDb implements Catalog, SqliteAccess {
       random: () => this.random(),
     })
     db.exec('PRAGMA foreign_keys = ON')
+  }
+
+  /**
+   * Has SQLite check foreign keys or not, as foreign_key_checks of a session
+   * says, which SQLite takes only outside of transactions.
+   */
+  foreignKeys(on: boolean): void {
+    if (this.#foreignKeys === on || this.sqlite.capi.sqlite3_get_autocommit(this.db.pointer!) === 0)
+      return
+    this.db.exec(`PRAGMA foreign_keys = ${on ? 'ON' : 'OFF'}`)
+    this.#foreignKeys = on
   }
 
   /** Opens a connection, a session of its own with an id, its variables and its transaction. */
@@ -472,6 +485,7 @@ export class Connection implements SqliteAccess {
     this.#warnings = []
     database.pendingError = undefined
     let statement: Statement | undefined = parsed
+    database.foreignKeys(this.foreignKeyChecks)
     try {
       statement ??= parseStatement(sql)
       if (bound !== undefined) {
@@ -759,14 +773,10 @@ export class Connection implements SqliteAccess {
         this.#variables.set(name, on)
         return
       }
-      case 'foreign_key_checks': {
-        const on = flag()
-        this.#variables.set(name, on)
-        // SQLite takes this only outside of transactions.
-        if (!this.inTransaction)
-          this.database.db.exec(`PRAGMA foreign_keys = ${on === 1 ? 'ON' : 'OFF'}`)
+      case 'foreign_key_checks':
+        this.#variables.set(name, flag())
+        this.database.foreignKeys(this.foreignKeyChecks)
         return
-      }
       case 'unique_checks':
       case 'sql_notes':
       case 'sql_safe_updates':
