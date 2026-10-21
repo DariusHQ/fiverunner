@@ -38,14 +38,26 @@ describe('Projects', () => {
   it('are resources, which servers of tests ensure, when they have a manifest', () => {
     const bank = openProject(write('bank', { 'fxmanifest.lua': MANIFEST, 'server.lua': '' }))!
     const old = openProject(write('old', { '__resource.lua': '' }))!
+    const shop = openProject(
+      write('shop', { 'fxmanifest.lua': `${MANIFEST}\nserver_script '@oxmysql/lib/MySQL.lua'` }),
+    )!
     const files = bank.files()
-    expect([bank.kind, bank.name, bank.mount, bank.commands, old.kind, old.commands]).toEqual([
+    expect([
+      bank.kind,
+      bank.name,
+      bank.mount,
+      bank.commands,
+      old.kind,
+      old.commands,
+      shop.commands,
+    ]).toEqual([
       'resource',
       'bank',
       'resources/bank',
       ['ensure "bank"'],
       'resource',
       ['ensure "old"'],
+      ['ensure oxmysql', 'ensure "shop"'],
     ])
     expect(decode(files.read('resources/bank/fxmanifest.lua'))).toBe(MANIFEST)
     // Each server of a test gets files of its own.

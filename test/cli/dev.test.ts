@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { main } from '../../src/cli/main.ts'
+import { sqlite } from '../db/helpers.ts'
 import { cfxlua } from '../lua/helpers.ts'
 
 let root: string
@@ -55,6 +56,7 @@ async function dev(
     },
     color: false,
     cfxlua,
+    sqlite,
     wasm: () => new Uint8Array([1, 2]),
     assets: host.assets ?? assets,
     interrupted: () => whileRunning(() => stdout),

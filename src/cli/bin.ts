@@ -12,6 +12,7 @@ process.exitCode = await main(process.argv.slice(2), {
   // The build puts cfxlua.wasm next to the tool.
   cfxlua: () => WebAssembly.compile(readFileSync(new URL('cfxlua.wasm', import.meta.url))),
   wasm: () => readFileSync(new URL('cfxlua.wasm', import.meta.url)),
+  sqlite: () => WebAssembly.compile(readFileSync(new URL('sqlite3.wasm', import.meta.url))),
   // The build puts the dev UI next to it too.
   assets: fileURLToPath(new URL('dev/', import.meta.url)),
   interrupted: () =>

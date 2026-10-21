@@ -38,9 +38,12 @@ export function openProject(root: string): LocalProject | undefined {
   const has = (name: string, directory: boolean) =>
     entries.some((entry) => entry.name === name && entry.directory === directory)
   const visible = withoutTests(source)
-  if (has('fxmanifest.lua', false) || has('__resource.lua', false)) {
+  const manifest = has('fxmanifest.lua', false) ? 'fxmanifest.lua' : '__resource.lua'
+  if (has(manifest, false)) {
     const name = basename(root)
     const mount = `resources/${name}`
+    // Resources that load oxmysql's library may leave starting oxmysql to a server.cfg, which they have none of.
+    const oxmysql = new TextDecoder().decode(source.read(manifest)).includes('@oxmysql/')
     return {
       kind: 'resource',
       name,
@@ -48,7 +51,7 @@ export function openProject(root: string): LocalProject | undefined {
       visible,
       mount,
       files: () => mounted(mount, visible),
-      commands: [`ensure "${name}"`],
+      commands: [...(oxmysql ? ['ensure oxmysql'] : []), `ensure "${name}"`],
     }
   }
   if (has('resources', true)) {

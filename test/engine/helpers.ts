@@ -10,6 +10,7 @@ import {
   type Resource,
   type ResourceDefinition,
 } from '../../src/core/engine/index.ts'
+import type { DatabaseOpener } from '../../src/core/engine/oxmysql.ts'
 import type { WatchdogOptions } from '../../src/core/lua/index.ts'
 import type { NativeDefinition, Side } from '../../src/core/natives/index.ts'
 import type { TimeZone } from '../../src/core/scripting/time.ts'
@@ -26,6 +27,7 @@ export interface ProcessOptions {
   readonly wallClock?: () => number
   readonly timeZone?: TimeZone
   readonly watchdog?: WatchdogOptions
+  readonly database?: DatabaseOpener
 }
 
 /** The files of a resource, by their paths in it. */
@@ -104,6 +106,7 @@ export async function createProcess(options: ProcessOptions = {}): Promise<TestP
       ...(options.wallClock === undefined ? {} : { wallClock: options.wallClock }),
       ...(options.timeZone === undefined ? {} : { timeZone: options.timeZone }),
       ...(options.watchdog === undefined ? {} : { watchdog: options.watchdog }),
+      ...(options.database === undefined ? {} : { database: options.database }),
     }),
     time: 0,
     warnings,

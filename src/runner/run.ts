@@ -1,6 +1,7 @@
 import {
   Engine,
   SERVER_FRAME_TIME,
+  sqliteDatabase,
   type FileSystem,
   type HttpClient,
   type NativeContext,
@@ -106,6 +107,8 @@ export interface FileResult {
 export interface RunOptions {
   /** cfxlua.wasm, compiled. */
   readonly cfxlua: WebAssembly.Module
+  /** sqlite3.wasm, compiled, which gives each test a database of its own for oxmysql. None by default. */
+  readonly sqlite?: WebAssembly.Module
   readonly project: Project
   /** Called with each test as it ends, or as it is skipped. */
   readonly onResult?: (result: TestResult) => void
@@ -277,6 +280,7 @@ class World<T> {
         return world!.#answer(method, args === null ? undefined : plain(unpackObject(args)))
       },
     )
+    const sqlite = options.sqlite === undefined ? undefined : sqliteDatabase(options.sqlite)
     const engine = await Engine.create({
       cfxlua: options.cfxlua,
       epoch: EPOCH,
@@ -291,6 +295,15 @@ class World<T> {
           pending.push(response)
           return response
         },
+        ...(sqlite === undefined
+          ? {}
+          : {
+              database: (database) => {
+                const opened = sqlite(database)
+                pending.push(opened)
+                return opened
+              },
+            }),
       },
     })
     const target = test === undefined ? { file: file.path } : { file: file.path, test }

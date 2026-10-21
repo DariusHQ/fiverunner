@@ -230,6 +230,19 @@ export class ScriptRuntime implements NativeCaller {
   }
 
   /**
+   * Runs one of FiveRunner's own scripts of a resource, in its own thread
+   * as files run, as @fiverunner:/name in stack traces.
+   */
+  runBuiltin(name: string, source: string): void {
+    const chunk = this.state.load(source, `@fiverunner:/${name}`)
+    try {
+      this.state.call(this.#runFile!, chunk)
+    } finally {
+      chunk.release()
+    }
+  }
+
+  /**
    * Takes the threads that are due out of the queue, for resume() to run. A
    * process collects in all of its runtimes before it resumes in any, as
    * FiveM does, so that threads queued during a tick wait for the next one.

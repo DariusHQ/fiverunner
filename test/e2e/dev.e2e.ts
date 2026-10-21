@@ -11,16 +11,21 @@ import { Chrome, findChrome, type Page } from './chrome.ts'
 const TOOL = fileURLToPath(new URL('../../dist/fiverunner.js', import.meta.url))
 const chromePath = findChrome()
 
-/** A resource with a page, which a server command opens on every client, and which closes through a callback. */
+/** A resource with a page, which a server command opens on every client, and which closes through a callback, and a table of oxmysql. */
 const FILES: Record<string, string> = {
   'fxmanifest.lua': `fx_version 'cerulean'
 game 'gta5'
+server_script '@oxmysql/lib/MySQL.lua'
 server_script 'server.lua'
 client_script 'client.lua'
 ui_page 'html/index.html'
 files { 'html/index.html', 'html/app.js' }
 `,
+  'bank.sql': `CREATE TABLE accounts (id INT AUTO_INCREMENT PRIMARY KEY);
+INSERT INTO accounts VALUES (), ();
+`,
   'server.lua': `print('bank server started')
+MySQL.ready(function() print('bank accounts', MySQL.scalar.await('SELECT COUNT(*) FROM accounts')) end)
 GlobalState.bank = 'open'
 RegisterNetEvent('bank:ping', function(value) print('ping', source, value) end)
 RegisterCommand('open', function()
@@ -105,13 +110,13 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     rmSync(root, { recursive: true, force: true, maxRetries: 5 })
   })
 
-  it('runs the server of the project', async () => {
+  it('runs the server of the project, with its tables in the database of oxmysql', async () => {
     await page.until(`document.getElementById('status').textContent === 'Running'`)
-    expect(
-      await page.until<string>(
-        `document.getElementById('console').innerText.includes('bank server started') && document.getElementById('console').innerText`,
-      ),
-    ).toContain('[script:bank] bank server started')
+    const console = await page.until<string>(
+      `document.getElementById('console').innerText.includes('bank accounts') && document.getElementById('console').innerText`,
+    )
+    expect(console).toContain('[script:bank] bank server started')
+    expect(console).toContain('[script:bank] bank accounts	2')
   })
 
   it('connects players, each with the frames of their NUI at origins of their own', async () => {

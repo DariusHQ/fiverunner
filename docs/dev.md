@@ -23,6 +23,8 @@ The console shows what the server prints, with the colors of `^1` to `^9`, its L
 
 The resources list shows each resource of the server and its state, with buttons that start, stop and restart it.
 
+Resources that use oxmysql run on FiveRunner's database, in memory, which starts anew with the project, with the tables of its `.sql` files, as [the differences from FiveM](differences.md#oxmysql) tell.
+
 ## Events
 
 The events panel shows the events that the server and the clients send each other, as they get them: those of `TriggerServerEvent` and `TriggerClientEvent`, latent ones too, and those that FiveM sends of its own, such as `onPlayerJoining`, each with where it came from, where it went, and its arguments, written as Lua would write them.

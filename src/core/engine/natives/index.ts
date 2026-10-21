@@ -8,6 +8,7 @@ import { httpNatives } from './http.ts'
 import { kvpNatives } from './kvp.ts'
 import { networkNatives } from './network.ts'
 import { nuiNatives } from './nui.ts'
+import { oxmysqlNatives } from './oxmysql.ts'
 import { playerNatives } from './players.ts'
 import { refNatives } from './refs.ts'
 import { resourceNatives } from './resources.ts'
@@ -34,6 +35,6 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...rpcNatives(side),
     ...streamingNatives(side),
     ...screenNatives(side),
-    ...(side === 'server' ? httpNatives() : nuiNatives()),
+    ...(side === 'server' ? [...httpNatives(), ...oxmysqlNatives()] : nuiNatives()),
   ]
 }

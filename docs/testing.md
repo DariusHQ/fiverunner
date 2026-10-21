@@ -122,6 +122,7 @@ The clock of the server of a test moves only as FiveRunner moves it, frame by fr
 
 - They run the resources of the project, with their files as they are on the disk. What tests write, such as with `SaveResourceFile`, stays in memory, and the next test does not see it.
 - KVP starts empty.
+- Resources that use oxmysql get a database of their own, in memory, which starts with the tables of the `.sql` files of the project, so the next test does not see what a test wrote. A resource whose manifest loads `@oxmysql/lib/MySQL.lua` gets oxmysql started before it. [docs/differences.md](differences.md#oxmysql) tells what the database runs.
 - `PerformHttpRequest` sends no requests: each fails as if no server took it, with status 0 and the error `FiveRunner sends no HTTP requests in tests - CURL error code 7 (Couldn't connect to server)`.
 - Tests may run any command with `ExecuteCommand`, as the console may.
 - A script that runs for 5 seconds without returning, such as a loop without `Wait`, gets an error.

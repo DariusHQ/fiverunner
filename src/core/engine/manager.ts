@@ -43,7 +43,15 @@ import { LatentEvents } from './latent.ts'
 import { Nui } from './nui.ts'
 import { atoi, compareUtf8, strtoull } from '../libc.ts'
 import { isFxVersionAtLeast } from './manifest.ts'
-import { arrayLength, pack } from './msgpack.ts'
+import { msgpackOfJs } from './javascript.ts'
+import { arrayLength, pack, packObject } from './msgpack.ts'
+import {
+  OXMYSQL_EVENT,
+  OXMYSQL_NAMES,
+  OxMysql,
+  oxmysqlFiles,
+  type DatabaseOpener,
+} from './oxmysql.ts'
 import { addPermissionCommands, FilesystemPermissions } from './permissions.ts'
 import { engineNatives } from './natives/index.ts'
 import { Resource, type ResourceDefinition } from './resource.ts'
@@ -99,6 +107,13 @@ export interface ResourceManagerOptions {
   readonly timeZone?: TimeZone
   /** Interrupts the scripts of the process that run too long without returning, as no FiveM process does: none by default. */
   readonly watchdog?: WatchdogOptions
+  /**
+   * On servers, what opens the database that oxmysql connects to, by the
+   * connection string it reads, for FiveRunner's emulation of oxmysql, and
+   * of its own when the server has none. None by default, which leaves
+   * oxmysql's JavaScript unrun, as FiveRunner runs only Lua.
+   */
+  readonly database?: DatabaseOpener
 }
 
 /** What a function reference names; see ResourceManager.lookUpRef. */
@@ -224,6 +239,10 @@ export class ResourceManager {
     },
   }
   readonly #rpc: ClientRpc | undefined
+  /** On servers, what opens the database of oxmysql. */
+  readonly #database: DatabaseOpener | undefined
+  /** On servers with a database, FiveRunner's emulation of oxmysql, once its script asks for it. */
+  #oxmysql: OxMysql | undefined
   /** sv_enableNetEventReassembly, which turns latent events on. */
   readonly #reassembly: Variable
   /** sv_stateBagStrictMode, which keeps clients from setting state bags. */
@@ -253,6 +272,7 @@ export class ResourceManager {
     this.files = options.files ?? new MemoryFileSystem()
     this.openFiles = new OpenFiles(this.files)
     this.http = options.http ?? fetchHttpClient
+    this.#database = options.side === 'server' ? options.database : undefined
     this.oneSync = this.side === 'server' && (options.oneSync ?? true)
     this.printer = new Printer((channel, text) => this.output.write(channel, text))
     const server = this.side === 'server'
@@ -510,6 +530,19 @@ export class ResourceManager {
    * started.
    */
   getResource(name: string, withProvides = true): Resource | undefined {
+    // Servers with a database that have no oxmysql get FiveRunner's own, once it is asked for.
+    if (
+      withProvides &&
+      this.#database !== undefined &&
+      OXMYSQL_NAMES.has(name) &&
+      !this.#resources.has(name) &&
+      !this.#resources.has('oxmysql')
+    ) {
+      this.addResource('oxmysql', {
+        files: oxmysqlFiles(),
+        path: 'citizen/system_resources/oxmysql',
+      })
+    }
     const resource = this.#resources.get(name)
     if (!withProvides || (resource !== undefined && resource.state !== 'stopped')) return resource
     for (const provider of this.#provides.get(name) ?? []) {
@@ -543,6 +576,60 @@ export class ResourceManager {
   /** On clients, the natives that their servers have them run, which they queue. */
   get rpc(): ClientRpc | undefined {
     return this.#rpc
+  }
+
+  /**
+   * On servers with a database, FiveRunner's emulation of oxmysql: the pool
+   * of its connections and the operations of its exports, which complete
+   * for the oxmysql of the server.
+   */
+  get oxmysql(): OxMysql | undefined {
+    const open = this.#database
+    if (open === undefined) return undefined
+    this.#oxmysql ??= new OxMysql({
+      open: (connectionString) =>
+        open({ connectionString, zone: this.timeZone, clock: () => this.wallClock() }),
+      print: (text) => this.log('script:oxmysql', `${text}\n`),
+      trigger: (name, args) => this.events.trigger(name, packObject(msgpackOfJs(args))),
+      complete: (token, ok, value) => {
+        const resource = this.getResource('oxmysql', false)
+        if (resource === undefined) return
+        this.events.trigger(
+          OXMYSQL_EVENT,
+          packObject(msgpackOfJs([token, ok, value])),
+          '',
+          resource,
+        )
+      },
+      convar: (name, fallback) => this.console.variables.find(name)?.value ?? fallback,
+      now: () => this.#time(),
+      measure: () => performance.now(),
+      seeds: () => this.#sqlFiles(),
+      diagnose: (message) => this.output.diagnose('oxmysql', message),
+    })
+    return this.#oxmysql
+  }
+
+  /** The .sql files of the resources of the server, in the order the resources were found, with those in each by path. */
+  #sqlFiles(): { path: string; sql: string }[] {
+    const found: { path: string; sql: string }[] = []
+    const decoder = new TextDecoder()
+    const visit = (directory: string) => {
+      const entries = [...(this.files.list(directory) ?? [])].sort((a, b) =>
+        compareUtf8(a.name, b.name),
+      )
+      for (const { name, directory: isDirectory } of entries) {
+        const path = `${directory}/${name}`
+        if (isDirectory) {
+          if (name !== 'node_modules' && !name.startsWith('.')) visit(path)
+        } else if (name.toLowerCase().endsWith('.sql')) {
+          const data = this.files.read(path)
+          if (data !== undefined) found.push({ path, sql: decoder.decode(data) })
+        }
+      }
+    }
+    for (const resource of this.#resources.values()) visit(normalizePath(resource.path))
+    return found
   }
 
   /** On clients, the player that their server knows them as, once they connected to it. */
@@ -781,6 +868,7 @@ export class ResourceManager {
     this.gameState?.tick()
     this.#world?.tick()
     this.#rpc?.tick()
+    this.#oxmysql?.tick()
     this.security.runAs('system.console', () => this.console.executeBuffer())
     this.events.tick()
     const ticking = this.#ticking.map((resource) => ({ resource, runtime: resource.runtime! }))

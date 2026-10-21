@@ -9,6 +9,7 @@ import {
   type ResourceManager,
   type ResourceState,
   SERVER_NET_ID,
+  sqliteDatabase,
 } from '../core/engine/index.ts'
 import { pack, type PackedValue } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
@@ -83,6 +84,8 @@ export type DevEvent =
 export interface DevSessionOptions {
   /** cfxlua.wasm, compiled. */
   readonly cfxlua: WebAssembly.Module
+  /** sqlite3.wasm, compiled, the database of oxmysql on the server. None by default. */
+  readonly sqlite?: WebAssembly.Module
   readonly project: Project
   /** What sends the HTTP requests of the scripts of the server. */
   readonly http: HttpClient
@@ -130,6 +133,7 @@ export class DevSession {
         files: options.project.files(),
         http: options.http,
         watchdog: options.watchdog ?? WATCHDOG,
+        ...(options.sqlite === undefined ? {} : { database: sqliteDatabase(options.sqlite) }),
       },
     })
     const session = new DevSession(engine, options)

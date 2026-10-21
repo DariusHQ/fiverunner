@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { main, type CliHost } from '../../src/cli/main.ts'
+import { sqlite } from '../db/helpers.ts'
 import { cfxlua } from '../lua/helpers.ts'
 
 let root: string
@@ -48,6 +49,7 @@ async function test(
     },
     color: false,
     cfxlua,
+    sqlite,
     wasm: () => new Uint8Array(),
     assets: '',
     interrupted: () => Promise.resolve(),

@@ -4,6 +4,8 @@
  * the engine needs them, on the clock of the host, which it tells the UI
  * the events of, and starts anew, with the players it had, as the UI asks.
  */
+import sqliteUrl from '@sqlite.org/sqlite-wasm/sqlite3.wasm?url'
+
 import { MemoryFileSystem } from '../core/engine/index.ts'
 import { answer } from './answers.ts'
 import type { FromWorker, ProjectInfo, ToWorker } from './protocol.ts'
@@ -20,6 +22,7 @@ const decoder = new TextDecoder()
 const tell = (message: FromWorker) => postMessage(message)
 
 let cfxlua: Promise<WebAssembly.Module> | undefined
+let sqlite: Promise<WebAssembly.Module> | undefined
 let session: DevSession | undefined
 /** The last state that the session told, whose players a new session connects again. */
 let state: DevState | undefined
@@ -52,9 +55,11 @@ async function start(): Promise<void> {
     cfxlua ??= WebAssembly.compileStreaming(
       fetch(`${API}cfxlua.wasm`, { headers: { [API_HEADER]: '1' } }),
     )
+    sqlite ??= WebAssembly.compileStreaming(fetch(sqliteUrl))
     const source = new RemoteSource(getSync)
     const started = await DevSession.start({
       cfxlua: await cfxlua,
+      sqlite: await sqlite,
       project: {
         files: () => {
           const files = new MemoryFileSystem()

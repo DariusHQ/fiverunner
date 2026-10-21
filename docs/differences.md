@@ -20,7 +20,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 
 - FiveM's built-in variables are all defined, with their types, flags and defaults, but FiveRunner acts on few of them. It runs GTA V only, with no switch to RDR3 by `gamename`. `citizen_dir` is not defined, `sv_infoVersion` stays 0, there is no `increase_pool_size`, and `version` reads `win32`, as FiveRunner follows FiveM's Windows build throughout.
 - `endpoint_add_tcp` and `endpoint_add_udp` listen nowhere and resolve no names. The first TCP endpoint still sets the primary port.
-- There are no system resources.
+- There are no system resources, but for FiveRunner's own [oxmysql](#oxmysql).
 - Directories list in the order of NTFS, for scans of resources as for `io`, whatever order the files of the host have, with upper case as JavaScript has it for each UTF-16 code unit, which can differ from the table of an NTFS volume for a few characters.
 - Relative paths of resources use forward slashes, with no doubled slashes.
 - Nothing is rate-limited: events, latent events, state bags, commands and HTTP requests.
@@ -57,6 +57,14 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 
 - `PerformHttpRequest` sends requests with `fetch` by default. Header names come back in lower case, repeated headers are joined but `Set-Cookie`, GET and HEAD send no body, TLS certificates are verified, which FiveM does not do, requests use HTTP/1.1 only, and curl's error texts are approximated. Browsers also hide redirects. `PerformHttpRequestInternal`, the JSON variant, is not implemented.
 - The HTTP server listens nowhere by itself: embedders hand it requests through `HttpServer.request`. Of FiveM's own endpoints, only `/` exists, with no `/info.json`, `/players.json`, `/dynamic.json`, `/client`, `/files/` or `/perf/`. Requests come whole, so FiveM's loss of chunked bodies sent before `setDataHandler` does not happen. The server speaks HTTP/1.1 only, leaves `Date` and `Connection` to the transport, and writes nothing after a response ends, where FiveM writes past it.
+
+## oxmysql
+
+- FiveRunner runs only Lua, so it runs its own oxmysql, in Lua, in place of oxmysql's `dist/build.js`: the exports of oxmysql 2.14.3, those of mysql-async and ghmattimysql that oxmysql provides, and its `lib/MySQL.lua`. Servers without an oxmysql resource get FiveRunner's, as `citizen/system_resources/oxmysql`, once a resource depends on it or a command starts it.
+- The database is FiveRunner's own, in memory: SQLite, which runs the SQL of MariaDB 11.4 and fails with its errors, as `11.4.0-MariaDB-FiveRunner`. There is one database, named as `mysql_connection_string` names it, or `fiverunner`, whatever server the string names. It starts empty, with the tables of the `.sql` files of the resources, which it runs in the order of their paths, leaving out the statements that fail, with a diagnosis, as `mysql --force` would. Nothing in it outlives the server.
+- Triggers, stored procedures and functions, and events fail with error 1235.
+- A connection with an open transaction keeps the others waiting until it ends, as SQLite has one writer, where MariaDB locks only the rows it touches. Queries that wait 50 seconds of the server's clock fail with error 1205, as `innodb_lock_wait_timeout` has them.
+- Queries run at the next tick of the server, one after another in the order they came, where oxmysql's pool runs them at once, and call back as they end. `mysql_slow_query_warning` and `mysql_debug` time them by the clock of the host.
 
 ## NUI
 

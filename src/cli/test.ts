@@ -58,9 +58,9 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
     return 1
   }
   const start = host.now()
-  const cfxlua = await host.cfxlua()
+  const [cfxlua, sqlite] = await Promise.all([host.cfxlua(), host.sqlite()])
   const reporter = new Reporter(host)
-  for (const path of paths) reporter.file(await run(project, path, cfxlua))
+  for (const path of paths) reporter.file(await run(project, path, cfxlua, sqlite))
   return reporter.end(host.now() - start)
 }
 
@@ -69,9 +69,10 @@ async function run(
   project: LocalProject,
   path: string,
   cfxlua: WebAssembly.Module,
+  sqlite: WebAssembly.Module,
 ): Promise<FileResult> {
   try {
-    return await runFile({ path, source: project.source.read(path) }, { cfxlua, project })
+    return await runFile({ path, source: project.source.read(path) }, { cfxlua, sqlite, project })
   } catch (error) {
     const message = `FiveRunner failed to run the file: ${error instanceof Error ? error.message : String(error)}`
     return { path, tests: [], failure: { message, frames: [] }, output: [] }

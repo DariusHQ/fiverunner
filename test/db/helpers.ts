@@ -12,6 +12,11 @@ const sqliteModule = WebAssembly.compile(
   ),
 )
 
+/** sqlite3.wasm, compiled. */
+export function sqlite(): Promise<WebAssembly.Module> {
+  return sqliteModule
+}
+
 /** 2024-05-06 07:08:09 UTC, a Monday, when the tests' databases are. */
 export const NOW = Date.UTC(2024, 4, 6, 7, 8, 9)
 

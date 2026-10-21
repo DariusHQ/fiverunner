@@ -3,6 +3,7 @@ import { ScriptRuntime, type ScriptHost } from '../scripting/runtime.ts'
 import { NativeContext } from './context.ts'
 import { addFile, MemoryFileSystem, type FileSystem } from './files.ts'
 import { glob, normalizePath } from './glob.ts'
+import oxmysqlSource from './lua/oxmysql.lua?raw'
 import type { ResourceManager } from './manager.ts'
 import {
   clientNativesFile,
@@ -344,6 +345,15 @@ export class Resource {
    * their name. On clients, it says when FiveM would give the scripts older
    * natives than FiveRunner does.
    */
+  /**
+   * Whether the resource is the server's oxmysql, whose JavaScript
+   * FiveRunner's own script of oxmysql takes the place of, on the server's
+   * database: when the server has one.
+   */
+  get emulatesOxmysql(): boolean {
+    return this.name === 'oxmysql' && this.manager.oxmysql !== undefined
+  }
+
   #createRuntime(): void {
     if (this.#runtime !== null) {
       this.manager.output.diagnose(
@@ -353,16 +363,19 @@ export class Resource {
       return
     }
     const scripts = this.scripts
+    const emulated = this.emulatesOxmysql
     for (const path of scripts) {
       if (!path.includes('.lua')) {
         this.manager.output.diagnose(
           this.name,
-          `FiveRunner runs only Lua scripts, so it skips ${path}.`,
+          emulated
+            ? `FiveRunner runs only Lua scripts, so it skips ${path}, and runs its own emulation of oxmysql in its place, which gives oxmysql's exports.`
+            : `FiveRunner runs only Lua scripts, so it skips ${path}.`,
         )
       }
     }
     const lua = scripts.filter((path) => path.includes('.lua'))
-    if (lua.length === 0) return
+    if (lua.length === 0 && !emulated) return
     this.manager.trace('citizen-scripting-core', `Creating script environments for ${this.name}\n`)
     if (this.manager.side === 'client') {
       const natives = clientNativesFile(this.metadata)
@@ -376,6 +389,7 @@ export class Resource {
     const runtime = this.enter(() => ScriptRuntime.create(this.manager.lua, this.#host()))
     this.#runtime = runtime
     this.manager.addRuntime(this)
+    if (emulated) this.enter(() => runtime.runBuiltin('oxmysql.lua', oxmysqlSource))
     for (const path of lua) {
       // A script that stopped the resource took the runtime the rest would load into.
       if (this.#runtime !== runtime) break

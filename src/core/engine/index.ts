@@ -46,6 +46,7 @@ export {
 } from './manifest.ts'
 export { engineNatives } from './natives/index.ts'
 export { Nui, type NuiFrame, type NuiRequest, type NuiResponse } from './nui.ts'
+export { sqliteDatabase, type DatabaseOpener } from './oxmysql.ts'
 export { Resource, type ResourceDefinition, type ResourceState } from './resource.ts'
 export { StateBag, StateBags, type StateBagChange, type StateBagSender } from './statebags.ts'
 export {

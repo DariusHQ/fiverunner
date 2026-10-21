@@ -7,7 +7,8 @@ under [native/vendor](native/vendor), together with the Emscripten runtime libra
 Every script runtime also loads one Lua library, [lua-promises](#lua-promises). The
 catalog of FiveM natives is generated from the
 [CitizenFX typings](#citizenfx-typings), and the types of the files NUI serves from the
-[mime](#mime) package.
+[mime](#mime) package. The database of FiveRunner's oxmysql is
+[SQLite](#sqlite-and-sqlite-wasm).
 
 ## Lua and LuaGLM
 
@@ -342,6 +343,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
+
+## SQLite and SQLite Wasm
+
+`sqlite3.wasm`, next to the built tool and among the assets of the dev UI, is SQLite
+compiled to WebAssembly, and the built tool and the dev UI bundle its JavaScript, both
+from the npm package [@sqlite.org/sqlite-wasm](https://www.npmjs.com/package/@sqlite.org/sqlite-wasm)
+at the version pinned in [package.json](package.json). SQLite is in the
+[public domain](https://sqlite.org/copyright.html). The package is licensed under the
+Apache License, Version 2.0. The license text is at the end of this file.
 
 ## Apache License 2.0
 

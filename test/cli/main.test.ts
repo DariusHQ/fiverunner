@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import packageJson from '../../package.json' with { type: 'json' }
 import { main } from '../../src/cli/main.ts'
+import { sqlite } from '../db/helpers.ts'
 import { cfxlua } from '../lua/helpers.ts'
 
 /** Runs the command line tool with `args`, and returns its exit code with what it wrote. */
@@ -19,6 +20,7 @@ async function run(...args: string[]): Promise<{ code: number; stdout: string; s
     },
     color: false,
     cfxlua,
+    sqlite,
     wasm: () => new Uint8Array(),
     assets: '',
     interrupted: () => Promise.resolve(),

@@ -8,6 +8,7 @@ import {
   type OutputLine,
   type RunOptions,
 } from '../../src/runner/index.ts'
+import { sqlite } from '../db/helpers.ts'
 import { cfxlua } from '../lua/helpers.ts'
 
 /** Runs `source` as tests/x.test.lua, in a project of `files` that `commands` start. */
@@ -411,6 +412,29 @@ end`,
     expect(outcomes(result)).toEqual([
       ['writes', 'passed'],
       ['writes', 'passed'],
+    ])
+  })
+
+  it("gives each test a database of its own, with the tables of the project's .sql files", async () => {
+    const files = {
+      ...resource('bank', ''),
+      'resources/bank/bank.sql':
+        'CREATE TABLE deposits (id INT AUTO_INCREMENT PRIMARY KEY, amount INT);\nINSERT INTO deposits (amount) VALUES (50);',
+    }
+    const result = await run(
+      `for _ = 1, 2 do
+    it('deposits', function()
+        expect(exports.oxmysql:insert_async('INSERT INTO deposits (amount) VALUES (?)', { 100 })).toBe(2)
+        expect(exports.oxmysql:scalar_async('SELECT COUNT(*) FROM deposits')).toBe(2)
+    end)
+end`,
+      files,
+      ['ensure oxmysql'],
+      { sqlite: await sqlite() },
+    )
+    expect(outcomes(result)).toEqual([
+      ['deposits', 'passed'],
+      ['deposits', 'passed'],
     ])
   })
 
