@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { Session, type PlayerIdentity } from '../../src/core/engine/index.ts'
-import { createProcess, join, runCommand, type TestProcess } from './helpers.ts'
+import { clientOf, createProcess, join, runCommand, type TestProcess } from './helpers.ts'
 
 /** A manifest for clients that runs main.lua, with natives FiveRunner has. */
 const CLIENT_SCRIPT = [
@@ -89,14 +89,16 @@ print(pcall(GetPlayerName, nil))`),
     ])
   })
 
-  it('belong to servers, as natives of clients have the same names for players of the game', async () => {
+  it('are known to clients by their indices, which natives of the same names take', async () => {
     const { clients } = await sessionOf({}, ANN)
     const client = clients[0]!
-    client.add('c', { 'main.lua': `print(GetPlayerName(1))` }, CLIENT_SCRIPT).start()
-    expect(client.take().filter((line) => line.startsWith('[script:'))).toEqual(['[script:c] nil'])
-    expect(client.diagnostics).toEqual([
-      'c: GetPlayerName is not implemented in FiveRunner yet: it does nothing and returns zero values.',
+    client
+      .add('c', { 'main.lua': `print(GetPlayerName(1), GetPlayerName(PlayerId()))` }, CLIENT_SCRIPT)
+      .start()
+    expect(client.take().filter((line) => line.startsWith('[script:'))).toEqual([
+      '[script:c] **Invalid**\tAnn',
     ])
+    expect(client.diagnostics).toEqual([])
   })
 
   it('exist by their net ids, as atoi reads them', async () => {
@@ -243,5 +245,110 @@ print(DropPlayer(9, nil), DropPlayer(1, 'bye'), DropPlayer(9, 'nobody'))`),
       expect(clients[1]!.take()).toEqual(oneSync ? [] : ['[script:c] left\t1\tAnn\t-1'])
       expect(server.diagnostics).toEqual([])
     }
+  })
+})
+
+describe('Players of clients', () => {
+  it('are the local player, which is at index 128 with OneSync', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`print(PlayerId(), GetPlayerIndex(), PlayerPedId())
+print(GetPlayerPed(-1), GetPlayerPed(PlayerId()), GetPlayerPedScriptIndex(PlayerId()), GetPlayerPedScriptIndex(-1))
+print(GetPlayerPed(3), GetPlayerPed(127), GetPlayerPed(0))`),
+    ).toEqual(['128\t128\t1', '1\t1\t1\t1', '0\t0\t0'])
+  })
+
+  it('are found by their indices in 8 bits', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`print(GetPlayerPed(128 + 256), GetPlayerServerId(128 - 256), NetworkIsPlayerActive(128 + 512))
+print(GetPlayerServerId(-1), NetworkIsPlayerActive(-1), GetPlayerName(-1))`),
+    ).toEqual(['1\t1\t1', '0\tfalse\t**Invalid**'])
+  })
+
+  it('have the names and the net ids that their server gave them', async () => {
+    const { run } = await clientOf({}, { name: 'Ann' })
+    expect(
+      run(`print(GetPlayerName(PlayerId()), GetPlayerName(5), GetPlayerServerId(PlayerId()), GetPlayerServerId(5))
+print(GetPlayerFromServerId(1), GetPlayerFromServerId(2), GetPlayerFromServerId(1 + 65536), GetPlayerFromServerId(0))`),
+    ).toEqual(['Ann\t**Invalid**\t1\t0', '128\t-1\t-1\t-1'])
+  })
+
+  it('have the net ids of the players of their clients, whatever they are', async () => {
+    const { session } = await clientOf()
+    const bob = await createProcess({ side: 'client' })
+    join(session, bob.manager, { name: 'Bob' })
+    bob
+      .add(
+        'c',
+        {
+          'main.lua': `print(GetPlayerName(PlayerId()), GetPlayerServerId(PlayerId()), GetPlayerFromServerId(2), GetPlayerFromServerId(1))`,
+        },
+        CLIENT_SCRIPT,
+      )
+      .start()
+    expect(bob.take().filter((line) => line.startsWith('[script:'))).toEqual([
+      '[script:c] Bob\t2\t128\t-1',
+    ])
+  })
+
+  it('play, alone, in a session that started', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`print(json.encode(GetActivePlayers()), GetNumberOfPlayers(), IsPlayerPlaying(PlayerId()), IsPlayerPlaying(1))
+print(NetworkIsPlayerActive(PlayerId()), NetworkIsPlayerConnected(PlayerId()), NetworkIsPlayerActive(1), NetworkIsPlayerConnected(1))
+print(NetworkIsSessionStarted(), NetworkIsSessionActive(), NetworkIsInSession())`),
+    ).toEqual(['[128]\t1\t1\tfalse', '1\t1\tfalse\tfalse', '1\t1\t1'])
+  })
+
+  it('have peds, which natives tell are those of players', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+print(IsPedAPlayer(ped), IsPedAPlayer(0), IsPedAPlayer(2), NetworkGetPlayerIndexFromPed(ped), NetworkGetPlayerIndexFromPed(0))`),
+    ).toEqual(['1\tfalse\tfalse\t128\t-1'])
+  })
+
+  it('are found by the names of their state bags, with OneSync, by their net ids in 16 bits', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`print(GetPlayerFromStateBagName('player:1'), GetPlayerFromStateBagName('player:' .. (1 + 65536)), GetPlayerFromStateBagName('player:2'))
+print(GetPlayerFromStateBagName('entity:1'), GetPlayerFromStateBagName('player:1x'), pcall(GetPlayerFromStateBagName))`),
+    ).toEqual([
+      '128\t128\t0',
+      '0\t128\tfalse\tnative 00000000a56135e0: Argument at index 0 was null.',
+    ])
+  })
+
+  it('are at index 0 without OneSync, which no state bag names', async () => {
+    const { run } = await clientOf({ oneSync: false })
+    expect(
+      run(`print(PlayerId(), GetPlayerPed(0), GetPlayerServerId(0), GetPlayerFromServerId(1), json.encode(GetActivePlayers()))
+print(GetPlayerFromStateBagName('player:1'), NetworkIsPlayerActive(0), GetPlayerPed(128))`),
+    ).toEqual(['0\t1\t1\t0\t[0]', '0\t1\t0'])
+  })
+
+  it('are a player at index 0, out of network games, before clients join sessions', async () => {
+    const client = await createProcess({ side: 'client' })
+    client
+      .add('alone', {
+        'main.lua': `print(PlayerId(), PlayerPedId(), GetPlayerPed(0), GetPlayerName(0), IsPlayerPlaying(0))
+print(GetPlayerServerId(0), GetPlayerFromServerId(0), json.encode(GetActivePlayers()), NetworkIsPlayerActive(0), NetworkIsPlayerConnected(0))
+print(NetworkIsSessionStarted(), NetworkGetPlayerIndexFromPed(PlayerPedId()), GetPlayerFromStateBagName('player:0'))`,
+      })
+      .start()
+    expect(client.take().filter((line) => line.startsWith('[script:'))).toEqual([
+      '[script:alone] 0\t1\t1\t\t1',
+      '[script:alone] 0\t-1\t[]\tfalse\tfalse',
+      '[script:alone] false\t-1\t0',
+    ])
+  })
+
+  it('are known to scripts that call natives by the hashes of GTA V', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`print(Citizen.InvokeNative(0x4F8644AF03D0E0D6, Citizen.ResultAsInteger()), Citizen.InvokeNative(0xD80958FC74E988A6, Citizen.ResultAsInteger()))
+print(Citizen.InvokeNative(0x43A66C31C68491C0, -1, Citizen.ResultAsInteger()), Citizen.InvokeNative(0x6D0DE6A7B5DA71F8, 128, Citizen.ResultAsString()))`),
+    ).toEqual(['128\t1', '1\tAnn'])
   })
 })

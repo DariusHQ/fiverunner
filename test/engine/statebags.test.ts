@@ -454,11 +454,12 @@ describe('State bags across a session', () => {
     ])
   })
 
-  it('name the players of clients with no native of servers', async () => {
+  it('name the players of clients by their indices there', async () => {
     const { session } = await serverWithBags()
     const ann = await joined(session)
     runCommand(ann.manager, 'names player:1', 'system.console')
-    expect(scripts(ann)).toEqual(['[script:a] names\t0'])
+    runCommand(ann.manager, 'names player:2', 'system.console')
+    expect(scripts(ann)).toEqual(['[script:a] names\t128', '[script:a] names\t0'])
   })
 
   it('of players go as they leave, with their slots', async () => {

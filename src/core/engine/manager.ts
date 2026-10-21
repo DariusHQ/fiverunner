@@ -51,6 +51,7 @@ import { ResourceScanner } from './scan.ts'
 import type { Player, Session } from './session.ts'
 import { StateBags } from './statebags.ts'
 import { OpenFiles } from './streams.ts'
+import { ClientWorld } from './world/client.ts'
 import { ServerGameState } from './world/server.ts'
 
 /** Where a process writes what it reports. */
@@ -203,6 +204,7 @@ export class ResourceManager {
   #configured = false
   #session: Session | undefined
   #player: Player | undefined
+  #world: ClientWorld | undefined
   /** sv_enableNetEventReassembly, which turns latent events on. */
   readonly #reassembly: Variable
   /** sv_stateBagStrictMode, which keeps clients from setting state bags. */
@@ -264,6 +266,7 @@ export class ResourceManager {
         )
       : undefined
     this.nui = server ? undefined : new Nui(this)
+    this.#world = server ? undefined : new ClientWorld()
     const consoleOptions = {
       security: this.security,
       output: this.printer,
@@ -498,6 +501,11 @@ export class ResourceManager {
     return this.#session
   }
 
+  /** On clients, the world of their game: its entities and the ped of their player. */
+  get world(): ClientWorld | undefined {
+    return this.#world
+  }
+
   /** On clients, the player that their server knows them as, once they connected to it. */
   get player(): Player | undefined {
     return this.#player
@@ -535,6 +543,8 @@ export class ResourceManager {
     if (left.joined) this.events.holdingResourceStops(() => this.resetResources())
     else this.resetResources()
     this.#forgetServerVariables()
+    // The game that the client goes back to has a world of its own.
+    this.#world = new ClientWorld()
     if (left.joined) {
       // FiveM's client forgets the bags of its game session, but for a new global one.
       this.states.reset()

@@ -1,7 +1,9 @@
 import { atoi } from '../../libc.ts'
 import { defineNative, type NativeDefinition, type Side } from '../../natives/index.ts'
 import type { NativeContext } from '../context.ts'
-import { DropReason, type Player } from '../session.ts'
+import { pack } from '../msgpack.ts'
+import { DropReason, ONESYNC_SLOT, type Player } from '../session.ts'
+import type { ClientEntity } from '../world/client.ts'
 import { checkArgument } from './events.ts'
 
 /** What FiveM's GET_PLAYER_LAST_MSG gives for no player. */
@@ -21,9 +23,186 @@ function at(list: readonly string[], index: number): string | null {
   return list[index] ?? null
 }
 
-/** Natives of the players of servers, which only servers have. */
+/** What GTA V's GET_PLAYER_NAME gives for no player. */
+const INVALID_NAME = '**Invalid**'
+
+/** A player as the client of a player knows it, by its index. */
+interface ClientPlayer {
+  readonly ped: ClientEntity
+  readonly name: string
+}
+
+/** The index of the local player of a client: the slot that its server gives it, 128 with OneSync, and 0 otherwise. */
+export function localPlayerIndex(ctx: NativeContext): number {
+  return ctx.manager.session?.server.oneSync ? ONESYNC_SLOT : 0
+}
+
+/** Whether a client is in a network game: whether it joined a session. */
+export function inSession(ctx: NativeContext): boolean {
+  return ctx.manager.player !== undefined
+}
+
+/** The player that an index names on a client, as FiveM's clients take indices: in 8 bits. */
+function clientPlayer(ctx: NativeContext, index: number): ClientPlayer | undefined {
+  const local = localPlayerIndex(ctx)
+  if ((index & 0xff) !== local) return undefined
+  const { player, world } = ctx.manager
+  return {
+    ped: world!.playerPed,
+    name: player?.name ?? '',
+  }
+}
+
+/** The player that an index names among those of the network game of a client, which there are none of out of it. */
+function networkPlayer(ctx: NativeContext, index: number): ClientPlayer | undefined {
+  return inSession(ctx) ? clientPlayer(ctx, index) : undefined
+}
+
+/** The handle of the ped of the player that an index names on a client, -1 for the local player, or 0. */
+function playerPed(ctx: NativeContext, index: number): number {
+  if (index === -1) return ctx.manager.world!.playerPed.handle
+  return clientPlayer(ctx, index)?.ped.handle ?? 0
+}
+
+/** Natives of players, which servers know by their net ids and clients by their indices. */
 export function playerNatives(side: Side): NativeDefinition<NativeContext>[] {
-  if (side === 'client') return []
+  return side === 'client' ? clientPlayerNatives() : serverPlayerNatives()
+}
+
+/** Natives of the players of clients: the local player, and the network game it is in. */
+function clientPlayerNatives(): NativeDefinition<NativeContext>[] {
+  const index = (ctx: NativeContext) => localPlayerIndex(ctx)
+  const session = (ctx: NativeContext) => inSession(ctx)
+  return [
+    defineNative(
+      { name: 'PLAYER_ID', hash: 0x4f8644af03d0e0d6n, result: 'Player', params: [] },
+      index,
+    ),
+    defineNative(
+      { name: 'GET_PLAYER_INDEX', hash: 0xa5edc40ef369b48dn, result: 'Player', params: [] },
+      index,
+    ),
+    defineNative(
+      { name: 'PLAYER_PED_ID', hash: 0xd80958fc74e988a6n, result: 'Ped', params: [] },
+      (ctx: NativeContext) => ctx.manager.world!.playerPed.handle,
+    ),
+    defineNative(
+      {
+        name: 'GET_PLAYER_PED',
+        hash: 0x43a66c31c68491c0n,
+        result: 'Ped',
+        params: ['Player playerId'],
+      },
+      playerPed,
+    ),
+    defineNative(
+      {
+        name: 'GET_PLAYER_PED_SCRIPT_INDEX',
+        hash: 0x50fac3a3e030a6e1n,
+        result: 'Ped',
+        params: ['Player player'],
+      },
+      playerPed,
+    ),
+    defineNative(
+      {
+        name: 'GET_PLAYER_NAME',
+        hash: 0x6d0de6a7b5da71f8n,
+        result: 'char*',
+        params: ['Player player'],
+      },
+      (ctx: NativeContext, player) => clientPlayer(ctx, player)?.name ?? INVALID_NAME,
+    ),
+    // There are no other players yet.
+    defineNative(
+      { name: 'GET_NUMBER_OF_PLAYERS', hash: 0x407c7f91ddb46c16n, result: 'int', params: [] },
+      () => 1,
+    ),
+    defineNative(
+      {
+        name: 'IS_PLAYER_PLAYING',
+        hash: 0x5e9564d8246b909an,
+        result: 'BOOL',
+        params: ['Player player'],
+      },
+      (ctx: NativeContext, player) => clientPlayer(ctx, player) !== undefined,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_IS_PLAYER_ACTIVE',
+        hash: 0xb8dfd30d6973e135n,
+        result: 'BOOL',
+        params: ['Player player'],
+      },
+      (ctx: NativeContext, player) => networkPlayer(ctx, player) !== undefined,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_IS_PLAYER_CONNECTED',
+        hash: 0x93dc1be4e1abe9d1n,
+        result: 'BOOL',
+        params: ['Player player'],
+      },
+      (ctx: NativeContext, player) => networkPlayer(ctx, player) !== undefined,
+    ),
+    defineNative(
+      { name: 'NETWORK_IS_SESSION_STARTED', hash: 0x9de624d2fc4b603fn, result: 'BOOL', params: [] },
+      session,
+    ),
+    defineNative(
+      { name: 'NETWORK_IS_SESSION_ACTIVE', hash: 0xd83c2b94e7508980n, result: 'BOOL', params: [] },
+      session,
+    ),
+    defineNative(
+      { name: 'NETWORK_IS_IN_SESSION', hash: 0xca97246103b63917n, result: 'BOOL', params: [] },
+      session,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_GET_PLAYER_INDEX_FROM_PED',
+        hash: 0x6c0e2e0125610278n,
+        result: 'Player',
+        params: ['Ped ped'],
+      },
+      (ctx: NativeContext, ped) =>
+        inSession(ctx) && ped === ctx.manager.world!.playerPed.handle ? localPlayerIndex(ctx) : -1,
+    ),
+    defineNative(
+      { name: 'IS_PED_A_PLAYER', hash: 0x12534c348c6cb68bn, result: 'BOOL', params: ['Ped ped'] },
+      (ctx: NativeContext, ped) => ped === ctx.manager.world!.playerPed.handle,
+    ),
+    defineNative(
+      { name: 'GET_PLAYER_SERVER_ID', result: 'int', params: ['Player player'] },
+      // FiveM's clients call the net ids of players their server ids.
+      (ctx: NativeContext, player) =>
+        networkPlayer(ctx, player) === undefined ? 0 : ctx.manager.player!.netId,
+    ),
+    defineNative(
+      { name: 'GET_PLAYER_FROM_SERVER_ID', result: 'Player', params: ['int serverId'] },
+      (ctx: NativeContext, serverId) =>
+        inSession(ctx) && serverId === ctx.manager.player!.netId ? localPlayerIndex(ctx) : -1,
+    ),
+    defineNative(
+      { name: 'GET_ACTIVE_PLAYERS', result: 'object', params: [] },
+      (ctx: NativeContext) => pack(inSession(ctx) ? [localPlayerIndex(ctx)] : []),
+    ),
+    defineNative(
+      { name: 'GET_PLAYER_FROM_STATE_BAG_NAME', result: 'int', params: ['char* bagName'] },
+      (ctx: NativeContext, bagName) => {
+        const name = checkArgument(bagName, 0)
+        const { player, session } = ctx.manager
+        // FiveM's clients know the net ids of players, in 16 bits, with OneSync alone.
+        if (!name.startsWith('player:') || player === undefined || !session!.server.oneSync) {
+          return 0
+        }
+        return (atoi(name.slice(7)) & 0xffff) === player.netId ? ONESYNC_SLOT : 0
+      },
+    ),
+  ]
+}
+
+/** Natives of the players of servers, by their net ids. */
+function serverPlayerNatives(): NativeDefinition<NativeContext>[] {
   /** The players as GetNumPlayerIndices last listed them, which GetPlayerFromIndex indexes for all resources. */
   let listed: Player[] = []
   return [

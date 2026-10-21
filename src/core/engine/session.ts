@@ -17,7 +17,7 @@ const MAX_SLOT = 2048
 const SKIPPED_SLOT = 31
 
 /** The slot that FiveM's servers with OneSync tell joining players they have. */
-const ONESYNC_SLOT = 128
+export const ONESYNC_SLOT = 128
 
 /** Why FiveM's servers drop players, as playerDropped gets it. */
 export const DropReason = {

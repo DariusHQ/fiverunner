@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createProcess, type TestProcess } from './helpers.ts'
+import { clientOf, createProcess, type TestProcess } from './helpers.ts'
 
 interface TestServer {
   readonly server: TestProcess
@@ -285,5 +285,159 @@ print(GetEntityScript(CreateVehicleServerSetter('adder', 'automobile', 0.0, 0.0,
     expect(server.diagnostics).toEqual([
       'run0: CREATE_VEHICLE_SERVER_SETTER: argument 3 (x) is a float, but the script passed the integer 100, which FiveM reads as 1.401298e-43. Write 100.0 instead.',
     ])
+  })
+})
+
+describe('Entities of clients', () => {
+  it('start with the ped of the player: player_zero, at 0, 0, 0, turned to the north', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+print(DoesEntityExist(ped), GetEntityModel(ped) == GetHashKey('player_zero'), GetEntityType(ped))
+print(IsEntityAPed(ped), IsEntityAVehicle(ped), IsEntityAnObject(ped))
+print(GetEntityCoords(ped, true), GetEntityHeading(ped), GetEntityRotation(ped, 2))
+print(IsEntityVisible(ped), IsEntityPositionFrozen(ped), GetEntityForwardVector(ped))`),
+    ).toEqual([
+      '1\ttrue\t1',
+      '1\tfalse\tfalse',
+      'vec3(0.000000, 0.000000, 0.000000)\t0.0\tvec3(0.000000, 0.000000, 0.000000)',
+      '1\tfalse\tvec3(0.000000, 1.000000, 0.000000)',
+    ])
+  })
+
+  it('are where scripts put them, in single precision, without the sizes of models', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+SetEntityCoords(ped, 100.5, -200.25, 30.1, false, false, false, true)
+print(GetEntityCoords(ped), string.format('%.9f', GetEntityCoords(ped).z))
+SetEntityCoordsNoOffset(ped, 1.0, 2.0, 3.0, false, false, false)
+print(GetEntityCoords(ped))`),
+    ).toEqual([
+      'vec3(100.500000, -200.250000, 30.100000)\t30.100000381',
+      'vec3(1.000000, 2.000000, 3.000000)',
+    ])
+  })
+
+  it('turn to headings, which their rotations tell as yaws from -180 to 180', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+SetEntityHeading(ped, 270.0)
+print(GetEntityHeading(ped), GetEntityRotation(ped, 2))
+SetEntityHeading(ped, -45.0)
+print(GetEntityHeading(ped), GetEntityRotation(ped, 2))
+SetEntityHeading(ped, 450.0)
+print(GetEntityHeading(ped))`),
+    ).toEqual([
+      '270.0\tvec3(0.000000, 0.000000, -90.000000)',
+      '315.0\tvec3(0.000000, 0.000000, -45.000000)',
+      '90.0',
+    ])
+  })
+
+  it('turn as their rotations say, in each order, which they give back in another', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+SetEntityRotation(ped, 10.0, 20.0, 30.0, 2, false)
+print(GetEntityRotation(ped, 2), GetEntityHeading(ped))
+print(GetEntityRotation(ped, 0))
+SetEntityRotation(ped, 10.0, 20.0, 30.0, 0, false)
+print(GetEntityRotation(ped, 0))`),
+    ).toEqual([
+      'vec3(10.000000, 20.000000, 30.000000)\t30.0',
+      'vec3(10.627584, 19.683498, 33.616440)',
+      'vec3(10.000000, 20.000000, 30.000000)',
+    ])
+  })
+
+  it('give where their fronts and their offsets are, as they turn', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+SetEntityCoords(ped, 10.0, 20.0, 5.0, false, false, false, false)
+SetEntityHeading(ped, 90.0)
+print(GetEntityForwardVector(ped))
+print(GetOffsetFromEntityInWorldCoords(ped, 0.0, 2.0, 1.0), GetOffsetFromEntityInWorldCoords(ped, 1.0, 0.0, 0.0))`),
+    ).toEqual([
+      // Heading 90 faces west.
+      'vec3(-1.000000, 0.000000, 0.000000)',
+      'vec3(8.000000, 20.000000, 6.000000)\tvec3(10.000000, 21.000000, 5.000000)',
+    ])
+  })
+
+  it('freeze and hide as scripts say', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+FreezeEntityPosition(ped, true)
+SetEntityVisible(ped, false, false)
+print(IsEntityPositionFrozen(ped), IsEntityVisible(ped))
+SetEntityCoords(ped, 1.0, 2.0, 3.0, false, false, false, false)
+FreezeEntityPosition(ped, false)
+SetEntityVisible(ped, true, false)
+print(IsEntityPositionFrozen(ped), IsEntityVisible(ped), GetEntityCoords(ped))`),
+    ).toEqual(['1\tfalse', 'false\t1\tvec3(1.000000, 2.000000, 3.000000)'])
+  })
+
+  it('give natives their defaults for handles of no entity, as GTA V does', async () => {
+    const { run, client } = await clientOf()
+    expect(
+      run(`print(DoesEntityExist(0), DoesEntityExist(2), DoesEntityExist(-1), GetEntityModel(2), GetEntityType(2))
+print(GetEntityCoords(2), GetEntityHeading(2), GetEntityRotation(2, 2), GetEntityForwardVector(2))
+print(GetOffsetFromEntityInWorldCoords(2, 1.0, 1.0, 1.0), IsEntityAPed(2), IsEntityVisible(2), IsEntityPositionFrozen(2))
+SetEntityCoords(2, 1.0, 1.0, 1.0, false, false, false, false)
+SetEntityCoordsNoOffset(2, 1.0, 1.0, 1.0, false, false, false)
+SetEntityHeading(2, 1.0)
+SetEntityRotation(2, 1.0, 1.0, 1.0, 2, false)
+FreezeEntityPosition(2, true)
+SetEntityVisible(2, false, false)
+print(NetworkGetEntityOwner(2))`),
+    ).toEqual([
+      'false\tfalse\tfalse\t0\t0',
+      'vec3(0.000000, 0.000000, 0.000000)\t0.0\tvec3(0.000000, 0.000000, 0.000000)\tvec3(0.000000, 0.000000, 0.000000)',
+      'vec3(0.000000, 0.000000, 0.000000)\tfalse\tfalse\tfalse',
+      '-1',
+    ])
+    expect(client.diagnostics).toEqual([])
+  })
+
+  it('are owned by the local player in network games, and have no owner out of them', async () => {
+    const { run } = await clientOf()
+    expect(run(`print(NetworkGetEntityOwner(PlayerPedId()))`)).toEqual(['128'])
+    const alone = await createProcess({ side: 'client' })
+    alone.add('alone', { 'main.lua': `print(NetworkGetEntityOwner(PlayerPedId()))` }).start()
+    expect(alone.take().filter((line) => line.startsWith('[script:'))).toEqual([
+      '[script:alone] -1',
+    ])
+  })
+
+  it('are known to scripts that call natives by the hashes of GTA V', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+Citizen.InvokeNative(0x06843DA7060A026B, ped, 4.0, 5.0, 6.0, false, false, false, false)
+print(Citizen.InvokeNative(0x3FEF770D40960D5A, ped, true, Citizen.ResultAsVector()), Citizen.InvokeNative(0x7239B21A38F536BA, ped))`),
+    ).toEqual(['vec3(4.000000, 5.000000, 6.000000)\t1'])
+  })
+
+  it('are those of a new world once the client left its session', async () => {
+    const { client, player, session, run } = await clientOf()
+    run(`SetEntityCoords(PlayerPedId(), 1.0, 2.0, 3.0, false, false, false, false)`)
+    player.quit()
+    client.manager.tick()
+    client.add('after', { 'main.lua': `print(PlayerId(), GetEntityCoords(PlayerPedId()))` }).start()
+    expect(client.take().filter((line) => line.startsWith('[script:'))).toEqual([
+      '[script:after] 0\tvec3(0.000000, 0.000000, 0.000000)',
+    ])
+    expect(session.player(1)).toBeUndefined()
+  })
+
+  it('are in the worlds of clients, which servers do not have, as clients have no game state', async () => {
+    const { client, server } = await clientOf()
+    expect(server.manager.world).toBeUndefined()
+    expect(client.manager.gameState).toBeUndefined()
+    expect(client.manager.world?.playerPed.handle).toBe(1)
   })
 })

@@ -22,9 +22,12 @@ import {
   quaternionRotation,
   radiansToDegrees,
 } from '../world/quantize.ts'
+import type { ClientEntity } from '../world/client.ts'
+import { apply, fromEuler, fromHeading, headingOf, toEuler } from '../world/rotation.ts'
 import type { ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
 import { checkArgument } from './events.ts'
+import { inSession, localPlayerIndex } from './players.ts'
 
 const encoder = new TextEncoder()
 
@@ -86,9 +89,251 @@ function create(ctx: NativeContext, type: NetObjType, state: SyncState): number 
   return entity === undefined ? 0 : gameState.handleOf(entity)
 }
 
-/** Natives of the entities of servers, which their game state keeps. */
+/** The entity of a handle on a client, if there is one: GTA V's natives give their default values for no entity. */
+function clientEntityOf(ctx: NativeContext, handle: number): ClientEntity | undefined {
+  return ctx.manager.world!.byHandle(handle)
+}
+
+/** The vector of x, y and z, which natives give in single precision, as GTA V does. */
+function vector([x, y, z]: readonly [number, number, number]): Vector3Like {
+  return { x, y, z }
+}
+
+const ZERO: Vector3Like = { x: 0, y: 0, z: 0 }
+
+/** Natives of entities: those of the game state on servers, and those of the world on clients. */
 export function entityNatives(side: Side): NativeDefinition<NativeContext>[] {
-  if (side === 'client') return []
+  return side === 'client' ? clientEntityNatives() : serverEntityNatives()
+}
+
+/** Natives of the entities of the world of clients, as GTA V has them. */
+function clientEntityNatives(): NativeDefinition<NativeContext>[] {
+  /** A native that tells whether an entity is of an entity type. */
+  const isOfType = (name: string, hash: bigint, type: number) =>
+    defineNative(
+      { name, hash, result: 'BOOL', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        return found !== undefined && entityTypeOf(found.type) === type
+      },
+    )
+  /** Puts an entity at a position, as SET_ENTITY_COORDS does without the size of its model, which FiveRunner does not know. */
+  const moveTo = (ctx: NativeContext, entity: number, x: number, y: number, z: number) => {
+    clientEntityOf(ctx, entity)?.moveTo(x, y, z)
+  }
+  return [
+    defineNative(
+      {
+        name: 'DOES_ENTITY_EXIST',
+        hash: 0x7239b21a38f536ban,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity) !== undefined,
+    ),
+    defineNative(
+      {
+        name: 'GET_ENTITY_COORDS',
+        hash: 0x3fef770d40960d5an,
+        result: 'Vector3',
+        params: ['Entity entity', 'BOOL alive'],
+      },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        return found === undefined ? ZERO : { x: found.x, y: found.y, z: found.z }
+      },
+    ),
+    defineNative(
+      {
+        name: 'SET_ENTITY_COORDS',
+        hash: 0x06843da7060a026bn,
+        result: 'void',
+        params: [
+          'Entity entity',
+          'float xPos',
+          'float yPos',
+          'float zPos',
+          'BOOL alive',
+          'BOOL deadFlag',
+          'BOOL ragdollFlag',
+          'BOOL clearArea',
+        ],
+      },
+      moveTo,
+    ),
+    defineNative(
+      {
+        name: 'SET_ENTITY_COORDS_NO_OFFSET',
+        hash: 0x239a3351ac1da385n,
+        result: 'void',
+        params: [
+          'Entity entity',
+          'float x',
+          'float y',
+          'float z',
+          'BOOL keepTasks',
+          'BOOL keepIK',
+          'BOOL doWarp',
+        ],
+      },
+      moveTo,
+    ),
+    defineNative(
+      {
+        name: 'GET_ENTITY_HEADING',
+        hash: 0xe83d4f9ba2a38914n,
+        result: 'float',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        return found === undefined ? 0 : headingOf(found.rotation)
+      },
+    ),
+    defineNative(
+      {
+        name: 'SET_ENTITY_HEADING',
+        hash: 0x8e2530aa8ada980en,
+        result: 'void',
+        params: ['Entity entity', 'float heading'],
+      },
+      (ctx: NativeContext, entity, heading) => {
+        const found = clientEntityOf(ctx, entity)
+        if (found !== undefined) found.rotation = fromHeading(heading)
+      },
+    ),
+    defineNative(
+      {
+        name: 'GET_ENTITY_ROTATION',
+        hash: 0xafbd61cc738d9eb9n,
+        result: 'Vector3',
+        params: ['Entity entity', 'int rotationOrder'],
+      },
+      (ctx: NativeContext, entity, rotationOrder) => {
+        const found = clientEntityOf(ctx, entity)
+        return found === undefined ? ZERO : vector(toEuler(found.rotation, rotationOrder))
+      },
+    ),
+    defineNative(
+      {
+        name: 'SET_ENTITY_ROTATION',
+        hash: 0x8524a8b0171d5e07n,
+        result: 'void',
+        params: [
+          'Entity entity',
+          'float pitch',
+          'float roll',
+          'float yaw',
+          'int rotationOrder',
+          'BOOL bDeadCheck',
+        ],
+      },
+      (ctx: NativeContext, entity, pitch, roll, yaw, rotationOrder) => {
+        const found = clientEntityOf(ctx, entity)
+        if (found !== undefined) found.rotation = fromEuler(pitch, roll, yaw, rotationOrder)
+      },
+    ),
+    defineNative(
+      {
+        name: 'GET_ENTITY_MODEL',
+        hash: 0x9f47b058362c84b5n,
+        result: 'Hash',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.model ?? 0,
+    ),
+    defineNative(
+      {
+        name: 'GET_ENTITY_TYPE',
+        hash: 0x8acd366038d14505n,
+        result: 'int',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        return found === undefined ? EntityType.none : entityTypeOf(found.type)
+      },
+    ),
+    isOfType('IS_ENTITY_A_PED', 0x524ac5ecea15343en, EntityType.ped),
+    isOfType('IS_ENTITY_A_VEHICLE', 0x6ac7003fa6e5575en, EntityType.vehicle),
+    isOfType('IS_ENTITY_AN_OBJECT', 0x8d68c8fd0faca94en, EntityType.object),
+    defineNative(
+      {
+        name: 'FREEZE_ENTITY_POSITION',
+        hash: 0x428ca6dbd1094446n,
+        result: 'void',
+        params: ['Entity entity', 'BOOL toggle'],
+      },
+      (ctx: NativeContext, entity, toggle) => {
+        const found = clientEntityOf(ctx, entity)
+        if (found !== undefined) found.frozen = toggle
+      },
+    ),
+    defineNative(
+      { name: 'IS_ENTITY_POSITION_FROZEN', result: 'BOOL', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.frozen ?? false,
+    ),
+    defineNative(
+      {
+        name: 'SET_ENTITY_VISIBLE',
+        hash: 0xea1c610a04db6bbbn,
+        result: 'void',
+        params: ['Entity entity', 'BOOL toggle', 'BOOL unk'],
+      },
+      (ctx: NativeContext, entity, toggle) => {
+        const found = clientEntityOf(ctx, entity)
+        if (found !== undefined) found.visible = toggle
+      },
+    ),
+    defineNative(
+      {
+        name: 'IS_ENTITY_VISIBLE',
+        hash: 0x47d6f43d77935c75n,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.visible ?? false,
+    ),
+    defineNative(
+      {
+        name: 'GET_ENTITY_FORWARD_VECTOR',
+        hash: 0x0a794a5a57f8df91n,
+        result: 'Vector3',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        return found === undefined ? ZERO : vector(apply(found.rotation, 0, 1, 0))
+      },
+    ),
+    defineNative(
+      {
+        name: 'GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS',
+        hash: 0x1899f328b0e12848n,
+        result: 'Vector3',
+        params: ['Entity entity', 'float offsetX', 'float offsetY', 'float offsetZ'],
+      },
+      (ctx: NativeContext, entity, offsetX, offsetY, offsetZ) => {
+        const found = clientEntityOf(ctx, entity)
+        if (found === undefined) return ZERO
+        const [x, y, z] = apply(found.rotation, offsetX, offsetY, offsetZ)
+        return vector([found.x + x, found.y + y, found.z + z])
+      },
+    ),
+    defineNative(
+      { name: 'NETWORK_GET_ENTITY_OWNER', result: 'int', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        // Out of network games, entities have no network objects, which their owners own.
+        if (found === undefined || !inSession(ctx)) return -1
+        return localPlayerIndex(ctx)
+      },
+    ),
+  ]
+}
+
+/** Natives of the entities of servers, which their game state keeps. */
+function serverEntityNatives(): NativeDefinition<NativeContext>[] {
   return [
     defineNative(
       { name: 'DOES_ENTITY_EXIST', result: 'BOOL', params: ['Entity entity'] },

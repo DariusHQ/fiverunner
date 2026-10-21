@@ -34,7 +34,10 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 
 ## Entities
 
-- Servers create vehicles, peds and objects with `CreateVehicleServerSetter`, `CreatePed` and `CreateObjectNoOffset`, but clients have no world yet: no client knows of the entities of the server or owns them, so `NetworkGetEntityOwner` gives -1, and `CreateVehicle` and `CreateObject`, which FiveM's server has a client run, are not implemented.
+- Nothing moves entities but scripts: there is no game to drive, walk, fall or collide, and no models, so `SetEntityCoords` puts entities where it is told, without lifting them by the sizes of their models.
+- The ped of the player of a client starts as `player_zero` at 0, 0, 0, turned to the north, and the handles of the entities of clients come from a pool of their own, so they are not those GTA V would give. Clients calculate the rotations of entities in double precision, then round them to single precision, and take orders of rotations other than 0 to 5 as 2.
+- Clients know no other players yet: `GetActivePlayers` lists the local player alone, at 128 with OneSync and at 0 without it.
+- Nothing syncs yet: clients know nothing of the entities that servers create with `CreateVehicleServerSetter`, `CreatePed` and `CreateObjectNoOffset`, and servers nothing of the entities of clients, the peds of players too. So no client owns the entities of the server, whose `NetworkGetEntityOwner` gives -1, and `CreateVehicle` and `CreateObject`, which FiveM's server has a client run, are not implemented on servers.
 - `GetGamePool`, `GetAllVehicles`, `GetAllPeds` and `GetAllObjects` list entities in the order they were created, where FiveM lists them in the order of their addresses in its memory.
 - The ticks of the server stand for those of FiveM's sync thread: an entity that a script deletes exists until the next tick, and goes at its end, after `entityRemoved`, where FiveM's sync thread gets to it a few milliseconds later, whatever the main thread does meanwhile.
 

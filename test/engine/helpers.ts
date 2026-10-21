@@ -1,11 +1,11 @@
 import {
   ResourceManager,
+  Session,
   type FileSystem,
   type HttpClient,
   type KvpStore,
   type Player,
   type PlayerIdentity,
-  type Session,
   type NativeContext,
   type Resource,
   type ResourceDefinition,
@@ -144,4 +144,45 @@ export function join(
   session.server.tick()
   session.server.tick()
   return player
+}
+
+/** A client that joined a session, and runs Lua code in resources of its own. */
+export interface TestClient {
+  readonly server: TestProcess
+  readonly client: TestProcess
+  readonly session: Session
+  readonly player: Player
+  /** Runs Lua code on the client in a resource of its own, and returns what it printed as it started. */
+  run(code: string): string[]
+}
+
+/** A client that joined a server with or without OneSync as `identity`. */
+export async function clientOf(
+  options: { oneSync?: boolean } = {},
+  identity: PlayerIdentity = { name: 'Ann' },
+): Promise<TestClient> {
+  const server = await createProcess(options)
+  const session = new Session(server.manager)
+  const client = await createProcess({ side: 'client' })
+  const player = join(session, client.manager, identity)
+  let count = 0
+  return {
+    server,
+    client,
+    session,
+    player,
+    run(code) {
+      const prefix = `[script:run${count}] `
+      client
+        .add(`run${count++}`, {
+          'fxmanifest.lua': `fx_version 'cerulean'\ngame 'gta5'\nclient_script 'main.lua'`,
+          'main.lua': code,
+        })
+        .start()
+      return client
+        .take()
+        .filter((line) => line.startsWith(prefix))
+        .map((line) => line.slice(prefix.length))
+    },
+  }
 }
