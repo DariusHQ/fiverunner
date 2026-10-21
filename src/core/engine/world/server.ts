@@ -301,6 +301,11 @@ export class ServerGameState {
     return pending.guid + SCRIPT_HANDLE_BASE
   }
 
+  /** The clients that have an entity, as the server sent it them or they created it. */
+  knownBy(entity: SyncEntity): GameStateClient[] {
+    return [...this.#known].flatMap(([client, known]) => (known.has(entity) ? [client] : []))
+  }
+
   /** The entity of an object id, which FiveM takes in 16 bits, if there is one, valid or not. */
   byObjectId(objectId: number): SyncEntity | undefined {
     return this.#byId.get(objectId & 0xffff)
@@ -361,6 +366,7 @@ export class ServerGameState {
           scope.delete(other)
           this.#host.leaveScope(client, other, slot, false)
         }
+        entity.bag?.unroute(client)
         clones.push({ kind: 'remove', objectId: entity.objectId })
         continue
       }
@@ -375,6 +381,8 @@ export class ServerGameState {
       if (sent !== undefined && owner === client) {
         for (const fn of entity.onOwned.splice(0)) fn(client)
       }
+      // The bag of the entity routes to the client once it has the entity.
+      if (sent !== undefined) entity.bag?.route(client)
       if (sent === undefined) {
         clones.push({
           kind: 'create',
@@ -455,6 +463,7 @@ export class ServerGameState {
   #finalize(entity: SyncEntity): void {
     if (entity.finalizing) return
     entity.finalizing = true
+    entity.bag?.remove()
     this.#host.onMainThread(() => {
       const handle = this.handleOf(entity)
       this.#host.trigger('entityRemoved', [handle])

@@ -51,7 +51,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 ## Events and state bags
 
 - Latent events arrive by a deadline: the end of the sender's tick, plus the latency in whole milliseconds for each fragment after the first. Nothing is acknowledged or sent again, and pending events have no limit: `sv_netEventReassemblyMaxPendingEvents` is defined but not enforced.
-- Entities have no state bags yet, though `GetEntityFromStateBagName` finds them by the names their bags have. The packets of state bags have no size limit, and arrive at the start of the other side's next tick.
+- The packets of state bags have no size limit, and arrive at the start of the other side's next tick. Clients send what they set of the bags of the entities that they create before their servers took them, the first value of each key, as FiveM's do, but in the order they set them, where FiveM's clients send them in the order of a hash map.
 
 ## HTTP
 

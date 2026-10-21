@@ -63,6 +63,18 @@ export class ClientEntity {
   }
 }
 
+/** What the world of a client tells of the network objects of its entities, which their state bags follow. */
+export interface WorldHooks {
+  /** An entity got a network object: one that the client created, or a clone that its server sent. */
+  networked(entity: ClientEntity, created: boolean): void
+  /** The server took an entity that the client created. */
+  taken(entity: ClientEntity): void
+  /** An entity went from the world. */
+  forgotten(entity: ClientEntity): void
+}
+
+const NO_HOOKS: WorldHooks = { networked: () => {}, taken: () => {}, forgotten: () => {} }
+
 /** A player of another client, as a client knows it while it is in its scope. */
 export interface RemotePlayer {
   readonly netId: number
@@ -125,7 +137,10 @@ export class ClientWorld {
   /** The fade of the screen of the game. */
   readonly screen = new ScreenFade()
 
-  constructor() {
+  readonly #hooks: WorldHooks
+
+  constructor(hooks = NO_HOOKS) {
+    this.#hooks = hooks
     this.add(this.playerPed)
   }
 
@@ -241,6 +256,7 @@ export class ClientWorld {
         entity = new ClientEntity(clone.type, clone.state.model)
         entity.objectId = clone.objectId
         this.add(entity)
+        this.#hooks.networked(entity, false)
         if (clone.owner === netId) this.#take(entity, clone.state)
         else entity.owner = clone.owner
         entity.take(clone.state)
@@ -265,6 +281,13 @@ export class ClientWorld {
   /** Networks an entity with the first object id that the world has, if it has one. */
   network(entity: ClientEntity): void {
     entity.objectId = this.#objectIds.shift()
+    this.#hooks.networked(entity, true)
+  }
+
+  /** Learns that the server took an entity that the world created, of an object id. */
+  creationTaken(objectId: number): void {
+    const entity = this.byObjectId(objectId)
+    if (entity !== undefined) this.#hooks.taken(entity)
   }
 
   /** Lets go of the entities that the script of a resource owns, as GTA V does as scripts end. */
@@ -346,6 +369,7 @@ export class ClientWorld {
 
   /** Takes an entity out of the world, and returns whether the server knew of it. */
   #forget(entity: ClientEntity): boolean {
+    this.#hooks.forgotten(entity)
     this.#entities.delete(entity)
     this.#guids.delete(entity.handle)
     return this.#synced.delete(entity)

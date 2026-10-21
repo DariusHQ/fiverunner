@@ -26,6 +26,7 @@ import { ClientEntity } from '../world/client.ts'
 import { apply, fromEuler, fromHeading, headingOf, toEuler } from '../world/rotation.ts'
 import type { ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
+import { bindEntityBag } from '../world/bags.ts'
 import { checkArgument } from './events.ts'
 import { localPlayerIndex, withOneSync } from './players.ts'
 import { entityHandle } from './rpc.ts'
@@ -324,6 +325,15 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
     defineNative(
       { name: 'IS_ENTITY_POSITION_FROZEN', result: 'BOOL', params: ['Entity entity'] },
       (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.frozen ?? false,
+    ),
+    // FiveM's clients keep a bag of their own for the entities that scripts ask, while they are there.
+    defineNative(
+      { name: 'ENSURE_ENTITY_STATE_BAG', result: 'void', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => {
+        if (clientEntityOf(ctx, entity) !== undefined) {
+          ctx.manager.states.register(`localEntity:${entity}`, false)
+        }
+      },
     ),
     defineNative(
       {
@@ -811,6 +821,18 @@ function serverEntityNatives(): NativeDefinition<NativeContext>[] {
     defineNative(
       { name: 'DOES_ENTITY_EXIST', result: 'BOOL', params: ['Entity entity'] },
       (ctx: NativeContext, entity) => gameStateOf(ctx).byHandle(entity)?.valid ?? false,
+    ),
+    defineNative(
+      { name: 'ENSURE_ENTITY_STATE_BAG', result: 'void', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => {
+        const found = entityOf(ctx, entity)
+        if (found === undefined || found.bag !== undefined) return
+        const bag = bindEntityBag(ctx.manager.states, `entity:${found.objectId}`, found)
+        // FiveM's server routes it to the clients that have the entity, and to -1, which is none of them.
+        bag.addRoutingTarget(-1)
+        for (const client of gameStateOf(ctx).knownBy(found)) bag.addRoutingTarget(client.slot!)
+        found.bag!.own(found.owner)
+      },
     ),
     defineNative(
       { name: 'NETWORK_GET_ENTITY_FROM_NETWORK_ID', result: 'Entity', params: ['int netId'] },

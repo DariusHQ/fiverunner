@@ -52,7 +52,7 @@ import { ResourceScanner } from './scan.ts'
 import type { Player, Session } from './session.ts'
 import { StateBags } from './statebags.ts'
 import { OpenFiles } from './streams.ts'
-import { ClientWorld } from './world/client.ts'
+import { ClientWorld, type WorldHooks } from './world/client.ts'
 import { ServerGameState } from './world/server.ts'
 
 /** Where a process writes what it reports. */
@@ -206,6 +206,23 @@ export class ResourceManager {
   #session: Session | undefined
   #player: Player | undefined
   #world: ClientWorld | undefined
+  /**
+   * What the world of a client does with the bags of its entities, as
+   * FiveM's clients do: they have the bag of each network object, and hold
+   * back what they replicate of those that they create until their servers
+   * took them, and the bags go with their entities.
+   */
+  readonly #worldHooks: WorldHooks = {
+    networked: (entity, created) => {
+      const bag = this.states.register(`entity:${entity.objectId}`, true)
+      if (created) bag.hold()
+    },
+    taken: (entity) => this.states.get(`entity:${entity.objectId}`)?.release(),
+    forgotten: (entity) => {
+      if (entity.objectId !== undefined) this.states.remove(`entity:${entity.objectId}`)
+      this.states.remove(`localEntity:${entity.handle}`)
+    },
+  }
   readonly #rpc: ClientRpc | undefined
   /** sv_enableNetEventReassembly, which turns latent events on. */
   readonly #reassembly: Variable
@@ -274,7 +291,7 @@ export class ResourceManager {
         )
       : undefined
     this.nui = server ? undefined : new Nui(this)
-    this.#world = server ? undefined : new ClientWorld()
+    this.#world = server ? undefined : new ClientWorld(this.#worldHooks)
     this.#rpc = server ? undefined : new ClientRpc(this)
     const consoleOptions = {
       security: this.security,
@@ -348,10 +365,11 @@ export class ResourceManager {
         false,
       )
       this.#endpoints = undefined
-      // FiveM's client sends the bags it has to its server, and takes those of players as they come, as
-      // those of entities, which FiveRunner has none of.
+      // FiveM's client sends the bags it has to its server, and takes those of entities and players as
+      // they come.
       this.states.register('global', true)
       this.states.registerTarget(0)
+      this.states.addPreCreatePrefix('entity:', true)
       this.states.addPreCreatePrefix('player:', true)
     }
     this.natives.register(
@@ -566,7 +584,7 @@ export class ResourceManager {
     else this.resetResources()
     this.#forgetServerVariables()
     // The game that the client goes back to has a world of its own.
-    this.#world = new ClientWorld()
+    this.#world = new ClientWorld(this.#worldHooks)
     if (left.joined) {
       // FiveM's client forgets the bags of its game session, but for a new global one.
       this.states.reset()

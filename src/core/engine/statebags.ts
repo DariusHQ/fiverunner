@@ -34,6 +34,8 @@ export class StateBag {
   /** The peers it routes to, which a std::set orders. */
   readonly #routing = new Set<number>()
   #owner: number | undefined
+  /** What the bag holds back of what it replicates, until it may send it: the first value set of each key. */
+  #held: Map<string, Uint8Array> | undefined
 
   /** @internal State bags come from StateBags.register. */
   constructor(states: StateBags, name: string, useParentTargets: boolean) {
@@ -94,10 +96,30 @@ export class StateBag {
     } else {
       this.#data.set(key, new Uint8Array(data))
     }
-    if (replicated) {
-      const targets = this.#useParentTargets ? this.#states.targets : this.#routingTargets()
-      for (const target of targets) this.#states.send(target, this.name, key, data)
+    if (!replicated) return
+    // FiveM emplaces what it holds back, which keeps the first value of a key.
+    if (this.#held !== undefined) {
+      if (!this.#held.has(key)) this.#held.set(key, new Uint8Array(data))
+      return
     }
+    this.#replicate(key, data)
+  }
+
+  /** Holds back what the bag replicates, as FiveM's clients do for the entities they create until their servers have them. */
+  hold(): void {
+    this.#held = new Map()
+  }
+
+  /** Sends what the bag held back, and what it replicates from then on. */
+  release(): void {
+    const held = this.#held ?? new Map<string, Uint8Array>()
+    this.#held = undefined
+    for (const [key, data] of held) this.#replicate(key, data)
+  }
+
+  #replicate(key: string, data: Uint8Array): void {
+    const targets = this.#useParentTargets ? this.#states.targets : this.#routingTargets()
+    for (const target of targets) this.#states.send(target, this.name, key, data)
   }
 
   /** Routes the bag to a peer too, which gets all of its keys. */

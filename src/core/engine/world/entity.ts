@@ -85,9 +85,23 @@ export interface SyncState {
 /** A client of a server, as its game state knows it. */
 export interface GameStateClient {
   readonly netId: number
+  /** The slot of the client, which state bags route to, once it joined with OneSync. */
+  readonly slot?: number | undefined
 }
 
 /** An entity of FiveM's server game state, which its sync tree describes. */
+/** The state bag of an entity of a server, which routes to the clients that have the entity, as FiveM's server routes them. */
+export interface EntityBag {
+  /** Routes the bag to a client that has the entity, which gets all of its keys. */
+  route(client: GameStateClient): void
+  /** Routes the bag no more to a client that no longer has the entity. */
+  unroute(client: GameStateClient): void
+  /** Lets the client that owns the entity set the keys of the bag, or the server alone when none does. */
+  own(owner: GameStateClient | undefined): void
+  /** Removes the bag, which goes with the entity. */
+  remove(): void
+}
+
 /**
  * An entity that a client creates for a script of the server, as FiveM's
  * server knows it until the client syncs it: by its creation token, with a
@@ -114,8 +128,7 @@ export class SyncEntity {
   readonly objectId: number
   /** What the sync tree of the entity holds, which its owner syncs. */
   state: SyncState
-  /** The client that owns the entity and syncs it, if any. */
-  owner: GameStateClient | undefined = undefined
+  #owner: GameStateClient | undefined = undefined
   /** The client that created the entity, if one did. */
   firstOwner: GameStateClient | undefined = undefined
   /** Whether the client that created the entity dropped. */
@@ -134,11 +147,23 @@ export class SyncEntity {
   finalizing = false
   /** What waits for a client to own the entity, which runs once the client has it. */
   readonly onOwned: ((owner: GameStateClient) => void)[] = []
+  /** The state bag of the entity, once a script or a client asked for one. */
+  bag: EntityBag | undefined = undefined
 
   constructor(type: NetObjType, objectId: number, state: SyncState) {
     this.type = type
     this.objectId = objectId
     this.state = state
+  }
+
+  /** The client that owns the entity and syncs it, if any, which the bag of the entity takes keys from as it changes owners. */
+  get owner(): GameStateClient | undefined {
+    return this.#owner
+  }
+
+  set owner(client: GameStateClient | undefined) {
+    this.#owner = client
+    this.bag?.own(client)
   }
 
   /** Whether a script of the client that created the entity owns it, which keeps it with its owner. */

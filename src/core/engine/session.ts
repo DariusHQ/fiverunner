@@ -4,6 +4,7 @@ import { ManifestError } from './manifest.ts'
 import { pack } from './msgpack.ts'
 import type { Resource } from './resource.ts'
 import type { RpcCall } from './rpc.ts'
+import { bindEntityBag } from './world/bags.ts'
 import type { ClientWorld } from './world/client.ts'
 import type { ServerClone } from './world/server.ts'
 
@@ -521,6 +522,8 @@ export class Session {
               clone.state,
               clone.creationToken,
             )
+            // FiveM's servers tell clients that they took what they created.
+            this.#toWorld(player, (world) => world.creationTaken(clone.objectId))
             break
           case 'sync':
             gameState.receiveSync(player, clone.objectId, clone.state)
@@ -607,8 +610,10 @@ export class Session {
 
   /** @internal Called by the state bags of the server as they send a key to the client of a slot, which takes it at its next tick. */
   sendStateBag(slot: number, bag: string, key: string, data: Uint8Array): void {
-    // The bags send to no slot that no player has, which they forget as players leave.
-    const player = this.#slots.get(slot)!
+    // The bags send to no slot that no player has, which they forget as players leave, but the bags of
+    // entities, which also route to -1, which FiveM's server sends nothing to.
+    const player = this.#slots.get(slot)
+    if (player === undefined) return
     const bytes = new Uint8Array(data)
     // Clients of FiveM take what their server sends as from its peer 0.
     player.client.receive(() => player.client.states.receive(0, bag, key, bytes))
@@ -625,8 +630,22 @@ export class Session {
     server.receive(() => {
       const { slot } = player
       if (server.strictStateBags || slot === undefined) return
+      if (server.states.get(bag) === undefined) this.#createEntityBag(bag)
       server.states.receive(slot, bag, key, bytes)
     })
+  }
+
+  /**
+   * Creates the bag of an entity that a client sent a key of, as FiveM's
+   * server lets clients create those alone: when its name is entity: and an
+   * int, as std::from_chars reads it, of the object id of an entity.
+   */
+  #createEntityBag(name: string): void {
+    const digits = /^entity:(-?\d+)/.exec(name)?.[1]
+    const id = digits === undefined ? NaN : Number(digits)
+    if (!(id >= -(2 ** 31) && id < 2 ** 31)) return
+    const entity = this.server.gameState!.byObjectId(id)
+    if (entity !== undefined) bindEntityBag(this.server.states, name, entity)
   }
 
   /** @internal Called by the server with the replicated variables that changed, which the clients that joined take. */
