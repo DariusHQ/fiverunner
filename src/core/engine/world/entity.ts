@@ -145,6 +145,8 @@ export class SyncEntity {
   deleting = false
   /** Whether the entity is being removed for good. */
   finalizing = false
+  /** The routing bucket of the entity, whose clients alone have it: that of the client that created it, or 0. */
+  routingBucket = 0
   /** What waits for a client to own the entity, which runs once the client has it. */
   readonly onOwned: ((owner: GameStateClient) => void)[] = []
   /** The state bag of the entity, once a script or a client asked for one. */

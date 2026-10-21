@@ -250,6 +250,29 @@ function serverPlayerNatives(): NativeDefinition<NativeContext>[] {
       },
     ),
     defineNative(
+      { name: 'GET_PLAYER_ROUTING_BUCKET', result: 'int', params: ['char* playerSrc'] },
+      (ctx: NativeContext, playerSrc) => {
+        const player = playerOf(ctx, playerSrc)
+        return player === undefined ? 0 : ctx.manager.gameState!.bucketOf(player)
+      },
+    ),
+    defineNative(
+      {
+        name: 'SET_PLAYER_ROUTING_BUCKET',
+        result: 'void',
+        params: ['char* playerSrc', 'int bucket'],
+      },
+      (ctx: NativeContext, playerSrc, bucket) => {
+        const player = playerOf(ctx, playerSrc)
+        // FiveM's server takes no bucket below 0.
+        if (player === undefined || bucket < 0) return
+        const gameState = ctx.manager.gameState!
+        const old = gameState.bucketOf(player)
+        gameState.setBucket(player, bucket)
+        ctx.manager.events.trigger('onPlayerBucketChange', pack([playerSrc, bucket, old]))
+      },
+    ),
+    defineNative(
       { name: 'GET_PLAYER_GUID', result: 'char*', params: ['char* playerSrc'] },
       (ctx: NativeContext, playerSrc) => playerOf(ctx, playerSrc)?.guid ?? null,
     ),

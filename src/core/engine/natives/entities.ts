@@ -24,7 +24,7 @@ import {
 } from '../world/quantize.ts'
 import { ClientEntity } from '../world/client.ts'
 import { apply, fromEuler, fromHeading, headingOf, toEuler } from '../world/rotation.ts'
-import type { ServerGameState } from '../world/server.ts'
+import type { EntityLockdown, ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
 import { bindEntityBag } from '../world/bags.ts'
 import { checkArgument } from './events.ts'
@@ -40,6 +40,9 @@ const POOLS: ReadonlyMap<string, number> = new Map([
   ['CObject', EntityType.object],
   ['CNetObject', EntityType.object],
 ])
+
+/** The entity lockdown modes that SetRoutingBucketEntityLockdownMode takes. */
+const LOCKDOWN_MODES: ReadonlySet<string> = new Set(['strict', 'no_dummy', 'relaxed', 'inactive'])
 
 /** The game state of the server whose script calls a native. */
 function gameStateOf(ctx: NativeContext): ServerGameState {
@@ -898,6 +901,46 @@ function serverEntityNatives(): NativeDefinition<NativeContext>[] {
     defineNative(
       { name: 'GET_ENTITY_POPULATION_TYPE', result: 'int', params: ['Entity entity'] },
       (ctx: NativeContext, entity) => entityOf(ctx, entity)?.state.popType ?? 0,
+    ),
+    defineNative(
+      { name: 'GET_ENTITY_ROUTING_BUCKET', result: 'int', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => entityOf(ctx, entity)?.routingBucket ?? 0,
+    ),
+    defineNative(
+      {
+        name: 'SET_ENTITY_ROUTING_BUCKET',
+        result: 'void',
+        params: ['Entity entity', 'int bucket'],
+      },
+      (ctx: NativeContext, entity, bucket) => {
+        const found = entityOf(ctx, entity)
+        if (found === undefined) return
+        const old = found.routingBucket
+        // FiveM's server takes no bucket below 0, but tells of it all the same.
+        if (bucket >= 0) found.routingBucket = bucket
+        ctx.manager.events.trigger('onEntityBucketChange', pack([entity >>> 0, bucket, old]))
+      },
+    ),
+    defineNative(
+      {
+        name: 'SET_ROUTING_BUCKET_ENTITY_LOCKDOWN_MODE',
+        result: 'void',
+        params: ['int bucketId', 'char* mode'],
+      },
+      (ctx: NativeContext, bucketId, mode) => {
+        const name = checkArgument(mode, 1)
+        // FiveM's server takes no other mode.
+        if (LOCKDOWN_MODES.has(name)) gameStateOf(ctx).setLockdown(bucketId, name as EntityLockdown)
+      },
+    ),
+    // There is no population to enable or disable.
+    defineNative(
+      {
+        name: 'SET_ROUTING_BUCKET_POPULATION_ENABLED',
+        result: 'void',
+        params: ['int bucketId', 'BOOL mode'],
+      },
+      () => {},
     ),
     defineNative(
       { name: 'GET_ENTITY_MODEL', result: 'Hash', params: ['Entity entity'] },

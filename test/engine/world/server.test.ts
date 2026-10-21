@@ -196,6 +196,45 @@ describe('The game state of servers with entities that clients create for them',
   })
 })
 
+describe('The game state of servers in entity lockdown', () => {
+  it('deletes what clients create in strict and relaxed lockdown, but what it had them create and their players, without entityCreating', () => {
+    for (const mode of ['strict', 'relaxed'] as const) {
+      const { state, triggered, runMainThread } = gameState()
+      state.entityLockdown = mode
+      state.pend(48271, ANN)
+      state.receiveCreate(ANN, 1, NetObjType.player, STATE)
+      state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+      state.receiveCreate(ANN, 3, NetObjType.automobile, STATE, 48271)
+      // A token that the server gave no entity is none.
+      state.receiveCreate(ANN, 4, NetObjType.automobile, STATE, 12345)
+      runMainThread()
+      state.tick()
+      runMainThread()
+      expect(triggered.map(([name, [handle]]) => `${name} ${handle as number}`)).toEqual([
+        // The player, which no lockdown keeps from coming, then the vehicle that took the first GUID, which the server gave it.
+        'entityCreating 131329',
+        'entityCreating 131073',
+        // The second takes the GUID that the first had.
+        'entityRemoved 131585',
+        'entityRemoved 131586',
+      ])
+    }
+  })
+
+  it('keeps all in no_dummy and inactive lockdown, and takes the modes of routing buckets before its own', () => {
+    const { state, triggered, runMainThread } = gameState()
+    state.entityLockdown = 'strict'
+    state.setLockdown(0, 'no_dummy')
+    state.setLockdown(1, 'inactive')
+    state.setBucket(BOB, 1)
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.receiveCreate(BOB, 3, NetObjType.automobile, STATE)
+    runMainThread()
+    expect(triggered.map(([name]) => name)).toEqual(['entityCreating', 'entityCreating'])
+    expect([state.byObjectId(2)!.routingBucket, state.byObjectId(3)!.routingBucket]).toEqual([0, 1])
+  })
+})
+
 describe('The game state of servers with clients', () => {
   it('hands clients object ids from 1 up, which it then hands no one else', () => {
     const { state } = gameState()

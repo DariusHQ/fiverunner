@@ -53,7 +53,7 @@ import type { Player, Session } from './session.ts'
 import { StateBags } from './statebags.ts'
 import { OpenFiles } from './streams.ts'
 import { ClientWorld, type WorldHooks } from './world/client.ts'
-import { ServerGameState } from './world/server.ts'
+import { ServerGameState, type EntityLockdown } from './world/server.ts'
 
 /** Where a process writes what it reports. */
 export interface ProcessOutput {
@@ -333,6 +333,10 @@ export class ResourceManager {
         false,
       )
       this.#endpoints = defineServerVariables(this, options.gameBuild ?? DEFAULT_GAME_BUILD)
+      // The game state tracks sv_entityLockdown, as FiveM's does.
+      this.console.variables.find('sv_entityLockdown')!.track((mode) => {
+        this.gameState!.entityLockdown = mode as EntityLockdown
+      })
       this.#startServerConsole()
     } else {
       // FiveM's client lets its own code set what servers replicate, among others.

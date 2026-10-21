@@ -33,6 +33,9 @@ interface Known {
   readonly state: string
 }
 
+/** Which entities that clients create FiveM's servers keep, as the modes of sv_entityLockdown tell. */
+export type EntityLockdown = 'strict' | 'no_dummy' | 'relaxed' | 'inactive'
+
 /** Whether an entity is within 424 metres of a position on the ground, in single precision. */
 function near(entity: SyncEntity, [x, y]: readonly number[]): boolean {
   const [ex, ey] = fromSector(entity.state.position)
@@ -115,6 +118,12 @@ export class ServerGameState {
   readonly #pending = new Map<number, PendingEntity>()
   /** The last creation token, which FiveM's server draws from std::minstd_rand. */
   #creationToken = 1
+  /** The routing buckets of clients, which put them where they are alone with those of their buckets, 0 by default. */
+  readonly #buckets = new Map<GameStateClient, number>()
+  /** The entity lockdown modes of routing buckets, before that of sv_entityLockdown. */
+  readonly #lockdowns = new Map<number, EntityLockdown>()
+  /** The entity lockdown mode of sv_entityLockdown, which routing buckets of no mode of their own take. */
+  entityLockdown: EntityLockdown = 'inactive'
   /** The object ids of the entities that scripts or clients deleted, which the sync thread starts deleting. */
   readonly #deletes: number[] = []
 
@@ -191,6 +200,8 @@ export class ServerGameState {
     if (this.#byId.has(objectId)) return
     if (type === NetObjType.player && this.#players.has(client)) return
     const entity = this.#add(type, objectId, state)
+    entity.routingBucket = this.bucketOf(client)
+    const lockedDown = this.#lockedDown(client, type, creationToken)
     const pending = creationToken === undefined ? undefined : this.#pending.get(creationToken)
     if (pending !== undefined) {
       this.#pending.delete(pending.token)
@@ -204,6 +215,11 @@ export class ServerGameState {
     // The client has the entity, which it created.
     this.#known.get(client)?.set(entity, { owner: client.netId, state: JSON.stringify(state) })
     if (type === NetObjType.player) this.#players.set(client, entity)
+    // FiveM's server deletes what its entity lockdown keeps clients from creating, before entityCreating.
+    if (lockedDown) {
+      this.#deletes.push(objectId)
+      return
+    }
     this.#host.onMainThread(() => {
       if (!entity.valid) return
       if (!this.#host.trigger('entityCreating', [this.handleOf(entity)])) {
@@ -262,6 +278,7 @@ export class ServerGameState {
     for (const id of this.#objectIds.get(client) ?? []) this.#sent.delete(id)
     this.#objectIds.delete(client)
     this.#known.delete(client)
+    this.#buckets.delete(client)
     this.#players.delete(client)
   }
 
@@ -299,6 +316,38 @@ export class ServerGameState {
     pending.guid = this.#guids.add(pending)
     this.#pending.set(token, pending)
     return pending.guid + SCRIPT_HANDLE_BASE
+  }
+
+  /** The routing bucket of a client. */
+  bucketOf(client: GameStateClient): number {
+    return this.#buckets.get(client) ?? 0
+  }
+
+  /** Puts a client in a routing bucket, and the entity of its player, as FiveM's SetPlayerRoutingBucket does. */
+  setBucket(client: GameStateClient, bucket: number): void {
+    this.#buckets.set(client, bucket)
+    const player = this.#players.get(client)
+    if (player !== undefined) player.routingBucket = bucket
+  }
+
+  /** Sets the entity lockdown mode of a routing bucket, which takes it over that of sv_entityLockdown. */
+  setLockdown(bucket: number, mode: EntityLockdown): void {
+    this.#lockdowns.set(bucket, mode)
+  }
+
+  /**
+   * Whether the entity lockdown mode of the routing bucket of a client keeps
+   * it from creating an entity, as FiveM's server tells, but players: strict
+   * and relaxed keep all but those that the server has clients create, by
+   * their creation tokens, and the population, which FiveRunner has none of,
+   * which relaxed keeps too, and no_dummy keeps all but dummy objects,
+   * which there are none of either.
+   */
+  #lockedDown(client: GameStateClient, type: NetObjType, token: number | undefined): boolean {
+    if (type === NetObjType.player) return false
+    const mode = this.#lockdowns.get(this.bucketOf(client)) ?? this.entityLockdown
+    if (mode === 'inactive' || mode === 'no_dummy') return false
+    return token === undefined || !this.#pending.has(token)
   }
 
   /** The clients that have an entity, as the server sent it them or they created it. */
@@ -435,14 +484,17 @@ export class ServerGameState {
     if (entity.deleting) return false
     const owns = entity.owner === client
     if (!owns && !entity.passedFilter) return false
-    if (focus !== undefined && near(entity, focus)) {
+    // Entities are relevant to the clients of their routing buckets alone, but the entities of their players.
+    const bucket = entity.routingBucket === this.bucketOf(client)
+    const seen = bucket || this.#players.get(client) === entity
+    if (seen && focus !== undefined && near(entity, focus)) {
       if (owns) entity.wantsReassign = false
       return true
     }
     if (!owns) return false
     // An owner that is no longer near an entity hands it to the next client near it, and keeps it until then if its scripts own it or it did not sync it yet.
     entity.wantsReassign = true
-    return !entity.hasSynced || entity.ownedByClientScript
+    return (!entity.hasSynced || entity.ownedByClientScript) && bucket
   }
 
   #add(type: NetObjType, objectId: number, state: SyncState): SyncEntity {
