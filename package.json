@@ -46,6 +46,7 @@
   "devDependencies": {
     "@citizenfx/client": "2.0.37175-1",
     "@citizenfx/server": "2.0.37175-1",
+    "@sqlite.org/sqlite-wasm": "3.53.4-build2",
     "@types/node": "22.18.13",
     "mime": "2.4.0",
     "prettier": "3.9.9",
