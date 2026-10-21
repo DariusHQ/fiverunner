@@ -2,6 +2,7 @@ import { hashString } from '../../natives/index.ts'
 import { EntityType, entityTypeOf, NetObjType } from './entity.ts'
 import { Pool } from './pool.ts'
 import { IDENTITY, type Matrix } from './rotation.ts'
+import { ScreenFade } from './screen.ts'
 
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
 export const PLAYER_ZERO = hashString('player_zero')
@@ -58,6 +59,8 @@ export class ClientWorld {
   readonly #kinds = new Map<number, number>()
   /** The ped of the local player: player_zero, at 0, 0, 0. */
   readonly playerPed = new ClientEntity(NetObjType.player, PLAYER_ZERO)
+  /** The fade of the screen of the game. */
+  readonly screen = new ScreenFade()
 
   constructor() {
     this.add(this.playerPed)
