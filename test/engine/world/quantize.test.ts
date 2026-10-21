@@ -7,6 +7,10 @@ import {
   headingQuaternion,
   quaternionRotation,
   radiansToDegrees,
+  syncFloat,
+  syncHeading,
+  syncSector,
+  syncSignedFloat,
   toSector,
 } from '../../../src/core/engine/world/quantize.ts'
 
@@ -90,6 +94,46 @@ describe('Sector positions', () => {
       z: 5.100000381469727,
     })
     expect(fromSector(position)).toEqual([-1.0999984741210938, y, 30.0999755859375])
+  })
+})
+
+describe('Floats that clients sync', () => {
+  it('are truncated to the steps of their bits', () => {
+    // 46 / 54 * 4095 is 3488.33, and 3488 / 4095 * 54 is 45.9956.
+    expect(syncFloat(12, 54, 46)).toBe(45.99560546875)
+    expect(syncFloat(12, 54, 54)).toBe(54)
+    expect(syncFloat(12, 54, 0)).toBe(0)
+    expect(syncFloat(1, 1, 0.99)).toBe(0)
+  })
+
+  it('with signs are truncated toward 0', () => {
+    // -0.5 * 127 is -63.5.
+    expect(syncSignedFloat(8, 1, -0.5)).toBe(Math.fround(-63 / 127))
+    expect(syncSignedFloat(8, 1, 0.5)).toBe(Math.fround(63 / 127))
+  })
+
+  it('give positions in steps of 54 / 4095 and 69 / 4095 metres in their sectors', () => {
+    expect(syncSector(100, 200, 30)).toEqual({
+      sectorX: 513,
+      sectorY: 515,
+      sectorZ: 25,
+      x: 45.99560546875,
+      y: 37.9912109375,
+      z: 4.987545967102051,
+    })
+    expect(fromSector(syncSector(100, 200, 30))).toEqual([
+      99.99560546875, 199.9912109375, 29.987548828125,
+    ])
+  })
+
+  it('give the headings of peds in 8 bits, which turn them up to 3 degrees less', () => {
+    // A quarter of a turn is 31.75 of the 127 steps of a half turn.
+    expect(radiansToDegrees(syncHeading(Math.fround(Math.PI / 2)))).toBe(87.87401580810547)
+    expect(radiansToDegrees(syncHeading(Math.fround(-Math.PI / 2)))).toBe(-87.87401580810547)
+    expect(syncHeading(Math.fround(Math.PI))).toBe(
+      Math.fround(Math.fround(63 / 127) * Math.fround(6.28318548)),
+    )
+    expect(syncHeading(0)).toBe(0)
   })
 })
 

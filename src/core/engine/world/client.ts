@@ -1,16 +1,21 @@
 import { hashString } from '../../natives/index.ts'
-import { EntityType, entityTypeOf, NetObjType } from './entity.ts'
+import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
 import { Pool } from './pool.ts'
 import { IDENTITY, type Matrix } from './rotation.ts'
 import { ScreenFade } from './screen.ts'
+import { sameState, syncStateOf } from './sync.ts'
 
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
 export const PLAYER_ZERO = hashString('player_zero')
 
+/** How few object ids FiveM's clients in OneSync's big mode keep before they ask their servers for more. */
+const FEW_OBJECT_IDS = 4
+
 /**
  * An entity in the world of a client, as GTA V keeps it: where it is, how
- * it turns, its model, and the script that owns it, as mission entities
- * have. Nothing moves it but scripts.
+ * it turns, its model, the script that owns it, as mission entities have,
+ * and the object id of its network object, which networked entities have.
+ * Nothing moves it but scripts.
  */
 export class ClientEntity {
   readonly type: NetObjType
@@ -23,8 +28,8 @@ export class ClientEntity {
   rotation: Matrix = IDENTITY
   frozen = false
   visible = true
-  /** Whether the entity has a network object, which entities of network games that scripts want networked have. */
-  networked = false
+  /** The object id of the network object of the entity, which is its network id, if it is networked. */
+  objectId: number | undefined = undefined
   /** The resource whose script owns the entity, which makes it a mission entity, if any. */
   script: string | undefined = undefined
 
@@ -41,11 +46,30 @@ export class ClientEntity {
   }
 }
 
+/** What a client tells its server of the entities it owns, as FiveM's clients send clones. */
+export type CloneMessage =
+  | {
+      readonly kind: 'create'
+      readonly objectId: number
+      readonly type: NetObjType
+      readonly state: SyncState
+    }
+  | { readonly kind: 'sync'; readonly objectId: number; readonly state: SyncState }
+  | { readonly kind: 'remove'; readonly objectId: number }
+
+/** What a client sends its server as a tick of its world ends. */
+export interface WorldSync {
+  readonly clones: readonly CloneMessage[]
+  /** Whether the client asks for more object ids. */
+  readonly requestObjectIds: boolean
+}
+
 /**
  * The world of a client: the entities that it knows of, by the handles
  * that scripts know them by, which come from a pool of script GUIDs as GTA
- * V's do, the ped of its player, which it starts with, and the models that
- * it streamed in.
+ * V's do, the ped of its player, which it starts with, the models that it
+ * streamed in, and the object ids that its server handed it for the
+ * entities it networks, which it uses first in, first out.
  */
 export class ClientWorld {
   readonly #guids = new Pool<ClientEntity>(0)
@@ -57,6 +81,14 @@ export class ClientWorld {
   readonly #requested = new Set<number>()
   /** The entity types of the models that the world learned of, as scripts created entities of them. */
   readonly #kinds = new Map<number, number>()
+  /** The object ids that the world may network entities with. */
+  readonly #objectIds: number[] = []
+  /** Whether the world asked for object ids, which it has not got yet. */
+  #askedForObjectIds = false
+  /** What the world last told its server of each networked entity that it told of. */
+  readonly #synced = new Map<ClientEntity, SyncState>()
+  /** The object ids of the networked entities that scripts removed, which the world tells its server of. */
+  readonly #removed: number[] = []
   /** The ped of the local player: player_zero, at 0, 0, 0. */
   readonly playerPed = new ClientEntity(NetObjType.player, PLAYER_ZERO)
   /** The fade of the screen of the game. */
@@ -84,10 +116,54 @@ export class ClientWorld {
     return this.#guids.get(handle)
   }
 
-  /** Removes an entity from the world, which frees its handle. */
+  /** The entity of an object id, if there is one. */
+  byObjectId(objectId: number): ClientEntity | undefined {
+    for (const entity of this.#entities) {
+      if (entity.objectId === objectId) return entity
+    }
+    return undefined
+  }
+
+  /**
+   * Removes an entity from the world, which frees its handle. The object
+   * id of a networked entity that the server knows of is free once the
+   * server took its removal; those of others are free at once.
+   */
   remove(entity: ClientEntity): void {
-    this.#entities.delete(entity)
-    this.#guids.delete(entity.handle)
+    const known = this.#forget(entity)
+    const { objectId } = entity
+    if (objectId === undefined) return
+    if (known) this.#removed.push(objectId)
+    else this.#objectIds.push(objectId)
+  }
+
+  /** Removes the entity of an object id, which the server removed, and frees the object id. */
+  removedByServer(objectId: number): void {
+    const entity = this.byObjectId(objectId)
+    if (entity === undefined) return
+    this.#forget(entity)
+    this.#objectIds.push(objectId)
+  }
+
+  /** Frees the object id of an entity whose removal the server took. */
+  removalTaken(objectId: number): void {
+    this.#objectIds.push(objectId)
+  }
+
+  /** Takes object ids that the server handed the world. */
+  receiveObjectIds(ids: readonly number[]): void {
+    this.#objectIds.push(...ids)
+    this.#askedForObjectIds = false
+  }
+
+  /** Whether the world has an object id to network an entity with. */
+  get canNetwork(): boolean {
+    return this.#objectIds.length > 0
+  }
+
+  /** Networks an entity with the first object id that the world has, if it has one. */
+  network(entity: ClientEntity): void {
+    entity.objectId = this.#objectIds.shift()
   }
 
   /** Lets go of the entities that the script of a resource owns, as GTA V does as scripts end. */
@@ -116,5 +192,38 @@ export class ClientWorld {
   tick(): void {
     for (const model of this.#requested) this.#loaded.add(model)
     this.#requested.clear()
+  }
+
+  /**
+   * What the world tells its server as a tick ends, in a network game with
+   * OneSync: the ped of the player is networked as soon as the world has
+   * an object id, the server is told of the networked entities that scripts
+   * created, removed or changed since, and the world asks for object ids
+   * once it has few.
+   */
+  sync(): WorldSync {
+    if (this.playerPed.objectId === undefined) this.network(this.playerPed)
+    const clones: CloneMessage[] = this.#removed
+      .splice(0)
+      .map((objectId) => ({ kind: 'remove', objectId }))
+    for (const entity of this.#entities) {
+      const { objectId } = entity
+      if (objectId === undefined) continue
+      const state = syncStateOf(entity)
+      const last = this.#synced.get(entity)
+      if (last === undefined) clones.push({ kind: 'create', objectId, type: entity.type, state })
+      else if (!sameState(last, state)) clones.push({ kind: 'sync', objectId, state })
+      this.#synced.set(entity, state)
+    }
+    const requestObjectIds = !this.#askedForObjectIds && this.#objectIds.length < FEW_OBJECT_IDS
+    if (requestObjectIds) this.#askedForObjectIds = true
+    return { clones, requestObjectIds }
+  }
+
+  /** Takes an entity out of the world, and returns whether the server knew of it. */
+  #forget(entity: ClientEntity): boolean {
+    this.#entities.delete(entity)
+    this.#guids.delete(entity.handle)
+    return this.#synced.delete(entity)
   }
 }

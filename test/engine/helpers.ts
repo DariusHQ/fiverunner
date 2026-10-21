@@ -165,6 +165,9 @@ export async function clientOf(
   const session = new Session(server.manager)
   const client = await createProcess({ side: 'client' })
   const player = join(session, client.manager, identity)
+  // The client takes its object ids and networks the ped of its player, which the server then takes.
+  client.manager.tick()
+  server.manager.tick()
   let count = 0
   return {
     server,

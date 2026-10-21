@@ -7,10 +7,12 @@ import {
   headingOf,
   IDENTITY,
   toEuler,
+  toQuaternion,
   type Matrix,
 } from '../../../src/core/engine/world/rotation.ts'
 
 const RADIANS = Math.PI / 180
+const HALF_ROOT = Math.SQRT1_2
 
 /** The matrix of a rotation about an axis, written out as textbooks have it. */
 function axis(name: 'x' | 'y' | 'z', degrees: number): Matrix {
@@ -143,6 +145,25 @@ describe('Rotations of entities', () => {
     // Pitch does not change where the front points on the ground.
     expect(headingOf(fromEuler(30, 0, 45, 2))).toBeCloseTo(45, 9)
     expect(Object.is(headingOf(fromHeading(-0)), 0)).toBe(true)
+  })
+
+  it('are quaternions, by whichever of their components is largest', () => {
+    expect(toQuaternion(IDENTITY)).toEqual([0, 0, 0, 1])
+    expectClose(toQuaternion(fromHeading(90)), [0, 0, HALF_ROOT, HALF_ROOT])
+    // Half turns have no w, and the axes they turn about.
+    expectClose(toQuaternion(axis('x', 180)), [1, 0, 0, 0])
+    expectClose(toQuaternion(axis('y', 180)), [0, 1, 0, 0])
+    expectClose(toQuaternion(axis('z', 180)), [0, 0, 1, 0])
+    for (const rotation of [
+      product(axis('z', 47), axis('x', -12), axis('y', 101)),
+      product(axis('x', 170), axis('y', 20)),
+      product(axis('y', 175), axis('z', -30)),
+      product(axis('z', 179), axis('x', 3)),
+    ]) {
+      const [x, y, z, w] = toQuaternion(rotation)
+      expect(Math.hypot(x, y, z, w)).toBeCloseTo(1, 12)
+      expectClose(ofQuaternion(x, y, z, w), rotation)
+    }
   })
 
   it('turn the front of entities, y, to their headings', () => {

@@ -27,7 +27,7 @@ import { apply, fromEuler, fromHeading, headingOf, toEuler } from '../world/rota
 import type { ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
 import { checkArgument } from './events.ts'
-import { inSession, localPlayerIndex } from './players.ts'
+import { localPlayerIndex, withOneSync } from './players.ts'
 
 const encoder = new TextEncoder()
 
@@ -115,9 +115,10 @@ const CLIENT_POOLS: ReadonlyMap<string, number> = new Map([
 
 /**
  * Creates an entity of a client, as GTA V does for scripts: owned by their
- * script as a mission entity, networked in network games if they ask, and
+ * script as a mission entity, networked with OneSync if they ask, and
  * turned to a heading. Returns its handle, or 0 when its model is not
- * loaded, which GTA V creates nothing of.
+ * loaded, which GTA V creates nothing of, or when the client has no object
+ * id for it to network it with.
  */
 function createOnClient(
   ctx: NativeContext,
@@ -135,18 +136,20 @@ function createOnClient(
     )
     return 0
   }
+  const networks = isNetwork && withOneSync(ctx)
+  if (networks && !world.canNetwork) {
+    ctx.diagnose(
+      `${native} was asked to network the entity, but the client has no object id left to network it with, so it created nothing and returned 0: clients get 4 object ids as they join, and 6 more at their next tick each time they have fewer than 4.`,
+    )
+    return 0
+  }
   const entity = new ClientEntity(type, model)
   entity.moveTo(x, y, z)
   entity.rotation = fromHeading(heading)
-  entity.networked = isNetwork && inSession(ctx)
   entity.script = ctx.resource.name
   world.add(entity)
+  if (networks) world.network(entity)
   return entity.handle
-}
-
-/** Whether an entity of a client has a network object: the ped of the player has one in network games. */
-function networkedOnClient(ctx: NativeContext, entity: ClientEntity): boolean {
-  return entity === ctx.manager.world!.playerPed ? inSession(ctx) : entity.networked
 }
 
 /** Natives of entities: those of the game state on servers, and those of the world on clients. */
@@ -373,7 +376,7 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
       (ctx: NativeContext, entity) => {
         const found = clientEntityOf(ctx, entity)
         // Entities with no network objects have no owners.
-        if (found === undefined || !networkedOnClient(ctx, found)) return -1
+        if (found?.objectId === undefined) return -1
         return localPlayerIndex(ctx)
       },
     ),
@@ -550,13 +553,14 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
         for (const entity of ctx.manager.world!.entities) {
           if (entityTypeOf(entity.type) !== type) continue
           // CNetObject is the pool of the objects that have network objects.
-          if (name === 'CNetObject' && !networkedOnClient(ctx, entity)) continue
+          if (name === 'CNetObject' && entity.objectId === undefined) continue
           handles.push(entity.handle)
         }
         return pack(handles)
       },
     ),
     ...findNatives(),
+    ...clientNetworkNatives(),
     defineNative(
       {
         name: 'HAS_COLLISION_LOADED_AROUND_ENTITY',
@@ -566,6 +570,150 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
       },
       // There is no collision to stream in.
       (ctx: NativeContext, entity) => clientEntityOf(ctx, entity) !== undefined,
+    ),
+  ]
+}
+
+/** Natives of the network objects of the entities of clients, which their object ids name. */
+function clientNetworkNatives(): NativeDefinition<NativeContext>[] {
+  /** The network id of an entity that a native names, or 0, which it says of entities that are not networked. */
+  const networkIdOf = (ctx: NativeContext, native: string, handle: number, type?: number) => {
+    const found = clientEntityOf(ctx, handle)
+    if (found === undefined || (type !== undefined && entityTypeOf(found.type) !== type)) return 0
+    if (found.objectId === undefined) {
+      ctx.diagnose(
+        `${native} was given an entity that is not networked, which has no network id: FiveRunner returns 0.`,
+      )
+      return 0
+    }
+    return found.objectId
+  }
+  /** The handle of the entity of a network id, of a type if one is given, or 0. */
+  const entityOfNetworkId = (ctx: NativeContext, netId: number, type?: number) => {
+    const found = ctx.manager.world!.byObjectId(netId)
+    if (found === undefined || (type !== undefined && entityTypeOf(found.type) !== type)) return 0
+    return found.handle
+  }
+  const exists = (ctx: NativeContext, netId: number) => entityOfNetworkId(ctx, netId) !== 0
+  return [
+    defineNative(
+      {
+        name: 'NETWORK_GET_NETWORK_ID_FROM_ENTITY',
+        hash: 0xa11700682f3ad45cn,
+        result: 'int',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => networkIdOf(ctx, 'NetworkGetNetworkIdFromEntity', entity),
+    ),
+    ...(
+      [
+        ['VEH_TO_NET', 0xb4c94523f023419cn, 'Vehicle vehicle', EntityType.vehicle, 'VehToNet'],
+        ['PED_TO_NET', 0x0edec3c276198689n, 'Ped ped', EntityType.ped, 'PedToNet'],
+        ['OBJ_TO_NET', 0x99bfdc94a603e541n, 'Object object', EntityType.object, 'ObjToNet'],
+      ] as const
+    ).map(([name, hash, param, type, shown]) =>
+      defineNative({ name, hash, result: 'int', params: [param] }, (ctx: NativeContext, entity) =>
+        networkIdOf(ctx, shown, entity, type),
+      ),
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_GET_ENTITY_FROM_NETWORK_ID',
+        hash: 0xce4e5d9b0a4ff560n,
+        result: 'Entity',
+        params: ['int netId'],
+      },
+      (ctx: NativeContext, netId) => entityOfNetworkId(ctx, netId),
+    ),
+    ...(
+      [
+        ['NET_TO_VEH', 0x367b936610ba360cn, 'Vehicle', EntityType.vehicle],
+        ['NET_TO_PED', 0xbdcd95fc216a8b3en, 'Ped', EntityType.ped],
+        ['NET_TO_OBJ', 0xd8515f5fea14cb3fn, 'Object', EntityType.object],
+        ['NET_TO_ENT', 0xbffeab45a9a9094an, 'Entity', undefined],
+      ] as const
+    ).map(([name, hash, result, type]) =>
+      defineNative(
+        { name, hash, result, params: ['int netHandle'] },
+        (ctx: NativeContext, netHandle) => entityOfNetworkId(ctx, netHandle, type),
+      ),
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_DOES_NETWORK_ID_EXIST',
+        hash: 0x38ce16c96bd11344n,
+        result: 'BOOL',
+        params: ['int netId'],
+      },
+      exists,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_DOES_ENTITY_EXIST_WITH_NETWORK_ID',
+        hash: 0x18a47d074708fd68n,
+        result: 'BOOL',
+        params: ['int netId'],
+      },
+      exists,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_GET_ENTITY_IS_NETWORKED',
+        hash: 0xc7827959479dcc78n,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.objectId !== undefined,
+    ),
+    // The client owns every entity of its world, as no other syncs yet.
+    defineNative(
+      {
+        name: 'NETWORK_HAS_CONTROL_OF_ENTITY',
+        hash: 0x01bf60a500e28887n,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity) !== undefined,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_REQUEST_CONTROL_OF_ENTITY',
+        hash: 0xb69317bf5e782347n,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity) !== undefined,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_HAS_CONTROL_OF_NETWORK_ID',
+        hash: 0x4d36070fe0215186n,
+        result: 'BOOL',
+        params: ['int netId'],
+      },
+      exists,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_REQUEST_CONTROL_OF_NETWORK_ID',
+        hash: 0xa670b3662faffbd0n,
+        result: 'BOOL',
+        params: ['int netId'],
+      },
+      exists,
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_REGISTER_ENTITY_AS_NETWORKED',
+        hash: 0x06faacd625d80caan,
+        result: 'void',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        // Clients have object ids with OneSync alone.
+        if (found !== undefined && found.objectId === undefined) ctx.manager.world!.network(found)
+      },
     ),
   ]
 }
@@ -666,8 +814,20 @@ function serverEntityNatives(): NativeDefinition<NativeContext>[] {
     ),
     defineNative(
       { name: 'NETWORK_GET_ENTITY_OWNER', result: 'int', params: ['Entity entity'] },
-      // The entities of the server have no owner until a client takes them, which none does yet.
-      (ctx: NativeContext, entity) => (entityOf(ctx, entity) === undefined ? 0 : -1),
+      (ctx: NativeContext, entity) => {
+        const found = entityOf(ctx, entity)
+        return found === undefined ? 0 : (found.owner?.netId ?? -1)
+      },
+    ),
+    defineNative(
+      { name: 'NETWORK_GET_FIRST_ENTITY_OWNER', result: 'int', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => {
+        const found = entityOf(ctx, entity)
+        if (found === undefined) return 0
+        return found.firstOwner === undefined || found.firstOwnerDropped
+          ? -1
+          : found.firstOwner.netId
+      },
     ),
     defineNative(
       { name: 'GET_ENTITY_COORDS', result: 'Vector3', params: ['Entity entity'] },

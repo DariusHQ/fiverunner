@@ -82,12 +82,24 @@ export interface SyncState {
   scriptHash: number
 }
 
+/** A client of a server, as its game state knows it. */
+export interface GameStateClient {
+  readonly netId: number
+}
+
 /** An entity of FiveM's server game state, which its sync tree describes. */
 export class SyncEntity {
   readonly type: NetObjType
   /** The object id of the entity, which is its network id. */
   readonly objectId: number
-  readonly state: SyncState
+  /** What the sync tree of the entity holds, which its owner syncs. */
+  state: SyncState
+  /** The client that owns the entity and syncs it, if any. */
+  owner: GameStateClient | undefined = undefined
+  /** The client that created the entity, if one did. */
+  firstOwner: GameStateClient | undefined = undefined
+  /** Whether the client that created the entity dropped. */
+  firstOwnerDropped = false
   /** The handle of the script GUID of the entity, without the 0x20000 that scripts get it with, once it has one. */
   guid: number | undefined
   /** Whether the entity is being deleted, which no native finds it during. */

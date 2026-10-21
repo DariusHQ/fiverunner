@@ -104,6 +104,39 @@ export function headingOf(m: Matrix): number {
   return (heading < 0 ? heading + 360 : heading) + 0
 }
 
+/**
+ * The unit quaternion of a rotation, as x, y, z and w, by the largest of
+ * its components, which keeps it precise.
+ */
+export function toQuaternion(m: Matrix): [x: number, y: number, z: number, w: number] {
+  const [m00, m01, m02, m10, m11, m12, m20, m21, m22] = m as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ]
+  const trace = m00 + m11 + m22
+  if (trace > 0) {
+    const s = Math.sqrt(trace + 1) * 2
+    return [(m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s, s / 4]
+  }
+  if (m00 > m11 && m00 > m22) {
+    const s = Math.sqrt(1 + m00 - m11 - m22) * 2
+    return [s / 4, (m01 + m10) / s, (m02 + m20) / s, (m21 - m12) / s]
+  }
+  if (m11 > m22) {
+    const s = Math.sqrt(1 + m11 - m00 - m22) * 2
+    return [(m01 + m10) / s, s / 4, (m12 + m21) / s, (m02 - m20) / s]
+  }
+  const s = Math.sqrt(1 + m22 - m00 - m11) * 2
+  return [(m02 + m20) / s, (m12 + m21) / s, s / 4, (m10 - m01) / s]
+}
+
 /** The rotation about z alone by `heading` degrees, as GTA V turns entities to their headings. */
 export function fromHeading(heading: number): Matrix {
   return about(2, heading)

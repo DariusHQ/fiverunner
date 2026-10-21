@@ -43,6 +43,43 @@ export function fromSector(position: SectorPosition): [x: number, y: number, z: 
   ]
 }
 
+/**
+ * A float as clients sync it in `bits` bits, of 0 up to `divisor`, and as
+ * FiveM's server reads it: truncated to a step, as FiveM writes floats.
+ */
+export function syncFloat(bits: number, divisor: number, value: number): number {
+  const max = f((1 << bits) - 1)
+  return f(f(Math.trunc(f(f(value / divisor) * max)) / max) * divisor)
+}
+
+/**
+ * A float as clients sync it in `bits` bits with a sign, of -`divisor` to
+ * `divisor`, and as FiveM's server reads it: truncated to a step toward 0.
+ */
+export function syncSignedFloat(bits: number, divisor: number, value: number): number {
+  const max = f((1 << (bits - 1)) - 1)
+  return f(f(Math.trunc(f(f(value / divisor) * max)) / max) * divisor)
+}
+
+/** A position as clients sync it: its sector, and where in it in 12 bits of 54 metres for x and y and of 69 for z. */
+export function syncSector(x: number, y: number, z: number): SectorPosition {
+  const exact = toSector(x, y, z)
+  return {
+    ...exact,
+    x: syncFloat(12, 54, exact.x),
+    y: syncFloat(12, 54, exact.y),
+    z: syncFloat(12, 69, exact.z),
+  }
+}
+
+/** The single precision two pi that the sync trees of FiveM take the headings of peds in. */
+const TWO_PI = f(6.28318548)
+
+/** A heading in radians, from -pi to pi, as clients sync those of peds: in 8 bits. */
+export function syncHeading(radians: number): number {
+  return syncSignedFloat(8, TWO_PI, radians)
+}
+
 /** A quaternion compressed as its smallest three components, in 11 bits each, and which one was largest. */
 export interface CompressedQuaternion {
   readonly largest: number

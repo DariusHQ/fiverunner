@@ -261,6 +261,9 @@ export class ResourceManager {
             queue: (name, args) => this.events.queue(name, pack(args)),
             trigger: (name, args) => this.events.trigger(name, pack(args)),
             onMainThread: (fn) => this.enqueue(fn),
+            // The game state takes its clients from the session, which has them as players.
+            removeOnClient: (client, objectId) =>
+              this.#session?.removeOnClient(client as Player, objectId),
           },
           this.oneSync,
         )
@@ -749,6 +752,7 @@ export class ResourceManager {
     }
     if (this.side === 'server') this.#replicateVariables()
     for (const fn of this.#queued.splice(0)) fn()
+    if (this.#player !== undefined) this.#player.session.syncWorld(this.#player)
     if (this.reassembling) this.latent.tick()
   }
 

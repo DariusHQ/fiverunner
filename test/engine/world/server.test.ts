@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { NetObjType, PopType, type SyncState } from '../../../src/core/engine/world/entity.ts'
+import {
+  NetObjType,
+  PopType,
+  type GameStateClient,
+  type SyncState,
+} from '../../../src/core/engine/world/entity.ts'
 import { toSector } from '../../../src/core/engine/world/quantize.ts'
 import { ServerGameState, type GameStateHost } from '../../../src/core/engine/world/server.ts'
 
@@ -8,17 +13,24 @@ import { ServerGameState, type GameStateHost } from '../../../src/core/engine/wo
 function gameState(lengthHack = true) {
   const queued: [string, unknown[]][] = []
   const triggered: [string, unknown[]][] = []
+  const removedOnClients: [GameStateClient, number][] = []
   const mainThread: (() => void)[] = []
+  /** The events that handlers cancel. */
+  const canceled = new Set<string>()
   const host: GameStateHost = {
     queue: (name, args) => queued.push([name, [...args]]),
-    trigger: (name, args) => triggered.push([name, [...args]]),
+    trigger: (name, args) => {
+      triggered.push([name, [...args]])
+      return !canceled.has(name)
+    },
     onMainThread: (fn) => mainThread.push(fn),
+    removeOnClient: (client, objectId) => removedOnClients.push([client, objectId]),
   }
   const state = new ServerGameState(host, lengthHack)
   const runMainThread = () => {
     for (const fn of mainThread.splice(0)) fn()
   }
-  return { state, queued, triggered, runMainThread }
+  return { state, queued, triggered, removedOnClients, canceled, runMainThread }
 }
 
 const STATE: SyncState = {
@@ -125,5 +137,172 @@ describe('The game state of servers', () => {
     runMainThread()
     expect(player.valid).toBe(true)
     expect([...state.entities]).toEqual([player])
+  })
+})
+
+const ANN: GameStateClient = { netId: 1 }
+const BOB: GameStateClient = { netId: 2 }
+
+const MOVED: SyncState = { ...STATE, position: toSector(4, 5, 6) }
+
+describe('The game state of servers with clients', () => {
+  it('hands clients object ids from 1 up, which it then hands no one else', () => {
+    const { state } = gameState()
+    expect(state.grantObjectIds(ANN, 4)).toEqual([1, 2, 3, 4])
+    expect(state.grantObjectIds(BOB, 4)).toEqual([5, 6, 7, 8])
+    expect(state.grantObjectIds(ANN, 2)).toEqual([9, 10])
+  })
+
+  it('hands out no object id that an entity has, the ids of its own entities from the top too', () => {
+    const { state } = gameState(false)
+    state.receiveCreate(ANN, 1, NetObjType.automobile, STATE)
+    for (let id = 8191; id >= 4; id--) state.create(NetObjType.object, STATE)
+    // Clients get the object ids above those of the entities of the server too.
+    expect(state.grantObjectIds(BOB, 4)).toEqual([2, 3, 8192, 8193])
+  })
+
+  it('creates its own entities with no object id that it handed out or that an entity has', () => {
+    const { state } = gameState(false)
+    // Clients may create entities with object ids that they were not handed.
+    state.receiveCreate(ANN, 8191, NetObjType.automobile, STATE)
+    expect(state.create(NetObjType.object, STATE)!.objectId).toBe(8190)
+    state.grantObjectIds(BOB, 8189)
+    expect(state.create(NetObjType.object, STATE)).toBeUndefined()
+  })
+
+  it('takes the entities that clients create, owned by them, which entityCreating lets it keep', () => {
+    const { state, triggered, queued, runMainThread } = gameState()
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    const entity = state.byObjectId(2)!
+    expect([entity.owner, entity.firstOwner, entity.valid]).toEqual([ANN, ANN, true])
+    expect([triggered, queued]).toEqual([[], []])
+    runMainThread()
+    expect(triggered).toEqual([['entityCreating', [0x20001]]])
+    expect(queued).toEqual([['entityCreated', [0x20001]]])
+  })
+
+  it('removes the entities of clients that entityCreating cancels, but players', () => {
+    const { state, canceled, queued, removedOnClients, runMainThread } = gameState()
+    canceled.add('entityCreating')
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.receiveCreate(ANN, 3, NetObjType.player, STATE)
+    runMainThread()
+    expect(queued).toEqual([])
+    state.tick()
+    runMainThread()
+    expect(state.byObjectId(2)).toBeUndefined()
+    expect(state.byObjectId(3)?.valid).toBe(true)
+    // The client is told to remove what the server removed.
+    expect(removedOnClients).toEqual([[ANN, 2]])
+  })
+
+  it('triggers nothing for the entities of clients that went before the main thread got to them', () => {
+    const { state, triggered, runMainThread } = gameState()
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.receiveRemove(ANN, 2)
+    state.tick()
+    runMainThread()
+    expect(triggered).toEqual([['entityRemoved', [0x20001]]])
+  })
+
+  it('creates nothing for object ids that entities have', () => {
+    const { state } = gameState()
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.receiveCreate(BOB, 2, NetObjType.ped, MOVED)
+    expect([state.byObjectId(2)!.type, state.byObjectId(2)!.owner]).toEqual([
+      NetObjType.automobile,
+      ANN,
+    ])
+  })
+
+  it('unbinds the entities of players that went', () => {
+    const { state, runMainThread } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, STATE)
+    state.receiveRemove(ANN, 1)
+    state.tick()
+    runMainThread()
+    expect(state.playerHandleOf(ANN)).toBe(0)
+  })
+
+  it('binds the entities of the players of clients to them, one each', () => {
+    const { state } = gameState()
+    expect(state.playerHandleOf(ANN)).toBe(0)
+    state.receiveCreate(ANN, 1, NetObjType.player, STATE)
+    state.receiveCreate(ANN, 2, NetObjType.player, STATE)
+    expect(state.playerHandleOf(ANN)).toBe(0x20001)
+    expect(state.byObjectId(2)).toBeUndefined()
+    expect(state.playerHandleOf(BOB)).toBe(0)
+  })
+
+  it('takes what the owners of entities sync of them, and nothing of others', () => {
+    const { state } = gameState()
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.receiveSync(BOB, 2, MOVED)
+    expect(state.byObjectId(2)!.state).toBe(STATE)
+    state.receiveSync(ANN, 2, MOVED)
+    expect(state.byObjectId(2)!.state).toBe(MOVED)
+    state.receiveSync(ANN, 3, STATE)
+  })
+
+  it('removes the entities that their owners removed, which it need not tell them of', () => {
+    const { state, triggered, removedOnClients, runMainThread } = gameState()
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    runMainThread()
+    state.receiveRemove(BOB, 2)
+    state.tick()
+    expect(state.byObjectId(2)!.valid).toBe(true)
+    state.receiveRemove(ANN, 2)
+    expect(state.byObjectId(2)!.valid).toBe(true)
+    state.tick()
+    runMainThread()
+    expect(triggered.at(-1)).toEqual(['entityRemoved', [0x20001]])
+    expect(state.byObjectId(2)).toBeUndefined()
+    expect(removedOnClients).toEqual([])
+  })
+
+  it('tells clients to remove the entities of theirs that scripts of the server deleted', () => {
+    const { state, removedOnClients, runMainThread } = gameState()
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.delete(state.byObjectId(2)!)
+    state.tick()
+    runMainThread()
+    expect(removedOnClients).toEqual([[ANN, 2]])
+  })
+
+  it('keeps the object ids of the entities of clients that went for the clients', () => {
+    const { state, runMainThread } = gameState()
+    state.grantObjectIds(ANN, 2)
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.receiveRemove(ANN, 2)
+    state.tick()
+    runMainThread()
+    expect(state.grantObjectIds(BOB, 1)).toEqual([3])
+  })
+
+  it('forgets the clients that dropped: the entities they own go, and the object ids they were handed are free', () => {
+    const { state, triggered, removedOnClients, runMainThread } = gameState()
+    expect(state.grantObjectIds(ANN, 2)).toEqual([1, 2])
+    expect(state.grantObjectIds(ANN, 1)).toEqual([3])
+    state.grantObjectIds(BOB, 1)
+    state.receiveCreate(ANN, 1, NetObjType.player, STATE)
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE)
+    state.receiveCreate(BOB, 4, NetObjType.automobile, STATE)
+    const server = state.create(NetObjType.automobile, STATE)!
+    runMainThread()
+    state.drop(ANN)
+    expect(state.playerHandleOf(ANN)).toBe(0)
+    expect(state.byObjectId(2)!.firstOwnerDropped).toBe(true)
+    expect(state.byObjectId(4)!.firstOwnerDropped).toBe(false)
+    state.tick()
+    runMainThread()
+    // The entity of the server took the first GUID as the server created it.
+    expect(triggered.filter(([name]) => name === 'entityRemoved')).toEqual([
+      ['entityRemoved', [0x20101]],
+      ['entityRemoved', [0x20201]],
+    ])
+    expect(removedOnClients).toEqual([])
+    expect([state.byObjectId(4)?.valid, server.valid]).toEqual([true, true])
+    expect(state.playerHandleOf(ANN)).toBe(0)
+    expect(state.grantObjectIds(BOB, 4)).toEqual([1, 2, 3, 5])
   })
 })

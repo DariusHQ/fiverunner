@@ -42,6 +42,11 @@ export function inSession(ctx: NativeContext): boolean {
   return ctx.manager.player !== undefined
 }
 
+/** Whether a client is in a network game with OneSync, which syncs the entities that it networks. */
+export function withOneSync(ctx: NativeContext): boolean {
+  return inSession(ctx) && ctx.manager.session!.server.oneSync
+}
+
 /** The player that an index names on a client, as FiveM's clients take indices: in 8 bits. */
 function clientPlayer(ctx: NativeContext, index: number): ClientPlayer | undefined {
   const local = localPlayerIndex(ctx)
@@ -209,6 +214,14 @@ function serverPlayerNatives(): NativeDefinition<NativeContext>[] {
     defineNative(
       { name: 'GET_PLAYER_NAME', result: 'char*', params: ['char* playerSrc'] },
       (ctx: NativeContext, playerSrc) => playerOf(ctx, playerSrc)?.name ?? null,
+    ),
+    defineNative(
+      { name: 'GET_PLAYER_PED', result: 'Entity', params: ['char* playerSrc'] },
+      (ctx: NativeContext, playerSrc) => {
+        const player = playerOf(ctx, playerSrc)
+        // FiveM's server knows the ped of a player once its client networked it.
+        return player === undefined ? 0 : ctx.manager.gameState!.playerHandleOf(player)
+      },
     ),
     defineNative(
       { name: 'DOES_PLAYER_EXIST', result: 'BOOL', params: ['char* playerSrc'] },

@@ -3,6 +3,7 @@ import type { ResourceManager } from './manager.ts'
 import { ManifestError } from './manifest.ts'
 import { pack } from './msgpack.ts'
 import type { Resource } from './resource.ts'
+import type { ClientWorld } from './world/client.ts'
 
 /** The net id of what FiveM's servers send clients, which is the source of the events that clients get. */
 export const SERVER_NET_ID = 0xffff
@@ -18,6 +19,9 @@ const SKIPPED_SLOT = 31
 
 /** The slot that FiveM's servers with OneSync tell joining players they have. */
 export const ONESYNC_SLOT = 128
+
+/** How many object ids FiveM's servers in OneSync's big mode hand clients as they join, and as they ask for more. */
+const OBJECT_IDS = { joined: 4, asked: 6 } as const
 
 /** Why FiveM's servers drop players, as playerDropped gets it. */
 export const DropReason = {
@@ -422,7 +426,10 @@ export class Session {
     this.#nextNetId = netIdAfter(netId)
     this.#byNetId.set(netId, player)
     player.update({ netId, state: 'joined' })
-    if (this.server.oneSync) this.#addStateBags(player)
+    if (this.server.oneSync) {
+      this.#addStateBags(player)
+      this.#handObjectIds(player, OBJECT_IDS.joined)
+    }
     player.client.joinSession(this, player)
     player.client.takeServerVariables(this.server.replicatedVariables())
     // The client removes its resources and downloads those of the server as it connects.
@@ -463,8 +470,60 @@ export class Session {
       states.remove(`player:${player.netId}`)
       this.#slots.delete(slot)
     }
+    if (this.server.oneSync) this.server.gameState!.drop(player)
     player.update({ state })
     player.client.leaveSession(joined)
+  }
+
+  /** Hands the client of a player object ids, which it takes at its next tick. */
+  #handObjectIds(player: Player, count: number): void {
+    const ids = this.server.gameState!.grantObjectIds(player, count)
+    this.#toWorld(player, (world) => world.receiveObjectIds(ids))
+  }
+
+  /**
+   * Runs `fn` at the next tick of the client of a player with the world it
+   * has now, which the worlds it gets as it joins other sessions are not.
+   */
+  #toWorld(player: Player, fn: (world: ClientWorld) => void): void {
+    const world = player.client.world!
+    player.client.receive(() => fn(world))
+  }
+
+  /**
+   * @internal Called by a client with OneSync as a tick ends: the server
+   * takes the entities that the client created, changed and removed at
+   * its next tick, and hands it object ids if it asked, as FiveM's
+   * servers take clones.
+   */
+  syncWorld(player: Player): void {
+    if (!this.server.oneSync) return
+    const { clones, requestObjectIds } = player.client.world!.sync()
+    if (clones.length === 0 && !requestObjectIds) return
+    this.server.receive(() => {
+      if (player.state !== 'joined') return
+      const gameState = this.server.gameState!
+      for (const clone of clones) {
+        switch (clone.kind) {
+          case 'create':
+            gameState.receiveCreate(player, clone.objectId, clone.type, clone.state)
+            break
+          case 'sync':
+            gameState.receiveSync(player, clone.objectId, clone.state)
+            break
+          default:
+            gameState.receiveRemove(player, clone.objectId)
+            // FiveM's servers take the removals of clones whatever they make of them.
+            this.#toWorld(player, (world) => world.removalTaken(clone.objectId))
+        }
+      }
+      if (requestObjectIds) this.#handObjectIds(player, OBJECT_IDS.asked)
+    })
+  }
+
+  /** @internal Called by the game state of the server as it removed an entity that a client owns, which the client removes. */
+  removeOnClient(player: Player, objectId: number): void {
+    this.#toWorld(player, (world) => world.removedByServer(objectId))
   }
 
   /**
