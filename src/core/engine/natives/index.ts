@@ -11,6 +11,7 @@ import { nuiNatives } from './nui.ts'
 import { playerNatives } from './players.ts'
 import { refNatives } from './refs.ts'
 import { resourceNatives } from './resources.ts'
+import { rpcNatives } from './rpc.ts'
 import { screenNatives } from './screen.ts'
 import { scriptingNatives } from './scripting.ts'
 import { stateBagNatives } from './states.ts'
@@ -30,6 +31,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...playerNatives(side),
     ...stateBagNatives(side),
     ...entityNatives(side),
+    ...rpcNatives(side),
     ...streamingNatives(side),
     ...screenNatives(side),
     ...(side === 'server' ? httpNatives() : nuiNatives()),

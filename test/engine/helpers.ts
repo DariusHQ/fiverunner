@@ -156,14 +156,18 @@ export interface TestClient {
   run(code: string): string[]
 }
 
-/** A client that joined a server with or without OneSync as `identity`. */
+/** A client that joined a server with or without OneSync as `identity`, with natives of its own if it is given some. */
 export async function clientOf(
-  options: { oneSync?: boolean } = {},
+  options: { oneSync?: boolean; clientNatives?: ProcessOptions['natives'] } = {},
   identity: PlayerIdentity = { name: 'Ann' },
 ): Promise<TestClient> {
-  const server = await createProcess(options)
+  const { clientNatives, ...serverOptions } = options
+  const server = await createProcess(serverOptions)
   const session = new Session(server.manager)
-  const client = await createProcess({ side: 'client' })
+  const client = await createProcess({
+    side: 'client',
+    ...(clientNatives === undefined ? {} : { natives: clientNatives }),
+  })
   const player = join(session, client.manager, identity)
   // The client takes its object ids and networks the ped of its player, which the server then takes.
   client.manager.tick()

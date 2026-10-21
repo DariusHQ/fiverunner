@@ -3,6 +3,7 @@ import type { ResourceManager } from './manager.ts'
 import { ManifestError } from './manifest.ts'
 import { pack } from './msgpack.ts'
 import type { Resource } from './resource.ts'
+import type { RpcCall } from './rpc.ts'
 import type { ClientWorld } from './world/client.ts'
 import type { ServerClone } from './world/server.ts'
 
@@ -570,6 +571,11 @@ export class Session {
     this.#toWorld(player, (world) => {
       if (player.client.world === world) fn(world)
     })
+  }
+
+  /** @internal Called by natives of the server that the client of a player runs, which it queues at its next tick. */
+  sendRpc(player: Player, call: RpcCall): void {
+    this.#toPlayers(player, () => player.client.rpc!.receive(call))
   }
 
   /** @internal Called by the game state of the server as it sends the client of a player clones, which it takes at its next tick. */

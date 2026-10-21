@@ -145,6 +145,11 @@ function callable(value: LuaValue): LuaRef | LuaHostFunction {
   throw new LuaError(`attempt to call a ${type} value`)
 }
 
+/** What FiveRunner says of a native that it knows but does not implement, the first time it runs. */
+export function unimplementedDiagnosis(name: string): string {
+  return `${name} is not implemented in FiveRunner yet: it does nothing and returns zero values.`
+}
+
 /**
  * The Lua runtime of one resource on one side, set up like FiveM's: CfxLua
  * with FiveM's libraries and require, the Citizen table with natives that load
@@ -389,9 +394,7 @@ export class ScriptRuntime implements NativeCaller {
   unimplemented(name: string, hash: bigint): void {
     if (this.#unimplemented.has(hash)) return
     this.#unimplemented.add(hash)
-    this.host.diagnose(
-      `${name} is not implemented in FiveRunner yet: it does nothing and returns zero values.`,
-    )
+    this.host.diagnose(unimplementedDiagnosis(name))
   }
 
   #init(): void {

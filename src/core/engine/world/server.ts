@@ -327,6 +327,10 @@ export class ServerGameState {
       }
       const state = JSON.stringify(entity.state)
       const { objectId, owner } = entity
+      // What waits for a client to own the entity goes to it once it has the entity.
+      if (sent !== undefined && owner === client) {
+        for (const fn of entity.onOwned.splice(0)) fn(client)
+      }
       if (sent === undefined) {
         clones.push({
           kind: 'create',

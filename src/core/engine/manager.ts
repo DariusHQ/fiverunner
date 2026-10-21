@@ -47,6 +47,7 @@ import { arrayLength, pack } from './msgpack.ts'
 import { addPermissionCommands, FilesystemPermissions } from './permissions.ts'
 import { engineNatives } from './natives/index.ts'
 import { Resource, type ResourceDefinition } from './resource.ts'
+import { ClientRpc } from './rpc.ts'
 import { ResourceScanner } from './scan.ts'
 import type { Player, Session } from './session.ts'
 import { StateBags } from './statebags.ts'
@@ -205,6 +206,7 @@ export class ResourceManager {
   #session: Session | undefined
   #player: Player | undefined
   #world: ClientWorld | undefined
+  readonly #rpc: ClientRpc | undefined
   /** sv_enableNetEventReassembly, which turns latent events on. */
   readonly #reassembly: Variable
   /** sv_stateBagStrictMode, which keeps clients from setting state bags. */
@@ -273,6 +275,7 @@ export class ResourceManager {
       : undefined
     this.nui = server ? undefined : new Nui(this)
     this.#world = server ? undefined : new ClientWorld()
+    this.#rpc = server ? undefined : new ClientRpc(this)
     const consoleOptions = {
       security: this.security,
       output: this.printer,
@@ -515,6 +518,11 @@ export class ResourceManager {
     return this.#world
   }
 
+  /** On clients, the natives that their servers have them run, which they queue. */
+  get rpc(): ClientRpc | undefined {
+    return this.#rpc
+  }
+
   /** On clients, the player that their server knows them as, once they connected to it. */
   get player(): Player | undefined {
     return this.#player
@@ -750,6 +758,7 @@ export class ResourceManager {
     for (const fn of this.#received.splice(0)) fn()
     this.gameState?.tick()
     this.#world?.tick()
+    this.#rpc?.tick()
     this.security.runAs('system.console', () => this.console.executeBuffer())
     this.events.tick()
     const ticking = this.#ticking.map((resource) => ({ resource, runtime: resource.runtime! }))

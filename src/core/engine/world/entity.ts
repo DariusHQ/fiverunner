@@ -112,6 +112,8 @@ export class SyncEntity {
   deleting = false
   /** Whether the entity is being removed for good. */
   finalizing = false
+  /** What waits for a client to own the entity, which runs once the client has it. */
+  readonly onOwned: ((owner: GameStateClient) => void)[] = []
 
   constructor(type: NetObjType, objectId: number, state: SyncState) {
     this.type = type
