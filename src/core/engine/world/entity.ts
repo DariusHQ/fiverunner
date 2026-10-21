@@ -88,6 +88,26 @@ export interface GameStateClient {
 }
 
 /** An entity of FiveM's server game state, which its sync tree describes. */
+/**
+ * An entity that a client creates for a script of the server, as FiveM's
+ * server knows it until the client syncs it: by its creation token, with a
+ * script GUID of its own, which the entity takes once it comes.
+ */
+export class PendingEntity {
+  readonly token: number
+  /** The client that creates the entity, or undefined for all of them. */
+  readonly client: GameStateClient | undefined
+  /** The handle of the script GUID, without the 0x20000 that scripts get it with. */
+  guid = 0
+  /** Where SetEntityCoords last put the entity, which GetEntityCoords gives until it exists. */
+  coords: readonly [x: number, y: number, z: number] | undefined = undefined
+
+  constructor(token: number, client: GameStateClient | undefined) {
+    this.token = token
+    this.client = client
+  }
+}
+
 export class SyncEntity {
   readonly type: NetObjType
   /** The object id of the entity, which is its network id. */

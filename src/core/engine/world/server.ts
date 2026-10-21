@@ -1,5 +1,11 @@
 import type { PackedValue } from '../msgpack.ts'
-import { NetObjType, SyncEntity, type GameStateClient, type SyncState } from './entity.ts'
+import {
+  NetObjType,
+  PendingEntity,
+  SyncEntity,
+  type GameStateClient,
+  type SyncState,
+} from './entity.ts'
 import { Pool } from './pool.ts'
 import { fromSector } from './quantize.ts'
 
@@ -104,7 +110,11 @@ export class ServerGameState {
   readonly #scopes = new Map<GameStateClient, Map<GameStateClient, number>>()
   /** The entities of the players of clients, which the server bound to them. */
   readonly #players = new Map<GameStateClient, SyncEntity>()
-  readonly #guids = new Pool<SyncEntity>(GUID_POOL_SIZE)
+  readonly #guids = new Pool<SyncEntity | PendingEntity>(GUID_POOL_SIZE)
+  /** The entities that clients create for scripts of the server, by their creation tokens, until they come. */
+  readonly #pending = new Map<number, PendingEntity>()
+  /** The last creation token, which FiveM's server draws from std::minstd_rand. */
+  #creationToken = 1
   /** The object ids of the entities that scripts or clients deleted, which the sync thread starts deleting. */
   readonly #deletes: number[] = []
 
@@ -167,17 +177,26 @@ export class ServerGameState {
    * the client, which has one. Once the main thread triggered
    * entityCreating for it, which removes it when a handler cancels it but
    * for players, it queues entityCreated. Creates nothing for an object id
-   * that an entity has.
+   * that an entity has. An entity that the client created for a script of
+   * the server, by its creation token, takes the script GUID that the
+   * server gave it.
    */
   receiveCreate(
     client: GameStateClient,
     objectId: number,
     type: NetObjType,
     state: SyncState,
+    creationToken?: number,
   ): void {
     if (this.#byId.has(objectId)) return
     if (type === NetObjType.player && this.#players.has(client)) return
     const entity = this.#add(type, objectId, state)
+    const pending = creationToken === undefined ? undefined : this.#pending.get(creationToken)
+    if (pending !== undefined) {
+      this.#pending.delete(pending.token)
+      this.#guids.set(pending.guid, entity)
+      entity.guid = pending.guid
+    }
     entity.owner = client
     entity.firstOwner = client
     // The entities of players need not pass entityCreating to reach others.
@@ -254,7 +273,32 @@ export class ServerGameState {
 
   /** The entity of a script handle, if there is one, valid or not. */
   byHandle(handle: number): SyncEntity | undefined {
-    return this.#guids.get(handle - SCRIPT_HANDLE_BASE)
+    const found = this.#guids.get(handle - SCRIPT_HANDLE_BASE)
+    return found instanceof SyncEntity ? found : undefined
+  }
+
+  /** The entity that a client creates for a script of the server that a script handle names, until it comes. */
+  pendingOf(handle: number): PendingEntity | undefined {
+    const found = this.#guids.get(handle - SCRIPT_HANDLE_BASE)
+    return found instanceof PendingEntity ? found : undefined
+  }
+
+  /** The next creation token, as FiveM's server draws them: from std::minstd_rand, seeded with 1. */
+  nextCreationToken(): number {
+    this.#creationToken = (this.#creationToken * 48_271) % 2_147_483_647
+    return this.#creationToken
+  }
+
+  /**
+   * Gives an entity that a client creates for a script of the server, with
+   * a creation token, a script GUID, and returns its handle, which the
+   * entity takes once the client syncs it with the token.
+   */
+  pend(token: number, client: GameStateClient | undefined): number {
+    const pending = new PendingEntity(token, client)
+    pending.guid = this.#guids.add(pending)
+    this.#pending.set(token, pending)
+    return pending.guid + SCRIPT_HANDLE_BASE
   }
 
   /** The entity of an object id, which FiveM takes in 16 bits, if there is one, valid or not. */

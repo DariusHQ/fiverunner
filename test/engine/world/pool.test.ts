@@ -73,4 +73,12 @@ describe('Pools', () => {
     expect(pool.add('a')).toBe(0x001)
     expect(pool.size).toBe(1)
   })
+
+  it('put items in the slots of the handles that they gave', () => {
+    const pool = new Pool<string>(2)
+    const handle = pool.add('a')
+    pool.add('b')
+    pool.set(handle, 'c')
+    expect([pool.get(handle), pool.get(0x101)]).toEqual(['c', 'b'])
+  })
 })

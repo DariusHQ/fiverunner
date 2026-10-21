@@ -28,6 +28,7 @@ import type { ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
 import { checkArgument } from './events.ts'
 import { localPlayerIndex, withOneSync } from './players.ts'
+import { entityHandle } from './rpc.ts'
 
 const encoder = new TextEncoder()
 
@@ -843,6 +844,13 @@ function serverEntityNatives(): NativeDefinition<NativeContext>[] {
     defineNative(
       { name: 'GET_ENTITY_COORDS', result: 'Vector3', params: ['Entity entity'] },
       (ctx: NativeContext, entity) => {
+        // With OneSync, FiveM's server gives what is no entity, as its RPC natives see it, where SetEntityCoords put it.
+        const gameState = gameStateOf(ctx)
+        const handle = entityHandle(ctx, entity)
+        if (ctx.manager.oneSync && gameState.byHandle(handle) === undefined) {
+          const [x, y, z] = gameState.pendingOf(handle)?.coords ?? [0, 0, 0]
+          return { x, y, z }
+        }
         const found = entityOf(ctx, entity)
         if (found === undefined) return { x: 0, y: 0, z: 0 }
         const [x, y, z] = fromSector(found.state.position)

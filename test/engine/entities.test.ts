@@ -182,16 +182,19 @@ DeleteEntity(0)`),
     ])
   })
 
-  it('fail natives for handles of no entity', async () => {
+  it('fail natives for handles of no entity, but GetEntityCoords with OneSync', async () => {
     const { run } = await serverOf()
     expect(
       run(`print(DoesEntityExist(5), DoesEntityExist(-1))
+print(pcall(GetEntityHeading, 5))
 print(pcall(GetEntityCoords, 5))
 print(pcall(GetEntityModel, -1))
 print(pcall(DeleteEntity, 131073))`),
     ).toEqual([
       '[script:run0] false\tfalse',
-      '[script:run0] false\tnative 000000001647f1cb: Tried to access invalid entity: 5',
+      '[script:run0] false\tnative 00000000972cc383: Tried to access invalid entity: 5',
+      // FiveM's server gives what is no entity where its RPC natives put it, which no native did.
+      '[script:run0] true\tvec3(0.000000, 0.000000, 0.000000)',
       '[script:run0] false\tnative 00000000dafcb3ec: Tried to access invalid entity: -1',
       '[script:run0] false\tnative 00000000faa3d236: Tried to access invalid entity: 131073',
     ])
@@ -221,7 +224,7 @@ CreateThread(function()
     print('deleting', DoesEntityExist(v), NetworkGetEntityFromNetworkId(65534), json.encode(GetAllVehicles()))
     print('deleting', GetEntityFromStateBagName('entity:65534'), GetEntityCoords(v))
     Wait(0)
-    print('gone', pcall(GetEntityCoords, v))
+    print('gone', pcall(GetEntityHeading, v))
     print('gone', DoesEntityExist(v), GetEntityFromStateBagName('entity:65534'))
 end)`),
     ).toEqual(['[script:run0] deleted\t1\t131073\t[131073]'])
@@ -231,7 +234,7 @@ end)`),
       '[script:run0] removed\t131073\tfalse\tvec3(1.000000, 2.000000, 3.000000)',
     ])
     expect(tick()).toEqual([
-      '[script:run0] gone\tfalse\tnative 000000001647f1cb: Tried to access invalid entity: 131073',
+      '[script:run0] gone\tfalse\tnative 00000000972cc383: Tried to access invalid entity: 131073',
       '[script:run0] gone\tfalse\t0',
     ])
   })

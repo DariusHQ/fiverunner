@@ -40,6 +40,11 @@ export class Pool<T> {
     return this.#bytes[index] === (handle & 0xff) ? this.#items[index] : undefined
   }
 
+  /** Puts `item` in the slot of a handle that the pool gave, which holds what the handle names. */
+  set(handle: number, item: T): void {
+    this.#items[handle >> 8] = item
+  }
+
   /** Frees the slot of a handle that the pool gave, whatever its byte is now. */
   delete(handle: number): void {
     const index = handle >> 8

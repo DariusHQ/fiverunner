@@ -164,6 +164,38 @@ const BOB: GameStateClient = { netId: 2 }
 
 const MOVED: SyncState = { ...STATE, position: toSector(4, 5, 6) }
 
+describe('The game state of servers with entities that clients create for them', () => {
+  it('draws creation tokens from std::minstd_rand, seeded with 1', () => {
+    const { state } = gameState()
+    const tokens = [state.nextCreationToken(), state.nextCreationToken(), state.nextCreationToken()]
+    for (let i = 4; i < 10_000; i++) state.nextCreationToken()
+    // The C++ standard has the 10000th be 399268537.
+    expect([...tokens, state.nextCreationToken()]).toEqual([
+      48271, 182605794, 1291394886, 399268537,
+    ])
+  })
+
+  it('gives them the script GUIDs that it gave them as they come with their tokens, once', () => {
+    const { state, triggered, runMainThread } = gameState()
+    const handle = state.pend(48271, ANN)
+    expect([state.pendingOf(handle)?.token, state.byHandle(handle)]).toEqual([48271, undefined])
+    state.receiveCreate(ANN, 2, NetObjType.automobile, STATE, 48271)
+    const entity = state.byObjectId(2)!
+    expect([state.handleOf(entity), state.byHandle(handle), state.pendingOf(handle)]).toEqual([
+      handle,
+      entity,
+      undefined,
+    ])
+    // Another entity with the token takes a GUID of its own.
+    state.receiveCreate(ANN, 3, NetObjType.automobile, STATE, 48271)
+    runMainThread()
+    expect(triggered).toEqual([
+      ['entityCreating', [handle]],
+      ['entityCreating', [handle + 0x100]],
+    ])
+  })
+})
+
 describe('The game state of servers with clients', () => {
   it('hands clients object ids from 1 up, which it then hands no one else', () => {
     const { state } = gameState()

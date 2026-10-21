@@ -514,7 +514,13 @@ export class Session {
       for (const clone of clones) {
         switch (clone.kind) {
           case 'create':
-            gameState.receiveCreate(player, clone.objectId, clone.type, clone.state)
+            gameState.receiveCreate(
+              player,
+              clone.objectId,
+              clone.type,
+              clone.state,
+              clone.creationToken,
+            )
             break
           case 'sync':
             gameState.receiveSync(player, clone.objectId, clone.state)

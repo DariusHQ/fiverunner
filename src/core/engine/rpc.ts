@@ -4,15 +4,18 @@ import { unimplementedDiagnosis } from '../scripting/runtime.ts'
 import { NativeContext, type NativeRuntime } from './context.ts'
 import type { ResourceManager } from './manager.ts'
 import type { Resource } from './resource.ts'
+import type { ClientEntity } from './world/client.ts'
 
 /**
  * A native that FiveM's servers have clients run, as its RPC natives are:
  * by the client that owns the entity, or that is the player, which its
- * first argument names.
+ * first argument names, or to create an entity, by a client near where it
+ * goes.
  */
 export interface RpcNative {
   /** The name that servers declare it by, whose hash names it there. */
   readonly name: string
+  readonly kind: 'context' | 'create'
   /** The hash of the native of GTA V that clients run. */
   readonly hash: bigint
   /**
@@ -26,6 +29,8 @@ export interface RpcNative {
 /** An argument of a native that a server has a client run, as it goes to the client. */
 export type RpcArg =
   | { readonly kind: 'entity'; readonly objectId: number }
+  /** An entity that the client creates for the server, by its creation token. */
+  | { readonly kind: 'created'; readonly token: number }
   | { readonly kind: 'player'; readonly netId: number }
   | { readonly kind: 'hash'; readonly hash: number }
   | { readonly kind: 'value'; readonly value: number | boolean | string }
@@ -34,17 +39,25 @@ export type RpcArg =
 export interface RpcCall {
   readonly hash: bigint
   readonly resource: string
+  /** The creation token of the entity that the native creates, for those that create one. */
+  readonly token?: number
   readonly args: readonly RpcArg[]
 }
 
 function context(name: string, hash: bigint, params: readonly ParamSpec[]): RpcNative {
-  return { name, hash, params }
+  return { name, kind: 'context', hash, params }
+}
+
+function create(name: string, hash: bigint, params: readonly ParamSpec[]): RpcNative {
+  return { name, kind: 'create', hash, params }
 }
 
 /**
  * The natives that FiveM's servers have clients run, by the names of its
  * list of them: those of entities, players, peds, weapons, tasks and
- * vehicles. Those that create entities and blips are not there yet.
+ * vehicles, and those that create entities, but CreatePed and
+ * CreateObjectNoOffset, which servers create themselves. Those of blips
+ * are not there yet.
  */
 export const RPC_NATIVES: readonly RpcNative[] = [
   context('SET_ENTITY_COORDS', 0x06843da7060a026bn, [
@@ -102,6 +115,14 @@ export const RPC_NATIVES: readonly RpcNative[] = [
     'BOOL delayedResponse',
   ]),
   context('CLEAR_PLAYER_WANTED_LEVEL', 0xb302540597885499n, ['Player player']),
+  create('CREATE_PED_INSIDE_VEHICLE', 0x7dd959874c1fd534n, [
+    'Vehicle vehicle',
+    'int pedType',
+    'Hash modelHash',
+    'int seat',
+    'BOOL isNetwork',
+    'BOOL bScriptHostPed',
+  ]),
   context('ADD_PED_DECORATION_FROM_HASHES', 0x5f5d1665e352a839n, [
     'Ped ped',
     'Hash collection',
@@ -333,6 +354,15 @@ export const RPC_NATIVES: readonly RpcNative[] = [
     'float p5',
     'int p6',
   ]),
+  create('CREATE_VEHICLE', 0xaf35d0d2583051b0n, [
+    'Hash modelHash',
+    'float x',
+    'float y',
+    'float z',
+    'float heading',
+    'BOOL isNetwork',
+    'BOOL netMissionEntity',
+  ]),
   context('SET_VEHICLE_ALARM', 0xcde5e70c1ddb954cn, ['Vehicle vehicle', 'BOOL state']),
   context('SET_VEHICLE_BODY_HEALTH', 0xb77d05ac8c78aadbn, ['Vehicle vehicle', 'float value']),
   context('SET_VEHICLE_COLOURS', 0x4f1d4be3a7f24601n, [
@@ -369,6 +399,15 @@ export const RPC_NATIVES: readonly RpcNative[] = [
   context('SET_VEHICLE_DOORS_LOCKED', 0xb664292eaecf7fa6n, [
     'Vehicle vehicle',
     'int doorLockStatus',
+  ]),
+  create('CREATE_OBJECT', 0x509d5878eb39e842n, [
+    'Hash modelHash',
+    'float x',
+    'float y',
+    'float z',
+    'BOOL isNetwork',
+    'BOOL netMissionEntity',
+    'BOOL doorFlag',
   ]),
 ]
 
@@ -412,8 +451,10 @@ export class ClientRpc {
     const ready: (() => boolean)[] = []
     const after: (() => void)[] = []
     for (const arg of call.args) {
-      // FiveRunner's CD image has every model but 0.
-      if (arg.kind !== 'hash' || arg.hash === 0) continue
+      // An entity that the client creates for the server is there once the client created it.
+      if (arg.kind === 'created') ready.push(() => this.#createdOf(arg.token) !== undefined)
+      // FiveRunner's CD image has every model but 0, and clients load the models of what they create, whatever they are.
+      if (arg.kind !== 'hash' || (arg.hash === 0 && native.kind !== 'create')) continue
       this.#enqueue(resource, () => this.#invoke(resource, this.#native(REQUEST_MODEL), [arg.hash]))
       ready.push(() => this.#invoke(resource, this.#native(HAS_MODEL_LOADED), [arg.hash]) === true)
       after.push(() =>
@@ -474,6 +515,9 @@ export class ClientRpc {
         case 'entity':
           values.push(world.byObjectId(arg.objectId)?.handle ?? -1)
           break
+        case 'created':
+          values.push(this.#createdOf(arg.token)!.handle)
+          break
         case 'hash':
           values.push(arg.hash)
           break
@@ -484,14 +528,26 @@ export class ClientRpc {
     // The client has natives of the catalog by their names alone.
     const { natives } = this.#manager
     const native = natives.byHash(call.hash) ?? natives.byName(luaName(rpc.name))!
+    let result: unknown
     try {
-      this.#invoke(resource, native, values)
+      result = this.#invoke(resource, native, values)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.#manager.trace('gta-net-five', `failure executing native rpc: ${message}\n`)
       return
     }
+    // The entity that the native created, if any, goes to the server with its creation token once it networked it.
+    const created = call.token === undefined ? undefined : world.byHandle(result as number)
+    if (created !== undefined) created.creationToken = call.token
     for (const fn of after) fn()
+  }
+
+  /** The entity that the client created and networked for its server with a creation token, while there is one. */
+  #createdOf(token: number): ClientEntity | undefined {
+    for (const entity of this.#manager.world!.entities) {
+      if (entity.creationToken === token && entity.objectId !== undefined) return entity
+    }
+    return undefined
   }
 
   /** A native that the client implements, by its hash. */

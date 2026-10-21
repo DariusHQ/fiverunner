@@ -36,6 +36,8 @@ export class ClientEntity {
   script: string | undefined = undefined
   /** For clones of entities that other clients own, the net id of their owner, which syncs them. */
   owner: number | undefined = undefined
+  /** The creation token of an entity that the client created for its server, which it creates it on its server with. */
+  creationToken: number | undefined = undefined
 
   constructor(type: NetObjType, model: number) {
     this.type = type
@@ -74,6 +76,8 @@ export type CloneMessage =
       readonly objectId: number
       readonly type: NetObjType
       readonly state: SyncState
+      /** The creation token that the server gave the entity, if the client created it for the server. */
+      readonly creationToken?: number
     }
   | { readonly kind: 'sync'; readonly objectId: number; readonly state: SyncState }
   | { readonly kind: 'remove'; readonly objectId: number }
@@ -309,8 +313,16 @@ export class ClientWorld {
       if (objectId === undefined || entity.owner !== undefined) continue
       const state = syncStateOf(entity)
       const last = this.#synced.get(entity)
-      if (last === undefined) clones.push({ kind: 'create', objectId, type: entity.type, state })
-      else if (this.#taken.has(entity) || !sameState(last, state)) {
+      if (last === undefined) {
+        const { creationToken } = entity
+        clones.push({
+          kind: 'create',
+          objectId,
+          type: entity.type,
+          state,
+          ...(creationToken === undefined ? {} : { creationToken }),
+        })
+      } else if (this.#taken.has(entity) || !sameState(last, state)) {
         clones.push({ kind: 'sync', objectId, state })
       }
       this.#synced.set(entity, state)
