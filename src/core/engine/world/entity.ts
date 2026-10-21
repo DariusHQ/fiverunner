@@ -100,6 +100,12 @@ export class SyncEntity {
   firstOwner: GameStateClient | undefined = undefined
   /** Whether the client that created the entity dropped. */
   firstOwnerDropped = false
+  /** Whether the entity passed entityCreating, which those of the server need not, and clients other than its owner may know of it. */
+  passedFilter = true
+  /** Whether the owner of the entity synced it since it took it. */
+  hasSynced = false
+  /** Whether the owner of the entity has it no more, which lets the next client that it is relevant to take it. */
+  wantsReassign = false
   /** The handle of the script GUID of the entity, without the 0x20000 that scripts get it with, once it has one. */
   guid: number | undefined
   /** Whether the entity is being deleted, which no native finds it during. */
@@ -111,6 +117,11 @@ export class SyncEntity {
     this.type = type
     this.objectId = objectId
     this.state = state
+  }
+
+  /** Whether a script of the client that created the entity owns it, which keeps it with its owner. */
+  get ownedByClientScript(): boolean {
+    return this.firstOwner !== undefined && this.state.scriptHash !== 0
   }
 
   /** Whether natives may find the entity: it is not being deleted. */

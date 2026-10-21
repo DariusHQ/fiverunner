@@ -1,8 +1,10 @@
 import { hashString } from '../../natives/index.ts'
 import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
 import { Pool } from './pool.ts'
-import { IDENTITY, type Matrix } from './rotation.ts'
+import { decompressQuaternion, fromSector } from './quantize.ts'
+import { fromHeading, fromQuaternion, IDENTITY, type Matrix } from './rotation.ts'
 import { ScreenFade } from './screen.ts'
+import type { ServerClone } from './server.ts'
 import { sameState, syncStateOf } from './sync.ts'
 
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
@@ -32,6 +34,8 @@ export class ClientEntity {
   objectId: number | undefined = undefined
   /** The resource whose script owns the entity, which makes it a mission entity, if any. */
   script: string | undefined = undefined
+  /** For clones of entities that other clients own, the net id of their owner, which syncs them. */
+  owner: number | undefined = undefined
 
   constructor(type: NetObjType, model: number) {
     this.type = type
@@ -43,6 +47,17 @@ export class ClientEntity {
     this.x = x
     this.y = y
     this.z = z
+  }
+
+  /** Puts and turns the entity as a sync tree says, and gives it the model of the tree. */
+  take(state: SyncState): void {
+    this.moveTo(...fromSector(state.position))
+    const { orientation } = state
+    this.rotation =
+      orientation.kind === 'heading'
+        ? fromHeading((orientation.heading * 180) / Math.PI)
+        : fromQuaternion(...decompressQuaternion(orientation.quaternion))
+    this.model = state.model
   }
 }
 
@@ -83,12 +98,16 @@ export class ClientWorld {
   readonly #kinds = new Map<number, number>()
   /** The object ids that the world may network entities with. */
   readonly #objectIds: number[] = []
+  /** The object ids that the server handed the world, which it uses again as their entities go. */
+  readonly #granted = new Set<number>()
   /** Whether the world asked for object ids, which it has not got yet. */
   #askedForObjectIds = false
   /** What the world last told its server of each networked entity that it told of. */
   readonly #synced = new Map<ClientEntity, SyncState>()
   /** The object ids of the networked entities that scripts removed, which the world tells its server of. */
   readonly #removed: number[] = []
+  /** The entities that the world took from others, which it syncs once to tell its server it has them. */
+  readonly #taken = new Set<ClientEntity>()
   /** The ped of the local player: player_zero, at 0, 0, 0. */
   readonly playerPed = new ClientEntity(NetObjType.player, PLAYER_ZERO)
   /** The fade of the screen of the game. */
@@ -134,7 +153,7 @@ export class ClientWorld {
     const { objectId } = entity
     if (objectId === undefined) return
     if (known) this.#removed.push(objectId)
-    else this.#objectIds.push(objectId)
+    else this.#free(objectId)
   }
 
   /** Removes the entity of an object id, which the server removed, and frees the object id. */
@@ -142,18 +161,52 @@ export class ClientWorld {
     const entity = this.byObjectId(objectId)
     if (entity === undefined) return
     this.#forget(entity)
-    this.#objectIds.push(objectId)
+    this.#free(objectId)
   }
 
   /** Frees the object id of an entity whose removal the server took. */
   removalTaken(objectId: number): void {
-    this.#objectIds.push(objectId)
+    this.#free(objectId)
   }
 
   /** Takes object ids that the server handed the world. */
   receiveObjectIds(ids: readonly number[]): void {
+    for (const id of ids) this.#granted.add(id)
     this.#objectIds.push(...ids)
     this.#askedForObjectIds = false
+  }
+
+  /**
+   * Takes what the server sent of the entities of others, as FiveM's
+   * clients take clones: the world creates, moves and removes them. Those
+   * that the client of the world owns, which the server handed it, it
+   * syncs from then on.
+   */
+  receiveClones(clones: readonly ServerClone[], netId: number): void {
+    for (const clone of clones) {
+      if (clone.kind === 'remove') {
+        this.removedByServer(clone.objectId)
+        continue
+      }
+      let entity = this.byObjectId(clone.objectId)
+      if (clone.kind === 'create' && entity === undefined) {
+        entity = new ClientEntity(clone.type, clone.state.model)
+        entity.objectId = clone.objectId
+        this.add(entity)
+        if (clone.owner === netId) this.#take(entity, clone.state)
+        else entity.owner = clone.owner
+        entity.take(clone.state)
+      } else if (entity !== undefined && clone.owner !== netId) {
+        // A clone moves, or an entity that the client owned is another's now.
+        entity.owner = clone.owner
+        entity.take(clone.state)
+      } else if (entity !== undefined) {
+        // The client owns a clone that it knew of, which it syncs from then on.
+        entity.owner = undefined
+        this.#take(entity, clone.state)
+        entity.take(clone.state)
+      }
+    }
   }
 
   /** Whether the world has an object id to network an entity with. */
@@ -208,16 +261,31 @@ export class ClientWorld {
       .map((objectId) => ({ kind: 'remove', objectId }))
     for (const entity of this.#entities) {
       const { objectId } = entity
-      if (objectId === undefined) continue
+      // The owners of clones sync them.
+      if (objectId === undefined || entity.owner !== undefined) continue
       const state = syncStateOf(entity)
       const last = this.#synced.get(entity)
       if (last === undefined) clones.push({ kind: 'create', objectId, type: entity.type, state })
-      else if (!sameState(last, state)) clones.push({ kind: 'sync', objectId, state })
+      else if (this.#taken.has(entity) || !sameState(last, state)) {
+        clones.push({ kind: 'sync', objectId, state })
+      }
       this.#synced.set(entity, state)
     }
+    this.#taken.clear()
     const requestObjectIds = !this.#askedForObjectIds && this.#objectIds.length < FEW_OBJECT_IDS
     if (requestObjectIds) this.#askedForObjectIds = true
     return { clones, requestObjectIds }
+  }
+
+  /** Takes an entity that the world owns now, as its server handed it, which it syncs at once. */
+  #take(entity: ClientEntity, state: SyncState): void {
+    this.#synced.set(entity, state)
+    this.#taken.add(entity)
+  }
+
+  /** Frees an object id that the server handed the world: those of others are no longer the world's. */
+  #free(objectId: number): void {
+    if (this.#granted.has(objectId)) this.#objectIds.push(objectId)
   }
 
   /** Takes an entity out of the world, and returns whether the server knew of it. */

@@ -377,7 +377,8 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
         const found = clientEntityOf(ctx, entity)
         // Entities with no network objects have no owners.
         if (found?.objectId === undefined) return -1
-        return localPlayerIndex(ctx)
+        // FiveM's clients give the owners of clones that they know no player of as 255.
+        return found.owner === undefined ? localPlayerIndex(ctx) : 0xff
       },
     ),
     defineNative(
@@ -472,6 +473,12 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
           if (found === undefined || (type !== undefined && entityTypeOf(found.type) !== type))
             return
           if (found === world.playerPed) return
+          if (found.owner !== undefined) {
+            ctx.diagnose(
+              `${shown} was given an entity that another client owns, which GTA V does not delete until it has control of it.`,
+            )
+            return
+          }
           if (found.script === undefined) {
             ctx.diagnose(
               `${shown} was given an entity that is no mission entity, which GTA V does not delete: make it one with SetEntityAsMissionEntity(entity, true, true) first.`,
@@ -595,6 +602,9 @@ function clientNetworkNatives(): NativeDefinition<NativeContext>[] {
     return found.handle
   }
   const exists = (ctx: NativeContext, netId: number) => entityOfNetworkId(ctx, netId) !== 0
+  /** Whether the client controls an entity: one of its own, but no clone of an entity that another owns. */
+  const controls = (entity: ClientEntity | undefined) =>
+    entity !== undefined && entity.owner === undefined
   return [
     defineNative(
       {
@@ -665,7 +675,7 @@ function clientNetworkNatives(): NativeDefinition<NativeContext>[] {
       },
       (ctx: NativeContext, entity) => clientEntityOf(ctx, entity)?.objectId !== undefined,
     ),
-    // The client owns every entity of its world, as no other syncs yet.
+    // Clients control the entities of their worlds but the clones of those of others, whose control their owners keep.
     defineNative(
       {
         name: 'NETWORK_HAS_CONTROL_OF_ENTITY',
@@ -673,7 +683,7 @@ function clientNetworkNatives(): NativeDefinition<NativeContext>[] {
         result: 'BOOL',
         params: ['Entity entity'],
       },
-      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity) !== undefined,
+      (ctx: NativeContext, entity) => controls(clientEntityOf(ctx, entity)),
     ),
     defineNative(
       {
@@ -682,7 +692,7 @@ function clientNetworkNatives(): NativeDefinition<NativeContext>[] {
         result: 'BOOL',
         params: ['Entity entity'],
       },
-      (ctx: NativeContext, entity) => clientEntityOf(ctx, entity) !== undefined,
+      (ctx: NativeContext, entity) => controls(clientEntityOf(ctx, entity)),
     ),
     defineNative(
       {
@@ -691,7 +701,7 @@ function clientNetworkNatives(): NativeDefinition<NativeContext>[] {
         result: 'BOOL',
         params: ['int netId'],
       },
-      exists,
+      (ctx: NativeContext, netId) => controls(ctx.manager.world!.byObjectId(netId)),
     ),
     defineNative(
       {
@@ -700,7 +710,7 @@ function clientNetworkNatives(): NativeDefinition<NativeContext>[] {
         result: 'BOOL',
         params: ['int netId'],
       },
-      exists,
+      (ctx: NativeContext, netId) => controls(ctx.manager.world!.byObjectId(netId)),
     ),
     defineNative(
       {

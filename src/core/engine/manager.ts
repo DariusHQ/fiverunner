@@ -262,8 +262,7 @@ export class ResourceManager {
             trigger: (name, args) => this.events.trigger(name, pack(args)),
             onMainThread: (fn) => this.enqueue(fn),
             // The game state takes its clients from the session, which has them as players.
-            removeOnClient: (client, objectId) =>
-              this.#session?.removeOnClient(client as Player, objectId),
+            sendClones: (client, clones) => this.#session?.sendClones(client as Player, clones),
           },
           this.oneSync,
         )

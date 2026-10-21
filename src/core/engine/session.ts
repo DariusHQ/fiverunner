@@ -4,6 +4,7 @@ import { ManifestError } from './manifest.ts'
 import { pack } from './msgpack.ts'
 import type { Resource } from './resource.ts'
 import type { ClientWorld } from './world/client.ts'
+import type { ServerClone } from './world/server.ts'
 
 /** The net id of what FiveM's servers send clients, which is the source of the events that clients get. */
 export const SERVER_NET_ID = 0xffff
@@ -428,6 +429,7 @@ export class Session {
     player.update({ netId, state: 'joined' })
     if (this.server.oneSync) {
       this.#addStateBags(player)
+      this.server.gameState!.addClient(player)
       this.#handObjectIds(player, OBJECT_IDS.joined)
     }
     player.client.joinSession(this, player)
@@ -521,9 +523,9 @@ export class Session {
     })
   }
 
-  /** @internal Called by the game state of the server as it removed an entity that a client owns, which the client removes. */
-  removeOnClient(player: Player, objectId: number): void {
-    this.#toWorld(player, (world) => world.removedByServer(objectId))
+  /** @internal Called by the game state of the server as it sends the client of a player clones, which it takes at its next tick. */
+  sendClones(player: Player, clones: readonly ServerClone[]): void {
+    this.#toWorld(player, (world) => world.receiveClones(clones, player.netId))
   }
 
   /**

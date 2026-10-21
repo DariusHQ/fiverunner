@@ -104,6 +104,21 @@ export function headingOf(m: Matrix): number {
   return (heading < 0 ? heading + 360 : heading) + 0
 }
 
+/** The rotation of a unit quaternion, x, y, z and w. */
+export function fromQuaternion(x: number, y: number, z: number, w: number): Matrix {
+  return [
+    1 - 2 * (y * y + z * z),
+    2 * (x * y - w * z),
+    2 * (x * z + w * y),
+    2 * (x * y + w * z),
+    1 - 2 * (x * x + z * z),
+    2 * (y * z - w * x),
+    2 * (x * z - w * y),
+    2 * (y * z + w * x),
+    1 - 2 * (x * x + y * y),
+  ]
+}
+
 /**
  * The unit quaternion of a rotation, as x, y, z and w, by the largest of
  * its components, which keeps it precise.

@@ -380,3 +380,155 @@ end, false)`,
     ])
   })
 })
+
+/** What scripts printed on a process since it was last asked. */
+function printed(process: TestClient['client']): string[] {
+  return process.take().filter((line) => line.includes('[script:'))
+}
+
+/** A second client, Bob, that joined the session of a test, which has run a tick. */
+async function bobOf(test: TestClient) {
+  const bob = await createProcess({ side: 'client' })
+  const player = join(test.session, bob.manager, { name: 'Bob' })
+  bob.tickAt(test.client.time)
+  test.server.tickAt(test.server.time + 10)
+  return { bob, player }
+}
+
+describe('Entities that servers sync to clients', () => {
+  it('are those near the peds of their players, which the first of them owns if no client does', async () => {
+    const test = await session(
+      `local near = CreateVehicleServerSetter('adder', 'automobile', 10.5, 0.0, 1.0, 90.0)
+local far = CreateVehicleServerSetter('adder', 'automobile', 500.0, 0.0, 1.0, 0.0)
+RegisterCommand('owners', function() print('owners', NetworkGetEntityOwner(near), NetworkGetEntityOwner(far)) end, false)`,
+      `RegisterCommand('clones', function()
+    local near, far = NetworkGetEntityFromNetworkId(65534), NetworkGetEntityFromNetworkId(65533)
+    print(near, DoesEntityExist(near), GetEntityModel(near) == GetHashKey('adder'), GetEntityCoords(near), GetEntityHeading(near))
+    print(IsEntityAVehicle(near), NetworkGetEntityOwner(near), NetworkHasControlOfEntity(near), IsEntityAMissionEntity(near), far)
+end, false)`,
+    )
+    step(test)
+    step(test)
+    test.client.manager.console.commands.invoke('clones', '')
+    test.server.manager.console.commands.invoke('owners', '')
+    expect([...printed(test.client), ...printed(test.server)]).toEqual([
+      // The server created the vehicle where it was told, and turned it by a quaternion in 11 bits.
+      '[script:run0] 257\t1\ttrue\tvec3(10.500000, 0.000000, 1.000000)\t90.000015258789',
+      '[script:run0] 1\t128\t1\tfalse\t0',
+      '[script:srv] owners\t1\t-1',
+    ])
+  })
+
+  it('are synced back by the clients that they were handed to', async () => {
+    const test = await session(
+      `local vehicle = CreateVehicleServerSetter('adder', 'automobile', 10.0, 0.0, 1.0, 0.0)
+RegisterCommand('where', function() print('where', GetEntityCoords(vehicle)) end, false)`,
+      `RegisterCommand('move', function() SetEntityCoords(NetworkGetEntityFromNetworkId(65534), 20.0, 30.0, 2.0, false, false, false, false) end, false)`,
+    )
+    step(test)
+    step(test)
+    test.client.manager.console.commands.invoke('move', '')
+    step(test)
+    test.server.manager.console.commands.invoke('where', '')
+    expect(printed(test.server)).toEqual([
+      // 30 / 54 * 4095 is 2275, on a step.
+      '[script:srv] where\tvec3(19.991209, 30.000002, 2.000000)',
+    ])
+  })
+
+  it('come and go as the peds of players come near them and go away', async () => {
+    const test = await session(
+      `CreateVehicleServerSetter('adder', 'automobile', 450.0, 0.0, 1.0, 0.0)`,
+      `RegisterCommand('walk', function(_, args) SetEntityCoords(PlayerPedId(), tonumber(args[1]) + 0.0, 0.0, 1.0, false, false, false, false) end, false)
+RegisterCommand('near', function() print('near', NetworkDoesNetworkIdExist(65534)) end, false)`,
+    )
+    const near = () => {
+      test.client.manager.console.commands.invoke('near', '')
+      return printed(test.client)
+    }
+    step(test)
+    step(test)
+    const away = near()
+    test.client.manager.console.commands.invoke('walk 30', '')
+    step(test)
+    step(test)
+    const came = near()
+    test.client.manager.console.commands.invoke('walk -30', '')
+    step(test)
+    step(test)
+    // 480 metres away, on the ground.
+    expect([...away, ...came, ...near()]).toEqual([
+      '[script:run0] near\tfalse',
+      '[script:run0] near\t1',
+      '[script:run0] near\tfalse',
+    ])
+  })
+
+  it('are within 424 metres of the peds of players, on the ground', async () => {
+    const test = await session(
+      `CreateVehicleServerSetter('adder', 'automobile', 0.0, 423.9, 300.0, 0.0)
+CreateVehicleServerSetter('adder', 'automobile', 0.0, -424.0, 0.0, 0.0)`,
+      `RegisterCommand('near', function() print('near', NetworkDoesNetworkIdExist(65534), NetworkDoesNetworkIdExist(65533)) end, false)`,
+    )
+    step(test)
+    step(test)
+    test.client.manager.console.commands.invoke('near', '')
+    expect(printed(test.client)).toEqual(['[script:run0] near\t1\tfalse'])
+  })
+
+  it('are clones that the clients that own them move, which others do not control', async () => {
+    const test = await session(
+      '',
+      withAdder(`local vehicle = CreateVehicle(adder, 5.0, 0.0, 1.0, 0.0, true, false)
+    RegisterCommand('move', function() SetEntityCoords(vehicle, 6.0, 1.0, 2.0, false, false, false, false) end, false)`),
+    )
+    const { bob } = await bobOf(test)
+    bob
+      .add('bob', {
+        'fxmanifest.lua': `fx_version 'cerulean'\ngame 'gta5'\nclient_script 'main.lua'`,
+        'main.lua': `RegisterCommand('clone', function()
+    local vehicle = NetworkGetEntityFromNetworkId(2)
+    print(vehicle, GetEntityCoords(vehicle), NetworkGetEntityOwner(vehicle), NetworkHasControlOfEntity(vehicle), NetworkRequestControlOfEntity(vehicle), NetworkHasControlOfNetworkId(2), NetworkRequestControlOfNetworkId(2))
+    print(DeleteEntity(vehicle), DoesEntityExist(vehicle))
+end, false)`,
+      })
+      .start()
+    for (let i = 0; i < 3; i++) {
+      step(test)
+      bob.tickAt(test.client.time)
+    }
+    bob.manager.console.commands.invoke('clone', '')
+    test.client.manager.console.commands.invoke('move', '')
+    for (let i = 0; i < 2; i++) {
+      step(test)
+      bob.tickAt(test.client.time)
+    }
+    bob.manager.console.commands.invoke('clone', '')
+    expect(printed(bob)).toEqual([
+      // Bob knows no player of Ann yet.
+      // Ann synced the vehicle at 5, 0, 1 in steps of its sector.
+      '[script:bob] 257\tvec3(4.997802, 0.000000, 0.989014)\t255\tfalse\tfalse\tfalse\tfalse',
+      '[script:bob] 257\t1',
+      '[script:bob] 257\tvec3(6.000000, 0.989011, 2.000000)\t255\tfalse\tfalse\tfalse\tfalse',
+      '[script:bob] 257\t1',
+    ])
+    expect(bob.diagnostics).toEqual([
+      'bob: DeleteEntity was given an entity that another client owns, which GTA V does not delete until it has control of it.',
+      'bob: DeleteEntity was given an entity that another client owns, which GTA V does not delete until it has control of it.',
+    ])
+  })
+
+  it('are removed on clients that know of them as servers delete them', async () => {
+    const test = await session(
+      `local vehicle = CreateVehicleServerSetter('adder', 'automobile', 10.0, 0.0, 1.0, 0.0)
+RegisterCommand('delete', function() DeleteEntity(vehicle) end, false)`,
+      `RegisterCommand('near', function() print('near', NetworkDoesNetworkIdExist(65534)) end, false)`,
+    )
+    step(test)
+    test.server.manager.console.commands.invoke('delete', '')
+    step(test)
+    step(test)
+    test.client.manager.console.commands.invoke('near', '')
+    expect(printed(test.client)).toEqual(['[script:run0] near\tfalse'])
+  })
+})

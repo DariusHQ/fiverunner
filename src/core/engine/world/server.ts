@@ -1,6 +1,7 @@
 import type { PackedValue } from '../msgpack.ts'
 import { NetObjType, SyncEntity, type GameStateClient, type SyncState } from './entity.ts'
 import { Pool } from './pool.ts'
+import { fromSector } from './quantize.ts'
 
 /** How many object ids FiveM's server keeps track of, from 0 up. */
 const MAX_OBJECT_ID = (1 << 16) - 1
@@ -11,6 +12,41 @@ const SCRIPT_HANDLE_BASE = 0x20000
 /** How many script GUIDs FiveM's server makes room for at first. */
 const GUID_POOL_SIZE = 1500
 
+/** The square of how far from the peds of players, on the ground, FiveM's server culls entities by default. */
+const CULLING_RADIUS_SQUARED = Math.fround(424 * 424)
+
+/** What the server last told a client of an entity: the net id of its owner, and its tree. */
+interface Known {
+  readonly owner: number
+  readonly state: string
+}
+
+/** Whether an entity is within 424 metres of a position on the ground, in single precision. */
+function near(entity: SyncEntity, [x, y]: readonly number[]): boolean {
+  const [ex, ey] = fromSector(entity.state.position)
+  const dx = Math.fround(ex - x!)
+  const dy = Math.fround(ey - y!)
+  return Math.fround(Math.fround(dx * dx) + Math.fround(dy * dy)) < CULLING_RADIUS_SQUARED
+}
+
+/** What a server tells a client of the entities that it knows of, as FiveM's servers send clones. */
+export type ServerClone =
+  | {
+      readonly kind: 'create'
+      readonly objectId: number
+      readonly type: NetObjType
+      readonly state: SyncState
+      /** The net id of the client that owns the entity. */
+      readonly owner: number
+    }
+  | {
+      readonly kind: 'sync'
+      readonly objectId: number
+      readonly state: SyncState
+      readonly owner: number
+    }
+  | { readonly kind: 'remove'; readonly objectId: number }
+
 /** What the game state of a server needs of its process. */
 export interface GameStateHost {
   /** Queues an event for the resources, as FiveM's QueueEvent2 does. */
@@ -19,8 +55,8 @@ export interface GameStateHost {
   trigger(name: string, args: readonly PackedValue[]): boolean
   /** Runs `fn` on the main thread once its tick is done, as FiveM's sync thread has it run what scripts see. */
   onMainThread(fn: () => void): void
-  /** Tells a client to remove the entity of an object id that it owns, which the server removed. */
-  removeOnClient(client: GameStateClient, objectId: number): void
+  /** Sends a client what changed in the entities that it knows of, which it takes at its next tick. */
+  sendClones(client: GameStateClient, clones: readonly ServerClone[]): void
 }
 
 /**
@@ -31,7 +67,9 @@ export interface GameStateHost {
  * entities it creates from the top, from 65534 in OneSync's big mode,
  * which has the length hack, and from 8191 without it, and hands those of
  * clients out from 1 up. Clients create entities with the object ids that
- * they were handed, then sync them.
+ * they were handed, then sync them, and the server sends each client the
+ * entities near the ped of its player, which a client owns if no other
+ * does.
  *
  * FiveM's game state runs on a thread of its own, the sync thread, which
  * this one's ticks stand for.
@@ -50,6 +88,8 @@ export class ServerGameState {
   readonly #stolen = new Set<number>()
   /** The object ids that the server handed each client. */
   readonly #objectIds = new Map<GameStateClient, Set<number>>()
+  /** The entities that each client knows of, in the order clients joined, with what the server last told it of their owners and their trees. */
+  readonly #known = new Map<GameStateClient, Map<SyncEntity, Known>>()
   /** The entities of the players of clients, which the server bound to them. */
   readonly #players = new Map<GameStateClient, SyncEntity>()
   readonly #guids = new Pool<SyncEntity>(GUID_POOL_SIZE)
@@ -82,6 +122,11 @@ export class ServerGameState {
     const entity = this.#add(type, id, state)
     this.#host.queue('serverEntityCreated', [this.handleOf(entity)])
     return entity
+  }
+
+  /** Takes a client that joined, which the server then sends entities. */
+  addClient(client: GameStateClient): void {
+    this.#known.set(client, new Map())
   }
 
   /**
@@ -122,6 +167,9 @@ export class ServerGameState {
     const entity = this.#add(type, objectId, state)
     entity.owner = client
     entity.firstOwner = client
+    entity.passedFilter = false
+    // The client has the entity, which it created.
+    this.#known.get(client)?.set(entity, { owner: client.netId, state: JSON.stringify(state) })
     if (type === NetObjType.player) this.#players.set(client, entity)
     this.#host.onMainThread(() => {
       if (!entity.valid) return
@@ -129,6 +177,7 @@ export class ServerGameState {
         if (type !== NetObjType.player) this.#deletes.push(objectId)
         return
       }
+      entity.passedFilter = true
       this.#host.queue('entityCreated', [this.handleOf(entity)])
     })
   }
@@ -136,7 +185,9 @@ export class ServerGameState {
   /** Takes what a client synced of an entity that it owns. */
   receiveSync(client: GameStateClient, objectId: number, state: SyncState): void {
     const entity = this.#byId.get(objectId)
-    if (entity?.owner === client) entity.state = state
+    if (entity?.owner !== client) return
+    entity.state = state
+    entity.hasSynced = true
   }
 
   /** Takes the removal of an entity that a client owns, which the sync thread starts deleting. */
@@ -145,6 +196,7 @@ export class ServerGameState {
     if (entity?.owner !== client) return
     // The client removed the entity already, which it need not be told of.
     entity.owner = undefined
+    this.#known.get(client)?.delete(entity)
     this.#deletes.push(objectId)
   }
 
@@ -168,6 +220,7 @@ export class ServerGameState {
     }
     for (const id of this.#objectIds.get(client) ?? []) this.#sent.delete(id)
     this.#objectIds.delete(client)
+    this.#known.delete(client)
     this.#players.delete(client)
   }
 
@@ -200,17 +253,86 @@ export class ServerGameState {
 
   /**
    * Runs a tick of the sync thread: it starts deleting the entities that
-   * scripts and clients deleted, then removes those that are being
-   * deleted, which no client knows of.
+   * scripts and clients deleted, sends each client what changed in the
+   * entities near the ped of its player, and the removal of those it knows
+   * of that are no longer near it or are being deleted, then removes those
+   * that are being deleted, which no client knows of.
    */
   tick(): void {
     for (const id of this.#deletes.splice(0)) {
       const entity = this.#byId.get(id)
       if (entity !== undefined) entity.deleting = true
     }
+    for (const [client, known] of this.#known) this.#sync(client, known)
     for (const entity of this.#entities) {
       if (entity.deleting) this.#finalize(entity)
     }
+  }
+
+  /**
+   * Sends a client what changed in the entities that are relevant to it,
+   * as FiveM's server does: the client takes those that no client owns,
+   * and is sent no change of those that it owns, which it syncs.
+   */
+  #sync(client: GameStateClient, known: Map<SyncEntity, Known>): void {
+    const player = this.#players.get(client)
+    const focus = player === undefined ? undefined : fromSector(player.state.position)
+    const clones: ServerClone[] = []
+    for (const entity of this.#entities) {
+      const sent = known.get(entity)
+      if (!this.#relevant(client, entity, focus)) {
+        if (sent === undefined) continue
+        known.delete(entity)
+        clones.push({ kind: 'remove', objectId: entity.objectId })
+        continue
+      }
+      // The first client that an entity is relevant to takes it, and the next one once its owner has it no more.
+      if (entity.owner === undefined || (entity.wantsReassign && entity.owner !== client)) {
+        entity.owner = client
+        entity.wantsReassign = false
+      }
+      const state = JSON.stringify(entity.state)
+      const { objectId, owner } = entity
+      if (sent === undefined) {
+        clones.push({
+          kind: 'create',
+          objectId,
+          type: entity.type,
+          state: entity.state,
+          owner: owner.netId,
+        })
+      } else if (sent.owner !== owner.netId || (owner !== client && sent.state !== state)) {
+        clones.push({ kind: 'sync', objectId, state: entity.state, owner: owner.netId })
+      }
+      known.set(entity, { owner: owner.netId, state })
+    }
+    if (clones.length > 0) this.#host.sendClones(client, clones)
+  }
+
+  /**
+   * Whether an entity is relevant to a client, which the client should
+   * have, as FiveM's server tells: those that it owns, and those that
+   * passed entityCreating, but players, within 424 metres of the ped of
+   * its player on the ground. Entities that are being deleted are relevant
+   * to no client.
+   */
+  #relevant(
+    client: GameStateClient,
+    entity: SyncEntity,
+    focus: readonly number[] | undefined,
+  ): boolean {
+    if (entity.deleting) return false
+    const owns = entity.owner === client
+    if (entity.type === NetObjType.player) return owns
+    if (!owns && !entity.passedFilter) return false
+    if (focus !== undefined && near(entity, focus)) {
+      if (owns) entity.wantsReassign = false
+      return true
+    }
+    if (!owns) return false
+    // The owner of an entity lets it go once it is no longer near, but those that its scripts own, and those it did not sync yet.
+    entity.wantsReassign = true
+    return !entity.hasSynced || entity.ownedByClientScript
   }
 
   #add(type: NetObjType, objectId: number, state: SyncState): SyncEntity {
@@ -223,10 +345,10 @@ export class ServerGameState {
 
   /**
    * Removes an entity for good, as FiveM's FinalizeClone does: it is no
-   * longer valid, and once the main thread ran entityRemoved for it, the
-   * client that owns it removes it, and its object id and its GUID are
-   * free: the object id of an entity of the server for anyone, and that of
-   * an entity of a client for the client it was handed to.
+   * longer valid, and once the main thread ran entityRemoved for it, its
+   * object id and its GUID are free: the object id of an entity of the
+   * server for anyone, and that of an entity of a client for the client it
+   * was handed to.
    */
   #finalize(entity: SyncEntity): void {
     if (entity.finalizing) return
@@ -234,7 +356,6 @@ export class ServerGameState {
     this.#host.onMainThread(() => {
       const handle = this.handleOf(entity)
       this.#host.trigger('entityRemoved', [handle])
-      if (entity.owner !== undefined) this.#host.removeOnClient(entity.owner, entity.objectId)
       this.#byId.delete(entity.objectId)
       this.#used.delete(entity.objectId)
       if (this.#stolen.delete(entity.objectId)) this.#sent.delete(entity.objectId)

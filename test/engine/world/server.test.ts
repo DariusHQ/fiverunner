@@ -7,13 +7,24 @@ import {
   type SyncState,
 } from '../../../src/core/engine/world/entity.ts'
 import { toSector } from '../../../src/core/engine/world/quantize.ts'
-import { ServerGameState, type GameStateHost } from '../../../src/core/engine/world/server.ts'
+import {
+  ServerGameState,
+  type GameStateHost,
+  type ServerClone,
+} from '../../../src/core/engine/world/server.ts'
 
 /** A game state whose host records what it was given, and runs what is for the main thread when asked. */
 function gameState(lengthHack = true) {
   const queued: [string, unknown[]][] = []
   const triggered: [string, unknown[]][] = []
-  const removedOnClients: [GameStateClient, number][] = []
+  const sent: [GameStateClient, ServerClone[]][] = []
+  /** The object ids that the server told clients to remove. */
+  const removedOnClients = () =>
+    sent.flatMap(([client, clones]) =>
+      clones.flatMap((clone) =>
+        clone.kind === 'remove' ? [[client, clone.objectId] as const] : [],
+      ),
+    )
   const mainThread: (() => void)[] = []
   /** The events that handlers cancel. */
   const canceled = new Set<string>()
@@ -24,13 +35,16 @@ function gameState(lengthHack = true) {
       return !canceled.has(name)
     },
     onMainThread: (fn) => mainThread.push(fn),
-    removeOnClient: (client, objectId) => removedOnClients.push([client, objectId]),
+    sendClones: (client, clones) => sent.push([client, [...clones]]),
   }
   const state = new ServerGameState(host, lengthHack)
+  // Ann and Bob joined, but have no peds near anything.
+  state.addClient(ANN)
+  state.addClient(BOB)
   const runMainThread = () => {
     for (const fn of mainThread.splice(0)) fn()
   }
-  return { state, queued, triggered, removedOnClients, canceled, runMainThread }
+  return { state, queued, triggered, sent, removedOnClients, canceled, runMainThread }
 }
 
 const STATE: SyncState = {
@@ -193,7 +207,7 @@ describe('The game state of servers with clients', () => {
     expect(state.byObjectId(2)).toBeUndefined()
     expect(state.byObjectId(3)?.valid).toBe(true)
     // The client is told to remove what the server removed.
-    expect(removedOnClients).toEqual([[ANN, 2]])
+    expect(removedOnClients()).toEqual([[ANN, 2]])
   })
 
   it('triggers nothing for the entities of clients that went before the main thread got to them', () => {
@@ -257,7 +271,7 @@ describe('The game state of servers with clients', () => {
     runMainThread()
     expect(triggered.at(-1)).toEqual(['entityRemoved', [0x20001]])
     expect(state.byObjectId(2)).toBeUndefined()
-    expect(removedOnClients).toEqual([])
+    expect(removedOnClients()).toEqual([])
   })
 
   it('tells clients to remove the entities of theirs that scripts of the server deleted', () => {
@@ -266,7 +280,7 @@ describe('The game state of servers with clients', () => {
     state.delete(state.byObjectId(2)!)
     state.tick()
     runMainThread()
-    expect(removedOnClients).toEqual([[ANN, 2]])
+    expect(removedOnClients()).toEqual([[ANN, 2]])
   })
 
   it('keeps the object ids of the entities of clients that went for the clients', () => {
@@ -300,9 +314,165 @@ describe('The game state of servers with clients', () => {
       ['entityRemoved', [0x20101]],
       ['entityRemoved', [0x20201]],
     ])
-    expect(removedOnClients).toEqual([])
+    expect(removedOnClients()).toEqual([])
     expect([state.byObjectId(4)?.valid, server.valid]).toEqual([true, true])
     expect(state.playerHandleOf(ANN)).toBe(0)
     expect(state.grantObjectIds(BOB, 4)).toEqual([1, 2, 3, 5])
+  })
+})
+
+/** A tree at a position. */
+function at(x: number, y: number, scriptHash = 0): SyncState {
+  return { ...STATE, position: toSector(x, y, 0), scriptHash }
+}
+
+/** What the server sent a client, by kind and object id, and owner for creates and syncs. */
+function sentTo(sent: [GameStateClient, ServerClone[]][], client: GameStateClient): string[] {
+  return sent
+    .filter(([to]) => to === client)
+    .flatMap(([, clones]) =>
+      clones.map((clone) =>
+        clone.kind === 'remove'
+          ? `remove ${clone.objectId}`
+          : `${clone.kind} ${clone.objectId} ${clone.owner}`,
+      ),
+    )
+}
+
+describe('The game state of servers that sync their clients', () => {
+  it('sends clients the entities near the peds of their players, which the first of them takes if no client owns them', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    const near = state.create(NetObjType.automobile, at(100, 100))!
+    state.create(NetObjType.automobile, at(400, 300))
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1'])
+    expect(sentTo(sent, BOB)).toEqual([])
+    expect(near.owner).toBe(ANN)
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1'])
+    // Clients are sent nothing when nothing changed.
+    expect(sent).toHaveLength(1)
+  })
+
+  it('takes the distances of entities from the peds of players along both of x and y', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 500))
+    state.create(NetObjType.automobile, at(0, 0))
+    state.create(NetObjType.automobile, at(500, 500))
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual([])
+  })
+
+  it('takes entities within 424 metres on the ground to be near', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.create(NetObjType.automobile, { ...at(0, 423.99), position: toSector(0, 423.99, 900) })
+    state.create(NetObjType.automobile, at(-424, 0))
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1'])
+  })
+
+  it('sends others what changed in entities, and no owner what it synced', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(10, 0))
+    state.receiveCreate(ANN, 2, NetObjType.automobile, at(5, 0))
+    state.byObjectId(2)!.passedFilter = true
+    state.tick()
+    state.receiveSync(ANN, 2, at(6, 0))
+    state.tick()
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual([])
+    expect(sentTo(sent, BOB)).toEqual(['create 2 1', 'sync 2 1'])
+  })
+
+  it('sends others no entity until it passed entityCreating, and no player', () => {
+    const { state, sent, runMainThread } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(10, 0))
+    state.receiveCreate(ANN, 2, NetObjType.automobile, at(5, 0))
+    state.tick()
+    expect(sentTo(sent, BOB)).toEqual([])
+    runMainThread()
+    state.tick()
+    expect(sentTo(sent, BOB)).toEqual(['create 2 1'])
+  })
+
+  it('removes entities from clients that they go away from, and lets the next client near them take them from owners that had them no more', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(1000, 0))
+    const vehicle = state.create(NetObjType.automobile, at(10, 0))!
+    state.tick()
+    state.receiveSync(ANN, 65534, at(10, 0))
+    state.receiveSync(ANN, 1, at(800, 0))
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'remove 65534'])
+    expect([vehicle.owner, vehicle.wantsReassign]).toEqual([ANN, true])
+    state.receiveSync(BOB, 5, at(20, 0))
+    state.tick()
+    expect(sentTo(sent, BOB)).toEqual(['create 65534 2'])
+    expect([vehicle.owner, vehicle.wantsReassign]).toEqual([BOB, false])
+    // Ann comes back, to a vehicle that Bob owns now.
+    state.receiveSync(ANN, 1, at(0, 0))
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'remove 65534', 'create 65534 2'])
+  })
+
+  it('keeps entities with owners that come back near them before others take them', () => {
+    const { state } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(5000, 0))
+    const vehicle = state.create(NetObjType.automobile, at(10, 0))!
+    state.tick()
+    state.receiveSync(ANN, 65534, at(10, 0))
+    state.receiveSync(ANN, 1, at(800, 0))
+    state.tick()
+    state.receiveSync(ANN, 1, at(0, 0))
+    state.tick()
+    state.receiveSync(BOB, 5, at(20, 0))
+    state.tick()
+    expect([vehicle.owner, vehicle.wantsReassign]).toEqual([ANN, false])
+  })
+
+  it('keeps entities with their owners far from them, which they did not sync yet or which their scripts own', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(ANN, 2, NetObjType.automobile, at(10, 0, 0xbeef))
+    state.create(NetObjType.automobile, at(10, 0))
+    state.tick()
+    state.receiveSync(ANN, 1, at(5000, 0))
+    state.receiveSync(ANN, 2, at(10, 0, 0xbeef))
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1'])
+    expect(state.byObjectId(2)!.wantsReassign).toBe(true)
+  })
+
+  it('tells clients that knew of an entity that it changed owners, its owners too', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(0, 0))
+    const vehicle = state.create(NetObjType.automobile, at(10, 0))!
+    state.tick()
+    vehicle.owner = BOB
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'sync 65534 2'])
+    expect(sentTo(sent, BOB)).toEqual(['create 65534 1', 'sync 65534 2'])
+  })
+
+  it('removes deleted entities from the clients that knew of them, but those that removed them', () => {
+    const { state, sent } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(0, 0))
+    state.receiveCreate(ANN, 2, NetObjType.automobile, at(5, 0))
+    state.byObjectId(2)!.passedFilter = true
+    const vehicle = state.create(NetObjType.automobile, at(10, 0))!
+    state.tick()
+    state.receiveRemove(ANN, 2)
+    state.delete(vehicle)
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'remove 65534'])
+    expect(sentTo(sent, BOB)).toEqual(['create 2 1', 'create 65534 1', 'remove 2', 'remove 65534'])
   })
 })
