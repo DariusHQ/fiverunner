@@ -12,6 +12,12 @@ const SCRIPT_HANDLE_BASE = 0x20000
 /** How many script GUIDs FiveM's server makes room for at first. */
 const GUID_POOL_SIZE = 1500
 
+/** The highest of the slots that players come into the scopes of others at, from which FiveM's server counts down, skipping 31. */
+const SCOPE_SLOTS = 127
+
+/** The slot that FiveM's server gives no player in the scope of another. */
+const SKIPPED_SCOPE_SLOT = 31
+
 /** The square of how far from the peds of players, on the ground, FiveM's server culls entities by default. */
 const CULLING_RADIUS_SQUARED = Math.fround(424 * 424)
 
@@ -57,6 +63,10 @@ export interface GameStateHost {
   onMainThread(fn: () => void): void
   /** Sends a client what changed in the entities that it knows of, which it takes at its next tick. */
   sendClones(client: GameStateClient, clones: readonly ServerClone[]): void
+  /** Tells a client of a player that came into its scope, at a slot, before the server sends it the entity of the player. */
+  enterScope(viewer: GameStateClient, player: GameStateClient, slot: number): void
+  /** Tells a client of a player that left its scope, or that dropped. */
+  leaveScope(viewer: GameStateClient, player: GameStateClient, slot: number, dropped: boolean): void
 }
 
 /**
@@ -90,6 +100,8 @@ export class ServerGameState {
   readonly #objectIds = new Map<GameStateClient, Set<number>>()
   /** The entities that each client knows of, in the order clients joined, with what the server last told it of their owners and their trees. */
   readonly #known = new Map<GameStateClient, Map<SyncEntity, Known>>()
+  /** The players in the scope of each client, by their slots there. */
+  readonly #scopes = new Map<GameStateClient, Map<GameStateClient, number>>()
   /** The entities of the players of clients, which the server bound to them. */
   readonly #players = new Map<GameStateClient, SyncEntity>()
   readonly #guids = new Pool<SyncEntity>(GUID_POOL_SIZE)
@@ -127,6 +139,7 @@ export class ServerGameState {
   /** Takes a client that joined, which the server then sends entities. */
   addClient(client: GameStateClient): void {
     this.#known.set(client, new Map())
+    this.#scopes.set(client, new Map())
   }
 
   /**
@@ -167,7 +180,8 @@ export class ServerGameState {
     const entity = this.#add(type, objectId, state)
     entity.owner = client
     entity.firstOwner = client
-    entity.passedFilter = false
+    // The entities of players need not pass entityCreating to reach others.
+    entity.passedFilter = type === NetObjType.player
     // The client has the entity, which it created.
     this.#known.get(client)?.set(entity, { owner: client.netId, state: JSON.stringify(state) })
     if (type === NetObjType.player) this.#players.set(client, entity)
@@ -212,6 +226,14 @@ export class ServerGameState {
    * was handed are free again.
    */
   drop(client: GameStateClient): void {
+    // Players that the client had in scope drop out of it, as it drops out of the scopes of others.
+    for (const [viewer, scope] of this.#scopes) {
+      const slot = scope.get(client)
+      if (slot === undefined) continue
+      scope.delete(client)
+      this.#host.leaveScope(viewer, client, slot, true)
+    }
+    this.#scopes.delete(client)
     for (const entity of this.#entities) {
       if (entity.firstOwner === client) entity.firstOwnerDropped = true
       if (entity.owner !== client) continue
@@ -277,12 +299,24 @@ export class ServerGameState {
   #sync(client: GameStateClient, known: Map<SyncEntity, Known>): void {
     const player = this.#players.get(client)
     const focus = player === undefined ? undefined : fromSector(player.state.position)
+    const scope = this.#scopes.get(client)!
     const clones: ServerClone[] = []
     for (const entity of this.#entities) {
       const sent = known.get(entity)
-      if (!this.#relevant(client, entity, focus)) {
+      const other =
+        entity.type === NetObjType.player && entity.owner !== client ? entity.owner : undefined
+      if (
+        !this.#relevant(client, entity, focus) ||
+        (sent === undefined && other !== undefined && !this.#enter(client, scope, other))
+      ) {
         if (sent === undefined) continue
         known.delete(entity)
+        if (other !== undefined) {
+          // The players of others leave the scopes that they came into before their entities go.
+          const slot = scope.get(other)!
+          scope.delete(other)
+          this.#host.leaveScope(client, other, slot, false)
+        }
         clones.push({ kind: 'remove', objectId: entity.objectId })
         continue
       }
@@ -310,11 +344,32 @@ export class ServerGameState {
   }
 
   /**
+   * Brings a player into the scope of a client, as FiveM's server does in
+   * OneSync's big mode before it sends the client the entity of the
+   * player: at the highest slot from 127 down, but 31, that no player has
+   * there. Returns whether there was a slot.
+   */
+  #enter(
+    client: GameStateClient,
+    scope: Map<GameStateClient, number>,
+    player: GameStateClient,
+  ): boolean {
+    const taken = new Set(scope.values())
+    let slot = SCOPE_SLOTS
+    while (slot >= 0 && (slot === SKIPPED_SCOPE_SLOT || taken.has(slot))) slot--
+    if (slot < 0) return false
+    scope.set(player, slot)
+    this.#host.enterScope(client, player, slot)
+    return true
+  }
+
+  /**
    * Whether an entity is relevant to a client, which the client should
-   * have, as FiveM's server tells: those that it owns, and those that
-   * passed entityCreating, but players, within 424 metres of the ped of
-   * its player on the ground. Entities that are being deleted are relevant
-   * to no client.
+   * have, as FiveM's server tells: those within 424 metres of the ped of
+   * its player on the ground that it owns or that passed entityCreating,
+   * which its player is, and those further away that it owns if its
+   * scripts own them or it did not sync them yet. Entities that are being
+   * deleted are relevant to no client.
    */
   #relevant(
     client: GameStateClient,
@@ -323,14 +378,13 @@ export class ServerGameState {
   ): boolean {
     if (entity.deleting) return false
     const owns = entity.owner === client
-    if (entity.type === NetObjType.player) return owns
     if (!owns && !entity.passedFilter) return false
     if (focus !== undefined && near(entity, focus)) {
       if (owns) entity.wantsReassign = false
       return true
     }
     if (!owns) return false
-    // The owner of an entity lets it go once it is no longer near, but those that its scripts own, and those it did not sync yet.
+    // An owner that is no longer near an entity hands it to the next client near it, and keeps it until then if its scripts own it or it did not sync it yet.
     entity.wantsReassign = true
     return !entity.hasSynced || entity.ownedByClientScript
   }

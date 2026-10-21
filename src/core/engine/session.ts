@@ -65,6 +65,11 @@ export function netIdAfter(id: number): number {
   return id + 1 === SERVER_NET_ID ? 1 : id + 1
 }
 
+/** What playerEnteredScope and playerLeftScope tell of a player that came into or left the scope of a viewer. */
+function scopeOf(viewer: Player, player: Player): { player: string; for: string } {
+  return { player: String(player.netId), for: String(viewer.netId) }
+}
+
 /** Who a client is to the server it connects to. */
 export interface PlayerIdentity {
   /** The name the client plays by: player by default. */
@@ -520,6 +525,50 @@ export class Session {
         }
       }
       if (requestObjectIds) this.#handObjectIds(player, OBJECT_IDS.asked)
+    })
+  }
+
+  /**
+   * @internal Called by the game state of the server as a player comes into
+   * the scope of a viewer, at a slot: the client of the viewer takes it, and
+   * the bag of the player, at its next tick, and onPlayerJoining after it,
+   * as FiveM's clients do, the bag of the player on the server routes to
+   * it, and the server queues playerEnteredScope.
+   */
+  enterScope(viewer: Player, player: Player, slot: number): void {
+    const source = `net:${SERVER_NET_ID}`
+    this.#toPlayers(viewer, (world) => {
+      world.enter(slot, player.netId, player.name)
+      viewer.client.states.register(`player:${player.netId}`, true)
+      viewer.client.events.queue('onPlayerJoining', pack([player.netId, player.name, slot]), source)
+    })
+    this.server.states.get(`player:${player.netId}`)?.addRoutingTarget(viewer.slot!)
+    this.server.events.queue('playerEnteredScope', pack([scopeOf(viewer, player)]))
+  }
+
+  /**
+   * @internal Called by the game state of the server as a player leaves the
+   * scope of a viewer, or drops: the client of the viewer forgets it and
+   * its state bag, and gets onPlayerDropped, and for players that did not
+   * drop, the bag routes no more to it, and the server queues
+   * playerLeftScope.
+   */
+  leaveScope(viewer: Player, player: Player, slot: number, dropped: boolean): void {
+    const source = `net:${SERVER_NET_ID}`
+    this.#toPlayers(viewer, (world) => {
+      world.leave(slot)
+      viewer.client.states.remove(`player:${player.netId}`)
+      viewer.client.events.queue('onPlayerDropped', pack([player.netId, player.name, slot]), source)
+    })
+    if (dropped) return
+    this.server.states.get(`player:${player.netId}`)?.removeRoutingTarget(viewer.slot!)
+    this.server.events.queue('playerLeftScope', pack([scopeOf(viewer, player)]))
+  }
+
+  /** Runs `fn` with the world of the client of a player at its next tick, unless the client joined another session by then, to which the players of this one are nothing. */
+  #toPlayers(player: Player, fn: (world: ClientWorld) => void): void {
+    this.#toWorld(player, (world) => {
+      if (player.client.world === world) fn(world)
     })
   }
 

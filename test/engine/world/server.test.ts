@@ -26,6 +26,8 @@ function gameState(lengthHack = true) {
       ),
     )
   const mainThread: (() => void)[] = []
+  /** The players that came into the scopes of viewers, left them, or dropped out of them, at their slots. */
+  const scoped: ['enter' | 'leave' | 'drop', GameStateClient, GameStateClient, number][] = []
   /** The events that handlers cancel. */
   const canceled = new Set<string>()
   const host: GameStateHost = {
@@ -36,6 +38,9 @@ function gameState(lengthHack = true) {
     },
     onMainThread: (fn) => mainThread.push(fn),
     sendClones: (client, clones) => sent.push([client, [...clones]]),
+    enterScope: (viewer, player, slot) => scoped.push(['enter', viewer, player, slot]),
+    leaveScope: (viewer, player, slot, dropped) =>
+      scoped.push([dropped ? 'drop' : 'leave', viewer, player, slot]),
   }
   const state = new ServerGameState(host, lengthHack)
   // Ann and Bob joined, but have no peds near anything.
@@ -44,7 +49,7 @@ function gameState(lengthHack = true) {
   const runMainThread = () => {
     for (const fn of mainThread.splice(0)) fn()
   }
-  return { state, queued, triggered, sent, removedOnClients, canceled, runMainThread }
+  return { state, queued, triggered, sent, removedOnClients, scoped, canceled, runMainThread }
 }
 
 const STATE: SyncState = {
@@ -383,20 +388,21 @@ describe('The game state of servers that sync their clients', () => {
     state.receiveSync(ANN, 2, at(6, 0))
     state.tick()
     state.tick()
-    expect(sentTo(sent, ANN)).toEqual([])
-    expect(sentTo(sent, BOB)).toEqual(['create 2 1', 'sync 2 1'])
+    // Each has the player of the other.
+    expect(sentTo(sent, ANN)).toEqual(['create 5 2'])
+    expect(sentTo(sent, BOB)).toEqual(['create 1 1', 'create 2 1', 'sync 2 1'])
   })
 
-  it('sends others no entity until it passed entityCreating, and no player', () => {
+  it('sends others no entity until it passed entityCreating, but players', () => {
     const { state, sent, runMainThread } = gameState()
     state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
     state.receiveCreate(BOB, 5, NetObjType.player, at(10, 0))
     state.receiveCreate(ANN, 2, NetObjType.automobile, at(5, 0))
     state.tick()
-    expect(sentTo(sent, BOB)).toEqual([])
+    expect(sentTo(sent, BOB)).toEqual(['create 1 1'])
     runMainThread()
     state.tick()
-    expect(sentTo(sent, BOB)).toEqual(['create 2 1'])
+    expect(sentTo(sent, BOB)).toEqual(['create 1 1', 'create 2 1'])
   })
 
   it('removes entities from clients that they go away from, and lets the next client near them take them from owners that had them no more', () => {
@@ -406,7 +412,7 @@ describe('The game state of servers that sync their clients', () => {
     const vehicle = state.create(NetObjType.automobile, at(10, 0))!
     state.tick()
     state.receiveSync(ANN, 65534, at(10, 0))
-    state.receiveSync(ANN, 1, at(800, 0))
+    state.receiveSync(ANN, 1, at(-800, 0))
     state.tick()
     expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'remove 65534'])
     expect([vehicle.owner, vehicle.wantsReassign]).toEqual([ANN, true])
@@ -414,10 +420,15 @@ describe('The game state of servers that sync their clients', () => {
     state.tick()
     expect(sentTo(sent, BOB)).toEqual(['create 65534 2'])
     expect([vehicle.owner, vehicle.wantsReassign]).toEqual([BOB, false])
-    // Ann comes back, to a vehicle that Bob owns now.
+    // Ann comes back, to Bob and a vehicle that he owns now.
     state.receiveSync(ANN, 1, at(0, 0))
     state.tick()
-    expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'remove 65534', 'create 65534 2'])
+    expect(sentTo(sent, ANN)).toEqual([
+      'create 65534 1',
+      'remove 65534',
+      'create 5 2',
+      'create 65534 2',
+    ])
   })
 
   it('keeps entities with owners that come back near them before others take them', () => {
@@ -457,8 +468,8 @@ describe('The game state of servers that sync their clients', () => {
     state.tick()
     vehicle.owner = BOB
     state.tick()
-    expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'sync 65534 2'])
-    expect(sentTo(sent, BOB)).toEqual(['create 65534 1', 'sync 65534 2'])
+    expect(sentTo(sent, ANN)).toEqual(['create 5 2', 'create 65534 1', 'sync 65534 2'])
+    expect(sentTo(sent, BOB)).toEqual(['create 1 1', 'create 65534 1', 'sync 65534 2'])
   })
 
   it('removes deleted entities from the clients that knew of them, but those that removed them', () => {
@@ -472,7 +483,113 @@ describe('The game state of servers that sync their clients', () => {
     state.receiveRemove(ANN, 2)
     state.delete(vehicle)
     state.tick()
-    expect(sentTo(sent, ANN)).toEqual(['create 65534 1', 'remove 65534'])
-    expect(sentTo(sent, BOB)).toEqual(['create 2 1', 'create 65534 1', 'remove 2', 'remove 65534'])
+    expect(sentTo(sent, ANN)).toEqual(['create 5 2', 'create 65534 1', 'remove 65534'])
+    expect(sentTo(sent, BOB)).toEqual([
+      'create 1 1',
+      'create 2 1',
+      'create 65534 1',
+      'remove 2',
+      'remove 65534',
+    ])
+  })
+})
+
+/** What the server told a viewer of the players of others, by what they did, their net ids and their slots. */
+function scopeOf(
+  scoped: ['enter' | 'leave' | 'drop', GameStateClient, GameStateClient, number][],
+  viewer: GameStateClient,
+): string[] {
+  return scoped
+    .filter(([, to]) => to === viewer)
+    .map(([what, , player, slot]) => `${what} ${player.netId} ${slot}`)
+}
+
+describe('The game state of servers with players near each other', () => {
+  it('brings the players of others into the scopes of clients near them, at the highest slot from 127 down', () => {
+    const { state, scoped } = gameState()
+    const cid: GameStateClient = { netId: 3 }
+    state.addClient(cid)
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(10, 0))
+    state.receiveCreate(cid, 9, NetObjType.player, at(430, 0))
+    state.tick()
+    expect(scopeOf(scoped, ANN)).toEqual(['enter 2 127'])
+    // Cid is near Bob alone.
+    expect(scopeOf(scoped, BOB)).toEqual(['enter 1 127', 'enter 3 126'])
+    expect(scopeOf(scoped, cid)).toEqual(['enter 2 127'])
+    state.tick()
+    expect(scoped).toHaveLength(4)
+  })
+
+  it('takes the players of others out of the scopes of clients that they go away from, and brings them back at the slots that are free', () => {
+    const { state, sent, scoped } = gameState()
+    const cid: GameStateClient = { netId: 3 }
+    state.addClient(cid)
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(10, 0))
+    state.tick()
+    state.receiveSync(BOB, 5, at(1000, 0))
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 5 2', 'remove 5'])
+    expect(scopeOf(scoped, ANN)).toEqual(['enter 2 127', 'leave 2 127'])
+    expect(scopeOf(scoped, BOB)).toEqual(['enter 1 127', 'leave 1 127'])
+    // Cid comes first, then Bob, who takes the slot after his.
+    state.receiveCreate(cid, 9, NetObjType.player, at(20, 0))
+    state.tick()
+    state.receiveSync(BOB, 5, at(10, 0))
+    state.tick()
+    expect(scopeOf(scoped, ANN)).toEqual([
+      'enter 2 127',
+      'leave 2 127',
+      'enter 3 127',
+      'enter 2 126',
+    ])
+  })
+
+  it('skips the slot 31, and brings no more players into a scope once it has no slot left, until one is free', () => {
+    const { state, sent, scoped } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    const others = Array.from({ length: 128 }, (_, i) => ({ netId: 100 + i }))
+    for (const [i, other] of others.entries()) {
+      state.addClient(other)
+      state.receiveCreate(other, 100 + i, NetObjType.player, at(0, 0))
+    }
+    state.tick()
+    const slots = Array.from({ length: 128 }, (_, i) => 127 - i).filter((slot) => slot !== 31)
+    expect(scopeOf(scoped, ANN)).toEqual(slots.map((slot, i) => `enter ${100 + i} ${slot}`))
+    expect(sentTo(sent, ANN)).not.toContain('create 227 227')
+    // The first leaves, and the last takes its slot.
+    state.receiveSync(others[0]!, 100, at(1000, 0))
+    state.tick()
+    expect(scopeOf(scoped, ANN).slice(127)).toEqual(['leave 100 127', 'enter 227 127'])
+    expect(sentTo(sent, ANN).slice(-2)).toEqual(['remove 100', 'create 227 227'])
+  })
+
+  it('drops the players that drop out of the scopes of others, and forgets those in theirs', () => {
+    const { state, sent, scoped } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.receiveCreate(BOB, 5, NetObjType.player, at(10, 0))
+    state.tick()
+    state.drop(BOB)
+    expect(scopeOf(scoped, ANN)).toEqual(['enter 2 127', 'drop 2 127'])
+    expect(scopeOf(scoped, BOB)).toEqual(['enter 1 127'])
+    state.tick()
+    expect(sentTo(sent, ANN)).toEqual(['create 5 2', 'remove 5'])
+    // Cid takes the slot that Bob had, and Ann drops out of no scope of Bob's.
+    const cid: GameStateClient = { netId: 3 }
+    state.addClient(cid)
+    state.receiveCreate(cid, 9, NetObjType.player, at(20, 0))
+    state.tick()
+    state.drop(ANN)
+    expect(scopeOf(scoped, ANN)).toEqual(['enter 2 127', 'drop 2 127', 'enter 3 127'])
+    expect(scopeOf(scoped, BOB)).toEqual(['enter 1 127'])
+    expect(scopeOf(scoped, cid)).toEqual(['enter 1 127', 'drop 1 127'])
+  })
+
+  it('brings no player into the scope of a client that has no player', () => {
+    const { state, scoped } = gameState()
+    state.receiveCreate(ANN, 1, NetObjType.player, at(0, 0))
+    state.tick()
+    expect(scoped).toEqual([])
   })
 })

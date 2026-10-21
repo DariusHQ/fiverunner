@@ -263,6 +263,10 @@ export class ResourceManager {
             onMainThread: (fn) => this.enqueue(fn),
             // The game state takes its clients from the session, which has them as players.
             sendClones: (client, clones) => this.#session?.sendClones(client as Player, clones),
+            enterScope: (viewer, player, slot) =>
+              this.#session?.enterScope(viewer as Player, player as Player, slot),
+            leaveScope: (viewer, player, slot, dropped) =>
+              this.#session?.leaveScope(viewer as Player, player as Player, slot, dropped),
           },
           this.oneSync,
         )

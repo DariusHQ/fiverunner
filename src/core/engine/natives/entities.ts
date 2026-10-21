@@ -377,8 +377,9 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
         const found = clientEntityOf(ctx, entity)
         // Entities with no network objects have no owners.
         if (found?.objectId === undefined) return -1
+        if (found.owner === undefined) return localPlayerIndex(ctx)
         // FiveM's clients give the owners of clones that they know no player of as 255.
-        return found.owner === undefined ? localPlayerIndex(ctx) : 0xff
+        return ctx.manager.world!.indexOf(found.owner) ?? 0xff
       },
     ),
     defineNative(

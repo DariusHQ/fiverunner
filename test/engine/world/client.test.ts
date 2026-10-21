@@ -247,3 +247,35 @@ describe('Clones in the worlds of clients', () => {
     expect(world.canNetwork).toBe(true)
   })
 })
+
+describe('The players of others in the worlds of clients', () => {
+  it('are known by their indices while they are in scope, with the clones of their players as their peds', () => {
+    const world = new ClientWorld()
+    world.enter(127, 2, 'Bob')
+    world.enter(126, 3, 'Cid')
+    world.receiveClones(
+      [
+        { kind: 'create', objectId: 5, type: NetObjType.player, state: TREE, owner: 2 },
+        { kind: 'create', objectId: 6, type: NetObjType.ped, state: TREE, owner: 3 },
+      ],
+      1,
+    )
+    expect([...world.players]).toEqual([
+      [127, { netId: 2, name: 'Bob' }],
+      [126, { netId: 3, name: 'Cid' }],
+    ])
+    expect([world.indexOf(2), world.indexOf(3), world.indexOf(1)]).toEqual([127, 126, undefined])
+    expect(world.pedOf(2)).toBe(world.byObjectId(5))
+    // A ped that Cid owns is not the one of his player, and the client knows its own player by no net id.
+    expect([world.pedOf(3), world.pedOf(1)]).toEqual([undefined, undefined])
+    // Bob goes with his ped, and Cid with no ped of his player.
+    world.leave(127)
+    world.leave(126)
+    expect([world.indexOf(2), world.players.size, world.byObjectId(5)]).toEqual([
+      undefined,
+      0,
+      undefined,
+    ])
+    expect(world.byObjectId(6)?.owner).toBe(3)
+  })
+})

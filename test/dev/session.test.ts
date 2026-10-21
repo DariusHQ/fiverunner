@@ -240,7 +240,10 @@ CreateThread(function() TriggerServerEvent('bank:deposit', 100) end)`,
         event(1, 'server', 'bank:deposit', '100'),
         event(2, 'server', 'bank:deposit', '100'),
         event('server', 1, 'bank:balance', '600'),
+        // Ann and Bo come into the scopes of each other, at 0, 0, 0.
+        event('server', 1, 'onPlayerJoining', '2, "Bo", 127'),
         event('server', 2, 'bank:balance', '600'),
+        event('server', 2, 'onPlayerJoining', '1, "Ann", 127'),
       ],
       [
         'server: [script:bank] deposit\t1\t100',

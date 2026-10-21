@@ -379,7 +379,7 @@ describe('State bags across a session', () => {
     expect(scripts(bob)).toEqual(['[script:a] read\t2'])
   })
 
-  it('of players reach the clients of the players alone, as their slots', async () => {
+  it('of players reach the clients of the players, as their slots, before others have them in scope', async () => {
     const { server, session } = await serverWithBags()
     const ann = await joined(session)
     const bob = await joined(session)
@@ -415,7 +415,11 @@ describe('State bags across a session', () => {
     ann.manager.tick()
     expect([scripts(server), scripts(ann)]).toEqual([
       ['[script:a] server\tplayer:1\tmine\t5\t2048\ttrue'],
-      ['[script:a] change\tplayer:1\tmine\t5\t0\tfalse'],
+      [
+        '[script:a] change\tplayer:1\tmine\t5\t0\tfalse',
+        // Bob came into the scope of Ann, whose client gets his bag.
+        '[script:a] change\tplayer:2\thp\t100\t0\tfalse',
+      ],
     ])
     runCommand(server.manager, 'read global mine', 'system.console')
     expect(scripts(server)).toEqual(['[script:a] read\tnil'])

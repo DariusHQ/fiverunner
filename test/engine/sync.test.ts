@@ -505,12 +505,12 @@ end, false)`,
     }
     bob.manager.console.commands.invoke('clone', '')
     expect(printed(bob)).toEqual([
-      // Bob knows no player of Ann yet.
-      // Ann synced the vehicle at 5, 0, 1 in steps of its sector.
-      '[script:bob] 257\tvec3(4.997802, 0.000000, 0.989014)\t255\tfalse\tfalse\tfalse\tfalse',
-      '[script:bob] 257\t1',
-      '[script:bob] 257\tvec3(6.000000, 0.989011, 2.000000)\t255\tfalse\tfalse\tfalse\tfalse',
-      '[script:bob] 257\t1',
+      // Ann synced the vehicle at 5, 0, 1 in steps of its sector, and her ped took the handle before it.
+      // Bob has Ann in scope, at 127.
+      '[script:bob] 513\tvec3(4.997802, 0.000000, 0.989014)\t127\tfalse\tfalse\tfalse\tfalse',
+      '[script:bob] 513\t1',
+      '[script:bob] 513\tvec3(6.000000, 0.989011, 2.000000)\t127\tfalse\tfalse\tfalse\tfalse',
+      '[script:bob] 513\t1',
     ])
     expect(bob.diagnostics).toEqual([
       'bob: DeleteEntity was given an entity that another client owns, which GTA V does not delete until it has control of it.',
@@ -530,5 +530,193 @@ RegisterCommand('delete', function() DeleteEntity(vehicle) end, false)`,
     step(test)
     test.client.manager.console.commands.invoke('near', '')
     expect(printed(test.client)).toEqual(['[script:run0] near\tfalse'])
+  })
+})
+
+/** Lua of clients that tells of the players that come into their scopes and leave them, and walks their peds along x. */
+const SCOPES = `RegisterNetEvent('onPlayerJoining', function(serverId, name, slot)
+    print('joining', source, serverId, name, slot, GetPlayerServerId(slot), GetPlayerName(slot), GetPlayerPed(slot), GetPlayerFromServerId(serverId))
+end)
+RegisterNetEvent('onPlayerDropped', function(serverId, name, slot)
+    print('dropped', source, serverId, name, slot, GetPlayerServerId(slot), GetPlayerName(slot), GetPlayerPed(slot), GetPlayerFromServerId(serverId))
+end)
+RegisterCommand('players', function()
+    local ped = GetPlayerPed(127)
+    print(json.encode(GetActivePlayers()), GetNumberOfPlayers(), NetworkIsPlayerActive(127), IsPlayerPlaying(127), IsPedAPlayer(ped), NetworkGetPlayerIndexFromPed(ped), GetPlayerServerId(127 + 256), #GetGamePool('CPed'))
+    print(GetEntityCoords(ped), NetworkGetEntityOwner(ped), NetworkHasControlOfEntity(ped), GetPlayerFromStateBagName('player:' .. GetPlayerServerId(127)))
+end, false)
+RegisterCommand('walk', function(_, args) SetEntityCoords(PlayerPedId(), tonumber(args[1]) + 0.0, 0.0, 1.0, false, false, false, false) end, false)
+RegisterCommand('sethp', function(_, args) LocalPlayer.state:set('hp', tonumber(args[1]), true) end, false)
+RegisterCommand('hp', function(_, args) print('hp', Player(tonumber(args[1])).state.hp) end, false)
+RegisterCommand('mark', function(_, args)
+    local state = Player(tonumber(args[1])).state
+    state:set('seen', true, false)
+    print('seen', state.seen)
+end, false)
+RegisterCommand('owner', function(_, args)
+    local entity = NetworkGetEntityFromNetworkId(tonumber(args[1]))
+    print('owner', DoesEntityExist(entity), NetworkGetEntityOwner(entity), NetworkGetPlayerIndexFromPed(entity), IsPedAPlayer(entity))
+end, false)`
+
+/** A test whose server tells of the players that come into scopes and leave them, and whose client Ann and second client Bob run SCOPES. */
+async function scopes() {
+  const test = await session(
+    `AddEventHandler('playerEnteredScope', function(data) print('entered', data.player, data['for']) end)
+AddEventHandler('playerLeftScope', function(data) print('left', data.player, data['for']) end)`,
+    SCOPES,
+  )
+  const { bob, player } = await bobOf(test)
+  bob
+    .add('bob', {
+      'fxmanifest.lua': `fx_version 'cerulean'\ngame 'gta5'\nclient_script 'main.lua'`,
+      'main.lua': SCOPES,
+    })
+    .start()
+  /** Ticks Ann, the server and Bob, and returns what their scripts printed, marked with whose they are. */
+  const tick = () => {
+    const lines = step(test)
+    bob.tickAt(test.client.time)
+    return [...lines, ...printed(bob).map((line) => `bob ${line}`)]
+  }
+  return { ...test, bob, bobPlayer: player, tick }
+}
+
+describe('Players near each other', () => {
+  it('come into the scopes of each other, which their clients and servers are told of', async () => {
+    const test = await scopes()
+    const lines = [...test.tick(), ...test.tick(), ...test.tick()]
+    test.client.manager.console.commands.invoke('players', '')
+    test.bob.manager.console.commands.invoke('players', '')
+    // Ann has the bag of Bob, though he set no key of it.
+    test.client.manager.console.commands.invoke('mark 2', '')
+    expect([...lines, ...printed(test.client), ...printed(test.bob)]).toEqual([
+      // Each knows the other at 127, and the ped of the other by the handle after that of its own.
+      'client [script:run0] joining\t65535\t2\tBob\t127\t2\tBob\t257\t127',
+      'server [script:srv] entered\t2\t1',
+      'server [script:srv] entered\t1\t2',
+      'bob [script:bob] joining\t65535\t1\tAnn\t127\t1\tAnn\t257\t127',
+      '[script:run0] [127,128]\t2\t1\t1\t1\t127\t2\t2',
+      // The ped of Bob is at 0, 0, 0 on the steps of its sector.
+      '[script:run0] vec3(0.000000, 0.000000, -0.005127)\t127\tfalse\t127',
+      '[script:run0] seen\ttrue',
+      '[script:bob] [127,128]\t2\t1\t1\t1\t127\t1\t2',
+      '[script:bob] vec3(0.000000, 0.000000, -0.005127)\t127\tfalse\t127',
+    ])
+  })
+
+  it('leave the scopes of each other as they go away, and come back into them', async () => {
+    const test = await scopes()
+    for (let i = 0; i < 3; i++) test.tick()
+    test.bob.manager.console.commands.invoke('walk 500', '')
+    const away = [...test.tick(), ...test.tick(), ...test.tick()]
+    test.client.manager.console.commands.invoke('players', '')
+    const players = printed(test.client)
+    test.bob.manager.console.commands.invoke('walk 0', '')
+    expect([...away, ...players, ...test.tick(), ...test.tick(), ...test.tick()]).toEqual([
+      'server [script:srv] left\t2\t1',
+      'server [script:srv] left\t1\t2',
+      // Clients know the players that left their scopes no more as they are told of it.
+      'bob [script:bob] dropped\t65535\t1\tAnn\t127\t0\t**Invalid**\t0\t-1',
+      'client [script:run0] dropped\t65535\t2\tBob\t127\t0\t**Invalid**\t0\t-1',
+      '[script:run0] [128]\t1\tfalse\tfalse\tfalse\t-1\t0\t1',
+      '[script:run0] vec3(0.000000, 0.000000, 0.000000)\t-1\tfalse\t0',
+      'server [script:srv] entered\t2\t1',
+      'server [script:srv] entered\t1\t2',
+      // The new clones of the peds take the slots of the old ones in the pools, with other handles.
+      'bob [script:bob] joining\t65535\t1\tAnn\t127\t1\tAnn\t258\t127',
+      'client [script:run0] joining\t65535\t2\tBob\t127\t2\tBob\t258\t127',
+    ])
+  })
+
+  it('drop out of the scopes of others as they drop', async () => {
+    const test = await scopes()
+    for (let i = 0; i < 3; i++) test.tick()
+    test.bobPlayer.quit()
+    // The ped of Bob goes with him, before the server removes it.
+    const lines = test.tick()
+    test.client.manager.console.commands.invoke('players', '')
+    expect([...lines, ...printed(test.client)]).toEqual([
+      // The server queues no playerLeftScope for players that drop.
+      'client [script:run0] dropped\t65535\t2\tBob\t127\t0\t**Invalid**\t0\t-1',
+      '[script:run0] [128]\t1\tfalse\tfalse\tfalse\t-1\t0\t1',
+      '[script:run0] vec3(0.000000, 0.000000, 0.000000)\t-1\tfalse\t0',
+    ])
+  })
+
+  it('have the state bags of each other while they are in scope', async () => {
+    const test = await scopes()
+    test.bob.manager.console.commands.invoke('sethp 100', '')
+    const hp = () => {
+      test.client.manager.console.commands.invoke('hp 2', '')
+      return printed(test.client)
+    }
+    const before = hp()
+    for (let i = 0; i < 3; i++) test.tick()
+    const near = hp()
+    test.bob.manager.console.commands.invoke('walk 500', '')
+    for (let i = 0; i < 3; i++) test.tick()
+    test.bob.manager.console.commands.invoke('sethp 50', '')
+    for (let i = 0; i < 3; i++) test.tick()
+    const away = hp()
+    test.bob.manager.console.commands.invoke('walk 0', '')
+    for (let i = 0; i < 3; i++) test.tick()
+    expect([...before, ...near, ...away, ...hp()]).toEqual([
+      // Ann gets what Bob set while he was away as he comes back.
+      '[script:run0] hp\tnil',
+      '[script:run0] hp\t100',
+      '[script:run0] hp\tnil',
+      '[script:run0] hp\t50',
+    ])
+  })
+
+  it('tell clients that joined another session nothing more of the players of the one they left', async () => {
+    const test = await scopes()
+    // The server brought Bob into the scope of Ann, which her client takes at its next tick, after it left.
+    test.player.quit()
+    const other = await createProcess()
+    join(new Session(other.manager), test.client.manager, { name: 'Ann' })
+    const lines = test.run(SCOPES)
+    test.client.tickAt(test.client.time + 10)
+    test.client.manager.console.commands.invoke('players', '')
+    // The client of Ann knows herself alone in the new session.
+    expect([...lines, ...printed(test.client)]).toEqual([
+      '[script:run1] joining\t65535\t1\tAnn\t128\t1\tAnn\t1\t128',
+      '[script:run1] [128]\t1\tfalse\tfalse\tfalse\t-1\t0\t1',
+      '[script:run1] vec3(0.000000, 0.000000, 0.000000)\t-1\tfalse\t0',
+    ])
+  })
+
+  it('are listed by their indices', async () => {
+    const test = await scopes()
+    const cid = await createProcess({ side: 'client' })
+    join(test.session, cid.manager, { name: 'Cid' })
+    for (let i = 0; i < 3; i++) {
+      test.tick()
+      cid.tickAt(test.client.time)
+    }
+    test.client.manager.console.commands.invoke('players', '')
+    // Bob came first, at 127, then Cid, at 126.
+    expect(printed(test.client)).toEqual([
+      '[script:run0] [126,127,128]\t3\t1\t1\t1\t127\t2\t3',
+      '[script:run0] vec3(0.000000, 0.000000, -0.005127)\t127\tfalse\t127',
+    ])
+  })
+
+  it('own clones that others know by the slots that they are at, or as 255 out of their scopes', async () => {
+    const test = await scopes()
+    for (let i = 0; i < 3; i++) test.tick()
+    test.run(withAdder(`CreateVehicle(adder, 400.0, 0.0, 1.0, 0.0, true, false)`))
+    const owner = () => {
+      for (let i = 0; i < 4; i++) test.tick()
+      test.bob.manager.console.commands.invoke('owner 2', '')
+      return printed(test.bob)
+    }
+    const near = owner()
+    // Bob goes 800 metres away from Ann, and the vehicle is 400 metres from both.
+    test.bob.manager.console.commands.invoke('walk 800', '')
+    expect([...near, ...owner()]).toEqual([
+      '[script:bob] owner\t1\t127\t-1\tfalse',
+      '[script:bob] owner\t1\t255\t-1\tfalse',
+    ])
   })
 })

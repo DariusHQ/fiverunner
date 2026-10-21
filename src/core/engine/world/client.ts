@@ -61,6 +61,12 @@ export class ClientEntity {
   }
 }
 
+/** A player of another client, as a client knows it while it is in its scope. */
+export interface RemotePlayer {
+  readonly netId: number
+  readonly name: string
+}
+
 /** What a client tells its server of the entities it owns, as FiveM's clients send clones. */
 export type CloneMessage =
   | {
@@ -108,6 +114,8 @@ export class ClientWorld {
   readonly #removed: number[] = []
   /** The entities that the world took from others, which it syncs once to tell its server it has them. */
   readonly #taken = new Set<ClientEntity>()
+  /** The players of other clients in the scope of the client, by their indices. */
+  readonly #players = new Map<number, RemotePlayer>()
   /** The ped of the local player: player_zero, at 0, 0, 0. */
   readonly playerPed = new ClientEntity(NetObjType.player, PLAYER_ZERO)
   /** The fade of the screen of the game. */
@@ -120,6 +128,42 @@ export class ClientWorld {
   /** The entities, in the order they were created. */
   get entities(): IterableIterator<ClientEntity> {
     return this.#entities.values()
+  }
+
+  /** The players of other clients in the scope of the client, by their indices. */
+  get players(): ReadonlyMap<number, RemotePlayer> {
+    return this.#players
+  }
+
+  /** Takes a player of another client that came into the scope of the client, at an index. */
+  enter(index: number, netId: number, name: string): void {
+    this.#players.set(index, { netId, name })
+  }
+
+  /**
+   * Forgets the player at an index, which left the scope of the client,
+   * and its ped, as FiveM's clients delete the peds of the players that
+   * leave before their servers remove them.
+   */
+  leave(index: number): void {
+    const player = this.#players.get(index)!
+    this.#players.delete(index)
+    const ped = this.pedOf(player.netId)
+    if (ped !== undefined) this.#forget(ped)
+  }
+
+  /** The index of the player of another client of a net id, in the scope of the client, if it is. */
+  indexOf(netId: number): number | undefined {
+    for (const [index, player] of this.#players) if (player.netId === netId) return index
+    return undefined
+  }
+
+  /** The ped of the player of another client of a net id, which is the clone of its player that it owns, if the client knows of it. */
+  pedOf(netId: number): ClientEntity | undefined {
+    for (const entity of this.#entities) {
+      if (entity.type === NetObjType.player && entity.owner === netId) return entity
+    }
+    return undefined
   }
 
   /** Adds an entity to the world, with a handle of its own, and learns the type of its model. */

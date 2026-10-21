@@ -595,7 +595,7 @@ end, false)`)
     ])
   })
 
-  it('are told who joins after them without OneSync, but miss what comes before their resources start', async () => {
+  it('are told who joins after them without OneSync, missing who came before their resources started, and who comes near them with it', async () => {
     for (const oneSync of [true, false]) {
       const { server, session } = await serverWith('', oneSync)
       clientScript(server, WATCH)
@@ -603,8 +603,11 @@ end, false)`)
       ready(session, first, { name: 'Ann' })
       ready(session, second, { name: 'Bob' })
       session.tick()
+      // With OneSync, each comes into the scope of the other, whose peds are both at 0, 0, 0.
       expect([scripts(first), scripts(second)]).toEqual(
-        oneSync ? [[], []] : [['[script:c] joining\t2\tBob\t-1'], []],
+        oneSync
+          ? [['[script:c] joining\t2\tBob\t127'], ['[script:c] joining\t1\tAnn\t127']]
+          : [['[script:c] joining\t2\tBob\t-1'], []],
       )
     }
   })
