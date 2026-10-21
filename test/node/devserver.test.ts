@@ -297,14 +297,21 @@ describe('The dev server', () => {
         },
         (response) => {
           let text = ''
+          let written = false
           response.on('data', (chunk: Buffer) => {
             text += chunk.toString()
             if (text === ': FiveRunner\n\n') {
-              writeFileSync(join(project, 'node_modules', 'x.js'), 'x')
-              writeFileSync(join(project, '.git', 'HEAD'), 'x')
-              setTimeout(() => writeFileSync(join(project, 'client.lua'), 'print(2)'), 500)
+              // macOS can tell of the files of the project that were written just before the server watched them.
+              setTimeout(() => {
+                text = ''
+                changes.splice(0)
+                written = true
+                writeFileSync(join(project, 'node_modules', 'x.js'), 'x')
+                writeFileSync(join(project, '.git', 'HEAD'), 'x')
+                setTimeout(() => writeFileSync(join(project, 'client.lua'), 'print(2)'), 500)
+              }, 1000)
             }
-            if (text.includes('event: change')) {
+            if (written && text.includes('event: change')) {
               sent.destroy()
               resolve(`${response.headers['content-type']} ${JSON.stringify(text)}`)
             }
@@ -317,7 +324,7 @@ describe('The dev server', () => {
     const read = await get(port, '/__fiverunner/api/read?path=client.lua', { headers: API })
     expect([before.body, events, changes, read.body]).toEqual([
       'print(1)',
-      'text/event-stream ": FiveRunner\\n\\nevent: change\\ndata: \\n\\n"',
+      'text/event-stream "event: change\\ndata: \\n\\n"',
       ['changed'],
       'print(2)',
     ])
