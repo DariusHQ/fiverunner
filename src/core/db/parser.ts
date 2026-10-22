@@ -619,8 +619,14 @@ export class Parser {
       let table = this.tableName()
       if (this.acceptOneOf('FROM', 'IN') !== undefined)
         table = { schema: this.name(), name: table.name }
-      if (this.acceptWord('WHERE')) this.expression()
-      return { kind: 'showIndex', table, start, end: this.last }
+      const where = this.acceptWord('WHERE') ? this.expression() : undefined
+      return {
+        kind: 'showIndex',
+        table,
+        ...(where === undefined ? {} : { where }),
+        start,
+        end: this.last,
+      }
     }
     if (!full && scope === undefined && this.acceptWord('CREATE', 'TABLE')) {
       return { kind: 'showCreateTable', table: this.tableName(), start, end: this.last }

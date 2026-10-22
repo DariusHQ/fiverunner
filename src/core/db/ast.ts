@@ -549,7 +549,7 @@ export type ShowStatement = Span &
         readonly like?: Expression
         readonly where?: Expression
       }
-    | { readonly kind: 'showIndex'; readonly table: TableName }
+    | { readonly kind: 'showIndex'; readonly table: TableName; readonly where?: Expression }
     | { readonly kind: 'showCreateTable'; readonly table: TableName }
     | { readonly kind: 'showDatabases'; readonly like?: Expression }
     | { readonly kind: 'showVariables'; readonly like?: Expression; readonly where?: Expression }

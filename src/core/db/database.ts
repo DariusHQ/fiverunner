@@ -937,7 +937,7 @@ export class Connection implements SqliteAccess {
             'NO',
           ]),
         )
-        return { kind: 'rows', fields, rows }
+        return filter(rows, fields, 2)
       }
       case 'showCreateTable': {
         const key = tableKey(statement.table.name)

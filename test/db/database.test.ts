@@ -632,6 +632,11 @@ describe('ALTER TABLE', () => {
       ['ib', 'a'],
       ['ib', 'b'],
     ])
+    expect(rows(db, "SHOW INDEX FROM t WHERE Key_name = 'ia'")).toEqual([])
+    expect(rows(db, "SHOW INDEX FROM t WHERE Key_name = 'ib'").map((row) => row[4])).toEqual([
+      'a',
+      'b',
+    ])
   })
 })
 
