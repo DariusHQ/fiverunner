@@ -296,7 +296,7 @@ Duration: 0.63 s
     const usage = (await test(root, ['--help'])).stdout
     expect([
       await test(write('nothing', { 'readme.txt': '' })),
-      await test(bank({}), ['--watch']),
+      await test(bank({}), ['--bail']),
       await test(bank({}), ['--help', 'tests']),
       await test(root, ['-h']),
       usage.split('\n')[0],
@@ -307,11 +307,45 @@ Duration: 0.63 s
         stderr:
           'fiverunner: there is no FiveM project here: a resource has an fxmanifest.lua or a __resource.lua, and a server a resources directory\n',
       },
-      { code: 2, stdout: '', stderr: `fiverunner: unknown option --watch\n\n${usage}` },
+      { code: 2, stdout: '', stderr: `fiverunner: unknown option --bail\n\n${usage}` },
       { code: 2, stdout: '', stderr: `fiverunner: unknown option --help\n\n${usage}` },
       { code: 0, stdout: usage, stderr: '' },
       'Usage: fiverunner test [paths...]',
     ])
+  })
+
+  it('runs the tests again as files of the project change, when it watches, until it is interrupted', async () => {
+    const directory = bank({
+      'tests/a.test.lua': `it('a', function() expect(exports.bank:balance()).toBe(500) end)`,
+    })
+    let output = ''
+    let interrupt = () => {}
+    const interrupted = new Promise<void>((resolve) => {
+      interrupt = resolve
+    })
+    const running = test(directory, ['--watch'], {
+      stdout: (text) => {
+        output += text
+      },
+      interrupted: () => interrupted,
+    })
+    const until = async (done: () => boolean) => {
+      for (let waited = 0; !done() && waited < 10000; waited += 50) {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+    }
+    await until(() => output.includes('Watching'))
+    writeFileSync(join(directory, 'server.lua'), `exports('balance', function() return 600 end)`)
+    // The watcher of the host may tell of the files written before it watched, which runs the tests once more.
+    await until(() => output.includes('× a') && output.endsWith('until Ctrl+C\n'))
+    interrupt()
+    const { code } = await running
+    expect([
+      code,
+      output.startsWith('✓ tests/a.test.lua'),
+      output.includes('Files changed: running the tests again'),
+      output.includes('expected 600 to be 500'),
+    ]).toEqual([1, true, true, true])
   })
 
   it('fails the files that FiveRunner fails to run', async () => {

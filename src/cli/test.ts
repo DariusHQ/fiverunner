@@ -3,6 +3,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { FileSource } from '../core/engine/index.ts'
 import { compareUtf8 } from '../core/libc.ts'
 import { findTestFiles, openProject, type LocalProject } from '../node/project.ts'
+import { watchProject } from '../node/watch.ts'
 import { runFile, type FileResult } from '../runner/index.ts'
 import type { CliHost } from './main.ts'
 import { Reporter } from './report.ts'
@@ -16,7 +17,8 @@ it has a resources directory, whose server.cfg, if there is one, starts
 the resources of the server.
 
 Options:
-  -h, --help  Show this help
+  -w, --watch  Run the tests again as files of the project change, until Ctrl+C
+  -h, --help   Show this help
 `
 
 /** What the arguments of the command ask for that the project does not have. */
@@ -24,20 +26,46 @@ class UsageError extends Error {}
 
 /**
  * Runs the tests of the project in the directory that the tool runs in,
- * and returns the exit code: 0 if they passed, 1 if any failed, or if
- * there were none, and 2 if the arguments make no sense to it, or there
- * is no project.
+ * and again as its files change, when it watches, until it is interrupted,
+ * and returns the exit code of the last run: 0 if they passed, 1 if any
+ * failed, or if there were none, and 2 if the arguments make no sense to
+ * it, or there is no project.
  */
 export async function test(args: readonly string[], host: CliHost): Promise<number> {
   if (args.length === 1 && (args[0] === '-h' || args[0] === '--help')) {
     host.stdout(USAGE)
     return 0
   }
-  const option = args.find((arg) => arg.startsWith('-'))
+  const watching = args.some((arg) => arg === '-w' || arg === '--watch')
+  const paths = args.filter((arg) => arg !== '-w' && arg !== '--watch')
+  const option = paths.find((arg) => arg.startsWith('-'))
   if (option !== undefined) {
     host.stderr(`fiverunner: unknown option ${option}\n\n${USAGE}`)
     return 2
   }
+  if (!watching) return runTests(paths, host)
+  const interrupted = host.interrupted().then(() => false)
+  for (;;) {
+    // What changes as the tests run runs them again too.
+    let stop = () => {}
+    const changed = new Promise<boolean>((resolve) => {
+      stop = watchProject(host.cwd, () => resolve(true))
+    })
+    const code = await runTests(paths, host)
+    if (code === 2) {
+      stop()
+      return code
+    }
+    host.stdout('\nWatching the files of the project, until Ctrl+C\n')
+    const again = await Promise.race([changed, interrupted])
+    stop()
+    if (!again) return code
+    host.stdout('\nFiles changed: running the tests again\n\n')
+  }
+}
+
+/** Runs the tests of the project in the directory that the tool runs in, in `paths`, as test does once. */
+async function runTests(args: readonly string[], host: CliHost): Promise<number> {
   const project = openProject(host.cwd)
   if (project === undefined) {
     host.stderr(
