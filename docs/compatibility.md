@@ -22,7 +22,28 @@ This page lists only what passes.
 - players get jobs;
 - the characters of players that leave are saved.
 
-Run the suite on your machine, from the root of the repository, with `curl`, `sha256sum` and `unzip`:
+## ESX
+
+| Resource                                         | Version |
+| ------------------------------------------------ | ------- |
+| es_extended and its `legacy.sql`                 | 1.16.4  |
+| esx_lib, cron, esx_context                       | 1.16.4  |
+| esx_menu_default, esx_menu_dialog, esx_menu_list | 1.16.4  |
+| esx_notify, esx_progressbar, esx_textui          | 1.16.4  |
+| skinchanger, esx_skin                            | 1.16.4  |
+
+It runs ESX without esx_multicharacter and esx_identity, whose pages no test drives yet, as ESX runs when they are missing: players load as they join. [The tests](../compat/esx/tests/esx.test.lua) check that:
+
+- the resources start without script errors, on the server and on the client of a player;
+- players load, and the database keeps them;
+- money is given and taken, in cash and in the bank;
+- items are given and taken;
+- players get jobs;
+- players that leave are saved.
+
+## Running a suite
+
+Run a suite on your machine, from the root of the repository, with `curl`, `sha256sum` and `unzip`:
 
 ```bash
 sh compat/fetch.sh qbox

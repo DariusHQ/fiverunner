@@ -78,9 +78,13 @@ jobs:
       - run: npm test
 
   compat:
-    name: Compatibility with QBox
+    name: Compatibility with ${{ matrix.suite }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [qbox, esx]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -89,9 +93,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: sh compat/fetch.sh qbox
-      - name: Run the tests of the QBox suite
-        working-directory: compat/qbox
+      - run: sh compat/fetch.sh ${{ matrix.suite }}
+      - name: Run the tests of the suite
+        working-directory: compat/${{ matrix.suite }}
         run: node ../../dist/fiverunner.js test
 
   e2e:

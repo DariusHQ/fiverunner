@@ -38,7 +38,7 @@ The dev UI has the console of your server, where you run commands, its resources
 
 ## Frameworks
 
-QBox runs on FiveRunner: CI runs qbx_core, ox_lib, ox_inventory and qbx_vehicles, as they are released, on every change, with players who log in, earn money, carry items and get jobs. [docs/compatibility.md](docs/compatibility.md) lists what passes.
+QBox and ESX run on FiveRunner: CI runs qbx_core, ox_lib, ox_inventory, qbx_vehicles and es_extended, as they are released, on every change, with players who log in, earn money, carry items, get jobs and are saved as they leave. [docs/compatibility.md](docs/compatibility.md) lists what passes.
 
 ## Planned
 

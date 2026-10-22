@@ -1,0 +1,15 @@
+# The resources of the ESX suite: their category, their release, its SHA-256, and their
+# paths in it. It runs ESX without esx_multicharacter and esx_identity, whose UIs no test drives.
+[SQL] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[SQL]/legacy.sql
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_lib
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/es_extended
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/cron
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_context
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_menu_default
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_menu_dialog
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_menu_list
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_notify
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_progressbar
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_textui
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/skinchanger
+[core] https://github.com/esx-framework/esx_core/archive/refs/tags/1.16.4.zip 58b646c5c32de61823d7bf46e474eb345cffbd5be90b80240d97e480e68c7ad6 esx_core-1.16.4/[core]/esx_skin
