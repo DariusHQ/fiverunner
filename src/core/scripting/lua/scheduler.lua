@@ -218,8 +218,9 @@ local function newThread(fn)
     return {
         id = lastId,
         boundary = boundary,
-        co = coroutine_create(function(...)
-            withBoundary(boundary, fn, ...)
+        -- FiveM's boundary routine gives the function of a thread its boundary, which ox_lib takes as the id of the thread.
+        co = coroutine_create(function()
+            withBoundary(boundary, fn, boundary)
         end),
     }
 end

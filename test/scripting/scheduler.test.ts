@@ -50,6 +50,19 @@ print(Citizen.CreateThreadNow(function() Wait(0) end))`)
     expect(res.take()).toBe('now\nfalse\ntrue\n')
   })
 
+  it('give their functions their boundaries, which ox_lib takes as their ids', async () => {
+    const res = await createResource()
+    res.run(`local ids = {}
+Citizen.CreateThreadNow(function(id) ids[#ids + 1] = id end)
+CreateThread(function(id) ids[#ids + 1] = id end)
+SetTimeout(0, function(id)
+    ids[#ids + 1] = id
+    print(math.type(ids[1]), ids[1] ~= ids[2] and ids[2] ~= ids[3] and ids[1] ~= ids[3])
+end)`)
+    res.tickAt(0)
+    expect(res.take()).toBe('integer\ttrue\n')
+  })
+
   it('run in the order they were queued, whatever their wake times, as in FiveM', async () => {
     const res = await createResource()
     res.run(`SetTimeout(20, function() print('first') end)
