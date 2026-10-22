@@ -9,8 +9,8 @@ const USAGE = `Usage: fiverunner dev [options]
 
 Runs the project in this directory in the dev UI, in the browser: its
 server, with its console and its resources, and players that connect to
-it, each with a screen that shows the frames of its NUI. The dev UI runs
-the project anew as its files change. It needs a browser that takes the
+it, each with a screen that shows the frames of its NUI. The dev UI
+restarts the resources whose files change. It needs a browser that takes the
 names under localhost for the local machine, as Chrome, Edge and Firefox do.
 
 Options:
