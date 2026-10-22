@@ -54,7 +54,7 @@ Each frame is at an origin of its own, for each resource and each player, as in 
 
 ## Changes
 
-As files of the project change, the dev UI runs the project anew: a new server, with the players it had, who connect again in the order they came. The **Restart** button does the same.
+As files of a resource change, the dev UI restarts it, as `restart` does, if it runs: the players stay, and their clients start it anew, with its frames. As a manifest, a `.sql` file or a file of no resource changes, such as `server.cfg`, it runs the project anew: a new server, with a new database and the players it had, who connect again in the order they came. The **Restart** button does the same.
 
 ## What it does not do
 

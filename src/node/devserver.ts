@@ -182,13 +182,19 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   port = await listen(server, options.port ?? DEFAULT_PORT)
 
   let timer: ReturnType<typeof setTimeout> | undefined
+  /** The paths of the files that changed since the dev UIs were last told, or none when the watcher did not say which. */
+  let paths: Set<string> | undefined = new Set()
   const changed = (file: string | null) => {
     const parts = (file ?? '').split(/[\\/]/)
     if (parts.some((part) => part === 'node_modules' || part.startsWith('.'))) return
+    if (file === null) paths = undefined
+    else paths?.add(parts.join('/'))
     clearTimeout(timer)
     timer = setTimeout(() => {
       project = openProject(options.root) ?? project
-      for (const listener of listeners) listener.write('event: change\ndata: \n\n')
+      const data = JSON.stringify(paths === undefined ? null : [...paths].sort())
+      paths = new Set()
+      for (const listener of listeners) listener.write(`event: change\ndata: ${data}\n\n`)
       options.onChange?.()
     }, SETTLE)
   }

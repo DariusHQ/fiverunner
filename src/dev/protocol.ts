@@ -19,6 +19,8 @@ export type ToWorker =
   /** Starts a session of the project, or starts it anew with the players it had, if one runs. */
   | { readonly type: 'start' }
   | { readonly type: 'command'; readonly line: string }
+  /** Files of the project changed, at these paths in it, or at paths that the dev server could not tell. */
+  | { readonly type: 'change'; readonly paths: readonly string[] | null }
   | { readonly type: 'connect'; readonly name: string }
   | { readonly type: 'disconnect'; readonly client: number }
   | { readonly type: 'submitCard'; readonly client: number; readonly json: string }
@@ -46,6 +48,8 @@ export type FromWorker =
   | { readonly type: 'started'; readonly project: ProjectInfo }
   /** A session failed to start. */
   | { readonly type: 'failed'; readonly message: string }
+  /** The session restarted the resources that files changed in, or none, when it needs to start anew. */
+  | { readonly type: 'changed'; readonly restarted: readonly string[] | null }
   | { readonly type: 'event'; readonly event: DevEvent }
   | { readonly type: 'answer'; readonly id: number; readonly answer: Answer }
 

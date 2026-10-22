@@ -24,6 +24,8 @@ const tell = (message: FromWorker) => postMessage(message)
 let cfxlua: Promise<WebAssembly.Module> | undefined
 let sqlite: Promise<WebAssembly.Module> | undefined
 let session: DevSession | undefined
+/** Where the server of the session has the files of its project. */
+let mount = ''
 /** The last state that the session told, whose players a new session connects again. */
 let state: DevState | undefined
 /** How many sessions the worker started, which tells the events of the last apart. */
@@ -78,6 +80,7 @@ async function start(): Promise<void> {
     if (id !== generation) return
     tell({ type: 'started', project })
     session = started
+    mount = project.mount
     last = performance.now()
     for (const { name } of players) await started.connect({ name })
   } catch (error) {
@@ -108,6 +111,15 @@ addEventListener('message', (event: MessageEvent<ToWorker>) => {
     case 'command':
       session?.command(message.line)
       break
+    case 'change': {
+      const { paths } = message
+      const restarted =
+        paths === null
+          ? undefined
+          : session?.restartChanged(paths.map((path) => (mount === '' ? path : `${mount}/${path}`)))
+      tell({ type: 'changed', restarted: restarted ?? null })
+      break
+    }
     case 'connect':
       void session?.connect({ name: message.name })
       break

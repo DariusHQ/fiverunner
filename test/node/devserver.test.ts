@@ -324,7 +324,7 @@ describe('The dev server', () => {
     const read = await get(port, '/__fiverunner/api/read?path=client.lua', { headers: API })
     expect([before.body, events, changes, read.body]).toEqual([
       'print(1)',
-      'text/event-stream "event: change\\ndata: \\n\\n"',
+      'text/event-stream "event: change\\ndata: [\\"client.lua\\"]\\n\\n"',
       ['changed'],
       'print(2)',
     ])

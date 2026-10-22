@@ -1,5 +1,6 @@
 import {
   Engine,
+  MemoryFileSystem,
   type HttpClient,
   type Nui,
   type NuiFrame,
@@ -11,6 +12,7 @@ import {
   SERVER_NET_ID,
   sqliteDatabase,
 } from '../core/engine/index.ts'
+import { normalizePath } from '../core/engine/glob.ts'
 import { pack, type PackedValue } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
 import type { Project } from '../runner/index.ts'
@@ -177,6 +179,31 @@ export class DevSession {
       server.security.runAs('system.console', () => server.console.commands.invoke(line, ''))
     })
     this.#tell()
+  }
+
+  /**
+   * Restarts the started resources that files changed in, at these paths of
+   * the server, as `restart` does, with the players that are connected, and
+   * gives their names; or none when what changed needs the project run anew:
+   * a manifest, a .sql file, or a file of no resource, such as server.cfg.
+   */
+  restartChanged(paths: readonly string[]): string[] | undefined {
+    if (this.#crash !== undefined) return undefined
+    const resources = [...this.#engine.server.resources]
+    const names = new Set<string>()
+    for (const path of paths) {
+      const file = path.slice(path.lastIndexOf('/') + 1).toLowerCase()
+      if (file === 'fxmanifest.lua' || file === '__resource.lua' || file.endsWith('.sql')) {
+        return undefined
+      }
+      const resource = resources.find((each) => path.startsWith(`${normalizePath(each.path)}/`))
+      if (resource === undefined) return undefined
+      if (resource.state === 'started') names.add(resource.name)
+    }
+    const { files } = this.#engine.server
+    if (files instanceof MemoryFileSystem) for (const path of paths) files.refresh(path)
+    for (const name of names) this.command(`restart "${name}"`)
+    return [...names]
   }
 
   /**

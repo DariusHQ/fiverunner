@@ -61,7 +61,7 @@ export async function dev(args: readonly string[], host: CliHost): Promise<numbe
     assets: host.assets,
     cfxlua: host.wasm(),
     port,
-    onChange: () => host.stdout('Files changed: the dev UI runs the project anew\n'),
+    onChange: () => host.stdout('Files changed: the dev UI restarts the resources they are in\n'),
   })
   const name = project.kind === 'resource' ? `the resource ${project.name}` : 'the server'
   host.stdout(`FiveRunner runs ${name} at ${server.url}\nPress Ctrl+C to stop\n`)

@@ -89,6 +89,44 @@ describe('Dev sessions', () => {
     ])
   })
 
+  it('restart the resources that files changed in, with their players, or tell that they start anew', async () => {
+    const files = new MemoryFileSystem({
+      'resources/bank/fxmanifest.lua': MANIFEST,
+      'resources/bank/server.lua': `print('bank 1')`,
+      'resources/bank/client.lua': '',
+      'resources/bank/index.html': '<p>bank</p>',
+      'resources/idle/fxmanifest.lua': "fx_version 'cerulean'\ngame 'gta5'\n",
+    })
+    const events: DevEvent[] = []
+    const session = await DevSession.start({
+      cfxlua: await cfxlua(),
+      project: { files: () => files, commands: ['ensure bank'] },
+      http: offline,
+      onEvent: (event) => events.push(event),
+    })
+    await session.connect({ name: 'Ann' })
+    events.splice(0)
+    files.write('resources/bank/server.lua', new TextEncoder().encode(`print('bank 2')`))
+    expect(session.restartChanged(['resources/bank/server.lua', 'resources/idle/x.lua'])).toEqual([
+      'bank',
+    ])
+    // The client of the player that stays starts the resource anew at its next ticks.
+    session.advance(200)
+    expect(printed(events.splice(0)).filter((line) => line.includes('bank'))).toEqual([
+      'server: [resources] Stopping resource bank',
+      'server: [citizen-scripting-core] Creating script environments for bank',
+      'server: [script:bank] bank 2',
+      'server: [resources] Started resource bank',
+      'client 1: [citizen-legacy-net-resources] Required resources: bank ',
+      'client 1: [citizen-scripting-core] Creating script environments for bank',
+    ])
+    expect([
+      session.restartChanged(['resources/bank/fxmanifest.lua']),
+      session.restartChanged(['resources/bank/bank.sql']),
+      session.restartChanged(['server.cfg']),
+    ]).toEqual([undefined, undefined, undefined])
+  })
+
   it('run commands on the console of the server, once it ran those of the project', async () => {
     const { session, told } = await sessionOf('')
     told()

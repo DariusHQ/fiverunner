@@ -125,7 +125,7 @@ describe('fiverunner dev', () => {
       }
     })
     expect(result.stdout.split('\n').slice(2)).toEqual([
-      'Files changed: the dev UI runs the project anew',
+      'Files changed: the dev UI restarts the resources they are in',
       '',
     ])
   })

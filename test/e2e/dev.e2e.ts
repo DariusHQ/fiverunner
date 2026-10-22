@@ -172,7 +172,7 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     })()`)
     expect([
       await page.until<string>(
-        `document.getElementById('console').innerText.includes('ping') && document.getElementById('console').innerText`,
+        `document.getElementById('console').innerText.includes('[script:bank] ping') && document.getElementById('console').innerText`,
       ),
       await page.until<string>(
         `document.getElementById('events').innerText.includes('bank:ping') && document.getElementById('events').innerText`,
@@ -185,7 +185,7 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     ])
   })
 
-  it('runs the project anew as its files change, with the players it had, whose frames keep their storage', async () => {
+  it('restarts the resources whose files change, with the players they had, whose frames keep their storage', async () => {
     writeFileSync(join(project, 'server.lua'), `print('bank server changed')\n`)
     await page.until(`document.getElementById('console').innerText.includes('bank server changed')`)
     await page.until(`document.querySelectorAll('.viewport iframe').length === 2`)

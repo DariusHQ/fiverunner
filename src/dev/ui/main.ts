@@ -237,6 +237,11 @@ worker.addEventListener('message', (event: MessageEvent<FromWorker>) => {
       setStatus(`Failed: ${message.message}`, 'failed')
       server.note(message.message)
       break
+    case 'changed':
+      if (message.restarted === null) restart('Files changed')
+      else if (message.restarted.length > 0)
+        server.note(`Files changed: restarted ${message.restarted.join(', ')}`)
+      break
     case 'event': {
       const { event: devEvent } = message
       if (devEvent.type === 'output') showLine(devEvent.line)
@@ -332,6 +337,11 @@ byId<HTMLFormElement>('connect').addEventListener('submit', (event) => {
 byId<HTMLButtonElement>('restart').addEventListener('click', () => restart('Restarted'))
 
 const changes = new EventSource(`${API}events`)
-changes.addEventListener('change', () => restart('Files changed'))
+changes.addEventListener('change', (event) =>
+  send({
+    type: 'change',
+    paths: JSON.parse((event as MessageEvent<string>).data) as string[] | null,
+  }),
+)
 
 restart('Started')
