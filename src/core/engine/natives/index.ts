@@ -1,6 +1,7 @@
 import type { NativeDefinition, Side } from '../../natives/index.ts'
 import type { NativeContext } from '../context.ts'
 import { consoleNatives } from './console.ts'
+import { controlNatives } from './controls.ts'
 import { convarNatives } from './convars.ts'
 import { entityNatives } from './entities.ts'
 import { eventNatives } from './events.ts'
@@ -35,6 +36,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...rpcNatives(side),
     ...streamingNatives(side),
     ...screenNatives(side),
+    ...controlNatives(side),
     ...(side === 'server' ? [...httpNatives(), ...oxmysqlNatives()] : nuiNatives()),
   ]
 }

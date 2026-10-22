@@ -28,6 +28,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 ## Players
 
 - `GetPlayers` lists players in the order they connected.
+- Clients have no key bindings, so `GetControlInstructionalButton` gives the button of no key, an empty string.
 - Clients download resources at their next tick and start them at the one after. Ping is 0 unless set, and `lastSeen` moves with the ticks of clients.
 - A client that fails to start a resource goes on, with a diagnosis, where FiveM's client stops with "Couldn't start resource".
 - A client that leaves resets its resources at its next tick, where FiveM's does once its game session ends. A start that the client had pending for a resource that it removed meanwhile does not happen, where FiveM's race would start a destroyed resource.
