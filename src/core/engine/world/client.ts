@@ -136,6 +136,8 @@ export class ClientWorld {
   readonly playerPed = new ClientEntity(NetObjType.player, PLAYER_ZERO)
   /** The fade of the screen of the game. */
   readonly screen = new ScreenFade()
+  /** Whether the local player is in a solo tutorial session of the game, as character menus put it. */
+  tutorial = false
 
   readonly #hooks: WorldHooks
 

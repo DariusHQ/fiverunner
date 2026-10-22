@@ -160,6 +160,37 @@ function clientPlayerNatives(): NativeDefinition<NativeContext>[] {
       session,
     ),
     defineNative(
+      {
+        name: 'NETWORK_START_SOLO_TUTORIAL_SESSION',
+        hash: 0x17e0198b3882c2cbn,
+        result: 'void',
+        params: [],
+      },
+      (ctx: NativeContext) => {
+        ctx.manager.world!.tutorial = true
+      },
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_END_TUTORIAL_SESSION',
+        hash: 0xd0afaff5a51d72f7n,
+        result: 'void',
+        params: [],
+      },
+      (ctx: NativeContext) => {
+        ctx.manager.world!.tutorial = false
+      },
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_IS_IN_TUTORIAL_SESSION',
+        hash: 0xada24309fe08dacfn,
+        result: 'BOOL',
+        params: [],
+      },
+      (ctx: NativeContext) => ctx.manager.world!.tutorial,
+    ),
+    defineNative(
       { name: 'NETWORK_IS_SESSION_ACTIVE', hash: 0xd83c2b94e7508980n, result: 'BOOL', params: [] },
       session,
     ),

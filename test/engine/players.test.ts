@@ -301,6 +301,17 @@ print(NetworkIsSessionStarted(), NetworkIsSessionActive(), NetworkIsInSession())
     ).toEqual(['[128]\t1\t1\tfalse', '1\t1\tfalse\tfalse', '1\t1\t1'])
   })
 
+  it('go into solo tutorial sessions and out of them, as character menus have them', async () => {
+    const { run } = await clientOf()
+    expect(
+      run(`print(NetworkIsInTutorialSession())
+NetworkStartSoloTutorialSession()
+print(NetworkIsInTutorialSession())
+NetworkEndTutorialSession()
+print(NetworkIsInTutorialSession())`),
+    ).toEqual(['false', '1', 'false'])
+  })
+
   it('have peds, which natives tell are those of players', async () => {
     const { run } = await clientOf()
     expect(

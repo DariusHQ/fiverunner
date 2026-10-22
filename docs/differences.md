@@ -28,6 +28,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 ## Players
 
 - `GetPlayers` lists players in the order they connected.
+- `NetworkStartSoloTutorialSession` puts the player in a tutorial session at once, which `NetworkIsInTutorialSession` tells, but other players stay in its scope, where GTA V's sessions take them out of its sight.
 - Clients have no key bindings, so `GetControlInstructionalButton` gives the button of no key, an empty string.
 - Clients download resources at their next tick and start them at the one after. Ping is 0 unless set, and `lastSeen` moves with the ticks of clients.
 - A client that fails to start a resource goes on, with a diagnosis, where FiveM's client stops with "Couldn't start resource".
