@@ -12,6 +12,7 @@ import {
   SERVER_NET_ID,
   sqliteDatabase,
 } from '../core/engine/index.ts'
+import { sha1 } from '../core/db/hash.ts'
 import { normalizePath } from '../core/engine/glob.ts'
 import { pack, type PackedValue } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
@@ -21,6 +22,8 @@ import { describeArgs, describeValue } from './values.ts'
 
 /** Interrupts the scripts that run for 5 seconds without returning, which would hang the session. */
 const WATCHDOG: WatchdogOptions = { timeoutMs: 5000 }
+
+const encoder = new TextEncoder()
 
 /** What the NUI of a client tells as it happens. */
 export type NuiEvent =
@@ -213,7 +216,14 @@ export class DevSession {
    */
   async connect(identity: PlayerIdentity = {}): Promise<number> {
     const watchdog = this.#options.watchdog ?? WATCHDOG
-    const { client, player } = await this.#engine.connect(identity, { watchdog })
+    // Players of FiveM have the license of their Rockstar account, which frameworks turn players away without: here, one of their names.
+    const identifiers = identity.identifiers ?? [
+      `license:${sha1(encoder.encode(identity.name ?? 'player'))}`,
+    ]
+    const { client, player } = await this.#engine.connect(
+      { ...identity, identifiers },
+      { watchdog },
+    )
     this.#clients.push({ manager: client, player })
     const number = this.#clients.length
     client.events.onTrigger.connect((name, payload, source) => {

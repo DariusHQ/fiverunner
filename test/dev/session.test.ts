@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import { describe, expect, it } from 'vitest'
 
 import { MemoryFileSystem, type HttpClient } from '../../src/core/engine/index.ts'
@@ -162,6 +164,17 @@ describe('Dev sessions', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     session.advance(100)
     expect(printed(told())).toEqual(['server: [script:bank] 200\tgot https://example.com/'])
+  })
+
+  it('connect players with a license of their names, as players of FiveM have the licenses of their accounts', async () => {
+    const { session, told } = await sessionOf(
+      `AddEventHandler('playerJoining', function() print(GetPlayerIdentifierByType(source, 'license')) end)`,
+    )
+    await session.connect({ name: 'Ann' })
+    session.advance(100)
+    expect(printed(told()).filter((line) => line.includes('license:'))).toEqual([
+      `server: [script:bank] license:${createHash('sha1').update('Ann').digest('hex')}`,
+    ])
   })
 
   it('connect players, whose NUI they tell of, and quit them', async () => {
