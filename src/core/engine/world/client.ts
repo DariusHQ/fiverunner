@@ -1,4 +1,5 @@
 import { hashString } from '../../natives/index.ts'
+import { Blips } from './blips.ts'
 import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
 import { Pool } from './pool.ts'
 import { decompressQuaternion, fromSector } from './quantize.ts'
@@ -6,6 +7,7 @@ import { fromHeading, fromQuaternion, IDENTITY, type Matrix } from './rotation.t
 import { ScreenFade } from './screen.ts'
 import type { ServerClone } from './server.ts'
 import { sameState, syncStateOf } from './sync.ts'
+import { GameText } from './text.ts'
 
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
 export const PLAYER_ZERO = hashString('player_zero')
@@ -146,6 +148,10 @@ export class ClientWorld {
   readonly playerPed = new ClientEntity(NetObjType.player, PLAYER_ZERO)
   /** The fade of the screen of the game. */
   readonly screen = new ScreenFade()
+  /** The blips of the map of the game. */
+  readonly blips = new Blips()
+  /** The text of the game, which scripts build with text commands. */
+  readonly text = new GameText()
   /** Whether the local player is in a solo tutorial session of the game, as character menus put it. */
   tutorial = false
 
@@ -302,11 +308,12 @@ export class ClientWorld {
     if (entity !== undefined) this.#hooks.taken(entity)
   }
 
-  /** Lets go of the entities that the script of a resource owns, as GTA V does as scripts end. */
+  /** Lets go of the entities that the script of a resource owns, and removes its blips, as GTA V does as scripts end. */
   release(script: string): void {
     for (const entity of this.#entities) {
       if (entity.script === script) entity.script = undefined
     }
+    this.blips.release(script)
   }
 
   /** Asks the world to load a model, which it does at its next tick. */
@@ -382,6 +389,7 @@ export class ClientWorld {
   /** Takes an entity out of the world, and returns whether the server knew of it. */
   #forget(entity: ClientEntity): boolean {
     this.#hooks.forgotten(entity)
+    this.blips.forget(entity)
     this.#entities.delete(entity)
     this.#guids.delete(entity.handle)
     return this.#synced.delete(entity)
