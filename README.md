@@ -4,6 +4,10 @@ Run FiveM resources in your browser and in CI. No GTA V, no FXServer, no restart
 
 > **Status:** early development. `npx fiverunner test` runs the Lua tests of FiveM resources in Node, and `npx fiverunner dev` runs resources and their NUI in your browser. Watch the repository to follow along.
 
+![QBox in the dev UI: the console of its server, the events that its player sent, its resources and state bags, and the screen of the player](docs/media/dev-ui.png)
+
+[Watch the demo](https://github.com/DariusHQ/fiverunner/releases/download/v0.5.2/fiverunner.mp4) (49 seconds): the tests of QBox, then a player who registers a character in the dev UI.
+
 ## Testing resources
 
 Start with a test that your resource or server starts without script errors, and a GitHub workflow that runs it on each push:
@@ -30,6 +34,8 @@ Then run them, on your machine or in GitHub Actions:
 npx fiverunner test
 ```
 
+![The tests of QBox, passing in a terminal](docs/media/tests.png)
+
 Each test gets a server of its own, with your resources started, and players whose clients run your client scripts. Resources that use oxmysql get a database of their own, in memory, that speaks MariaDB's SQL and starts with the tables of your `.sql` files. Time moves as fast as it can, so tests that wait take no time. [docs/testing.md](docs/testing.md) tells all that tests can do, and [examples/bank](examples/bank) is a resource with tests.
 
 ## Developing resources
@@ -40,11 +46,13 @@ Run your project in your browser:
 npx fiverunner dev
 ```
 
-The dev UI has the console of your server, where you run commands, its resources, which you start, stop and restart, the events that the server and the players send each other, which you trigger too, and its state bags. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI runs your project anew, with the players it had. [docs/dev.md](docs/dev.md) tells all that it does.
+The dev UI has the console of your server, where you run commands, its resources, which you start, stop and restart, the events that the server and the players send each other, which you trigger too, and its state bags. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI restarts the resources that they belong to, and the players stay. [docs/dev.md](docs/dev.md) tells all that it does.
 
 ## Frameworks
 
 QBox and ESX run on FiveRunner: CI runs qbx_core, ox_lib, ox_inventory, qbx_vehicles and es_extended, as they are released, on every change, with players who log in, earn money, carry items, get jobs and are saved as they leave. [docs/compatibility.md](docs/compatibility.md) lists what passes.
+
+![The character registration of QBox, from the NUI of ox_lib, on the screen of a player in the dev UI](docs/media/qbox-registration.png)
 
 ## Planned
 
