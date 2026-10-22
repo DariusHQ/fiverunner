@@ -50,6 +50,10 @@ export class Chrome {
   >()
   readonly #targets = new Map<string, string>()
   readonly #contexts: { session: string; id: number; origin: string }[] = []
+  readonly #listeners = new Map<
+    string,
+    (params: Record<string, unknown>, session: string) => void
+  >()
   #next = 1
 
   private constructor(process: ChildProcess, profile: string, socket: WebSocket) {
@@ -148,6 +152,11 @@ export class Chrome {
     return result.result.value
   }
 
+  /** Has `listener` hear the events of `method`, with the sessions of the targets they came from. */
+  on(method: string, listener: (params: Record<string, unknown>, session: string) => void): void {
+    this.#listeners.set(method, listener)
+  }
+
   /** The origins of the contexts that scripts run in, those of frames too. */
   get origins(): string[] {
     return [...new Set(this.#contexts.map(({ origin }) => origin))]
@@ -183,6 +192,7 @@ export class Chrome {
     }
     const params = message.params ?? {}
     const session = message.sessionId ?? ''
+    this.#listeners.get(message.method ?? '')?.(params, session)
     switch (message.method) {
       case 'Target.attachedToTarget': {
         const { sessionId, targetInfo } = params as {
@@ -274,6 +284,64 @@ export class Page {
         throw new Error(`Timed out waiting for ${expression}: ${String(last)}`)
       await new Promise((resolve) => setTimeout(resolve, 100))
     }
+  }
+
+  /** Loads `url` in the page, and waits until it loaded. */
+  async goto(url: string): Promise<void> {
+    await this.#chrome.send('Page.navigate', { url }, this.#session)
+    await this.until(
+      `location.href === ${JSON.stringify(url)} && document.readyState === 'complete'`,
+    )
+  }
+
+  /**
+   * Records the page frame by frame, as Chrome paints it, as JPEG, with the
+   * time each frame came in milliseconds, into `frames`, and gives what stops it.
+   */
+  async record(frames: { data: string; time: number }[]): Promise<() => Promise<void>> {
+    this.#chrome.on('Page.screencastFrame', (params, session) => {
+      if (session !== this.#session) return
+      const { data, sessionId } = params as { data: string; sessionId: number }
+      frames.push({ data, time: Date.now() })
+      void this.#chrome.send('Page.screencastFrameAck', { sessionId }, this.#session)
+    })
+    await this.#chrome.send(
+      'Page.startScreencast',
+      { format: 'jpeg', quality: 92, maxWidth: 1920, maxHeight: 1080 },
+      this.#session,
+    )
+    return async () => {
+      await this.#chrome.send('Page.stopScreencast', {}, this.#session)
+    }
+  }
+
+  /** Types `text` into what has the focus, as a keyboard would. */
+  async type(text: string): Promise<void> {
+    await this.#chrome.send('Input.insertText', { text }, this.#session)
+  }
+
+  /** Lays the page out at `width` by `height` pixels. */
+  async resize(width: number, height: number): Promise<void> {
+    await this.#chrome.send(
+      'Emulation.setDeviceMetricsOverride',
+      { width, height, deviceScaleFactor: 1, mobile: false },
+      this.#session,
+    )
+  }
+
+  /** A screenshot of the viewport of the page, or of where `clip` is in the document, as PNG. */
+  async screenshot(clip?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }): Promise<Uint8Array> {
+    const { data } = (await this.#chrome.send(
+      'Page.captureScreenshot',
+      { format: 'png', ...(clip === undefined ? {} : { clip: { ...clip, scale: 1 } }) },
+      this.#session,
+    )) as { data: string }
+    return Buffer.from(data, 'base64')
   }
 
   /** Clicks the page at `x`, `y`, which are in its viewport. */
