@@ -577,17 +577,22 @@ describe('Transactions', () => {
     expect(rows(db, 'SELECT a FROM t')).toEqual([[1]])
   })
 
-  it('keep other connections out until they end', async () => {
+  it('keep the writes of other connections out until they end, but not their reads', async () => {
     const db = await database()
     const a = db.connect()
     const b = db.connect()
     a.query('CREATE TABLE t (x INT)')
     a.query('BEGIN')
-    expect(() => b.query('SELECT 1')).toThrow(
+    a.query('INSERT INTO t VALUES (1)')
+    expect(() => b.query('INSERT INTO t VALUES (2)')).toThrow(
       'Connection 2 ran a statement while connection 1 had a transaction open',
     )
-    a.query('COMMIT')
-    expect(b.query('SELECT 1').kind).toBe('rows')
+    // Reads see what the transaction changed, and start no transaction of their own.
+    b.query('SET autocommit = 0')
+    expect(rows(b, 'SELECT x FROM t')).toEqual([[1]])
+    expect(b.inTransaction).toBe(false)
+    a.query('ROLLBACK')
+    expect(rows(b, 'SELECT x FROM t')).toEqual([])
   })
 })
 

@@ -292,6 +292,59 @@ end)
     ])
   })
 
+  it('keeps writes waiting for the transactions of startTransaction, but not reads, which see what they changed', async () => {
+    const proc = await server()
+    proc
+      .add(
+        'app',
+        app(`
+MySQL.ready(function()
+  MySQL.query.await('CREATE TABLE t (a INT)')
+  local start = GetGameTimer()
+  CreateThread(function()
+    Wait(100)
+    MySQL.insert.await('INSERT INTO t VALUES (2)')
+    print('insert', GetGameTimer() - start)
+  end)
+  print('transaction', MySQL.startTransaction(function(query)
+    query('INSERT INTO t VALUES (1)')
+    print('read', MySQL.scalar.await('SELECT COUNT(*) FROM t'))
+    Wait(1000)
+  end), GetGameTimer() - start)
+  Wait(100)
+  print('rows', MySQL.scalar.await('SELECT COUNT(*) FROM t'))
+  CreateThread(function()
+    Wait(100)
+    print(pcall(MySQL.insert.await, 'INSERT INTO t VALUES (3)'))
+    print('late', GetGameTimer() - start)
+  end)
+  print('long', MySQL.startTransaction(function(query)
+    query('INSERT INTO t VALUES (4)')
+    Wait(60000)
+  end))
+  print('done')
+end)
+`),
+      )
+      .start()
+    expect(await proc.run('done', 1400)).toEqual([
+      CONNECTED,
+      '[script:app] read\t1',
+      '[script:app] transaction\ttrue\t1100',
+      '[script:app] insert\t1100',
+      '[script:app] rows\t2',
+      '[script:app] false\tapp was unable to execute a query!',
+      '[script:app] Query: INSERT INTO t VALUES (3)',
+      '[script:app] []',
+      '[script:app] Lock wait timeout exceeded; try restarting transaction',
+      '[script:app] late\t51400',
+      '[script:oxmysql] ^1Error: app was unable to execute a query!',
+      '[script:oxmysql] Transaction has timed out after 30 seconds.^7',
+      '[script:app] long\tfalse',
+      '[script:app] done',
+    ])
+  })
+
   it('runs transactions, which give false and print the error of the query that failed', async () => {
     const proc = await server()
     proc

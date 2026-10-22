@@ -367,6 +367,8 @@ export interface OxMysqlHost {
 interface Waiting {
   /** When it found the connections blocked first, which its wait for their lock times out from. */
   since: number | undefined
+  /** The SQL it runs, by which those that lock nothing wait for no transaction, or none for operations that write. */
+  readonly sql: string | undefined
   readonly run: (connection: DatabaseConnection) => void
   readonly fail: (error: unknown) => void
 }
@@ -589,7 +591,7 @@ export class OxMysql {
         connection.then(waiting.run, waiting.fail)
         continue
       }
-      if (!connection.blocked()) {
+      if (!connection.blocked(waiting.sql)) {
         this.#waiting.splice(index, 1)
         waiting.run(connection)
         continue
@@ -623,6 +625,7 @@ export class OxMysql {
   #withConnection(
     run: (this: OxMysql, connection: DatabaseConnection) => Steps,
     failed: (error: unknown) => void,
+    sql?: string,
   ): void {
     this.#acquire(
       (connection) =>
@@ -632,15 +635,21 @@ export class OxMysql {
           () => connection.release(),
         ),
       failed,
+      sql,
     )
   }
 
   /**
    * Takes a connection of the pool for `go` once there is one: once the
    * database is connected, and once no transaction of another connection
-   * is open, as those of SQLite keep others waiting, in the order they came.
+   * is open, unless `sql` locks nothing, as those of SQLite keep the writes
+   * of others waiting, in the order they came.
    */
-  #acquire(go: (connection: DatabaseConnection) => void, failed: (error: unknown) => void): void {
+  #acquire(
+    go: (connection: DatabaseConnection) => void,
+    failed: (error: unknown) => void,
+    sql?: string,
+  ): void {
     const client = this.#client
     if (client !== undefined && this.#waiting.length === 0) {
       const connection = client.connection()
@@ -648,15 +657,15 @@ export class OxMysql {
         connection.then(go, failed)
         return
       }
-      if (!connection.blocked()) {
+      if (!connection.blocked(sql)) {
         go(connection)
         return
       }
       connection.release()
-      this.#waiting.push({ since: this.#host.now(), run: go, fail: failed })
+      this.#waiting.push({ since: this.#host.now(), sql, run: go, fail: failed })
       return
     }
-    this.#waiting.push({ since: undefined, run: go, fail: failed })
+    this.#waiting.push({ since: undefined, sql, run: go, fail: failed })
   }
 
   /** The settings of oxmysql's convars, which it reads every second, so as they are. */
@@ -773,6 +782,7 @@ export class OxMysql {
           if (callback.given) this.#complete(token, true, parseResponse(type, result))
         },
         (error) => this.#logError(token, resource, callback, error, sql, parameters, true),
+        sql,
       ),
     )
     return true
@@ -842,6 +852,7 @@ export class OxMysql {
           } else this.#complete(token, true, responses)
         },
         (error) => this.#logError(token, resource, callback, error, sql, runs),
+        sql,
       ),
     )
     return true

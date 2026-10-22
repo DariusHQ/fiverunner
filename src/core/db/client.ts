@@ -1,5 +1,5 @@
 import type { TimeZone } from '../scripting/time.ts'
-import { MariaDb, type Connection, type Result } from './database.ts'
+import { locksNothing, MariaDb, type Connection, type Result } from './database.ts'
 import { SqlError } from './lexer.ts'
 import { parseScript, type ScriptStatement } from './parser.ts'
 import type { SqlValue } from './sqlite.ts'
@@ -77,8 +77,8 @@ export interface DatabaseConnection {
   query(sql: string, values?: unknown): QueryResult | Promise<QueryResult>
   /** Runs a statement as mysql2's execute does, with its values bound, as oxmysql's typeCastExecute reads them. */
   execute(sql: string, values?: readonly unknown[]): QueryResult | Promise<QueryResult>
-  /** Whether a statement would wait for the transaction of another connection to end. */
-  blocked(): boolean
+  /** Whether a statement of `sql`, or one that writes, would wait for the transaction of another connection to end: all but those that lock nothing do. */
+  blocked(sql?: string): boolean
   /** Gives the connection back to the pool, rolling back the transaction it has open. */
   release(): void
 }
@@ -171,9 +171,10 @@ class SqliteConnection implements DatabaseConnection {
     return this.#run(sql, () => this.#connection.execute(sql, bound), 'execute')
   }
 
-  blocked(): boolean {
+  blocked(sql?: string): boolean {
     const owner = this.#connection.database.transactionOwner
-    return owner !== undefined && owner !== this.#connection
+    if (owner === undefined || owner === this.#connection) return false
+    return sql === undefined || !locksNothing(sql)
   }
 
   release(): void {

@@ -168,6 +168,33 @@ export interface SqliteAccess {
  * gives, with its errors. There is one database, which every name of a
  * database names, and tables are named in lower case, as on Windows.
  */
+/**
+ * The statements that lock nothing, reads and those of the session, which
+ * run beside the transactions of other connections, as MariaDB's readers
+ * run beside its writers.
+ */
+const LOCK_FREE: ReadonlySet<Statement['kind']> = new Set([
+  'set',
+  'use',
+  'select',
+  'showTables',
+  'showColumns',
+  'showIndex',
+  'showCreateTable',
+  'showDatabases',
+  'showVariables',
+  'showWarnings',
+])
+
+/** Whether `sql` locks nothing, or fails to parse, so that it waits for no transaction of another connection. */
+export function locksNothing(sql: string): boolean {
+  try {
+    return LOCK_FREE.has(parseStatement(sql).kind)
+  } catch {
+    return true
+  }
+}
+
 export class MariaDb implements Catalog, SqliteAccess {
   readonly sqlite: Sqlite
   readonly db: SqliteDatabase
@@ -474,11 +501,6 @@ export class Connection implements SqliteAccess {
   #statement(sql: string, bound: readonly SqlValue[] | undefined, parsed?: Statement): Result {
     const { database } = this
     if (this.#closed) throw new Error('The connection is closed')
-    if (database.transactionOwner !== undefined && database.transactionOwner !== this) {
-      throw new Error(
-        `Connection ${this.id} ran a statement while connection ${database.transactionOwner.id} had a transaction open`,
-      )
-    }
     const previous = database.current
     database.current = this
     this.statementTime = database.clock()
@@ -488,6 +510,12 @@ export class Connection implements SqliteAccess {
     database.foreignKeys(this.foreignKeyChecks)
     try {
       statement ??= parseStatement(sql)
+      const owner = database.transactionOwner
+      if (owner !== undefined && owner !== this && !LOCK_FREE.has(statement.kind)) {
+        throw new Error(
+          `Connection ${this.id} ran a statement while connection ${owner.id} had a transaction open`,
+        )
+      }
       if (bound !== undefined) {
         const count = countParams(statement)
         if (count !== bound.length) {
@@ -646,7 +674,9 @@ export class Connection implements SqliteAccess {
 
   /** Runs what a statement does in a savepoint, which rolls it back if it fails, in a transaction that autocommit commits. */
   #atomically<T>(run: () => T): T {
-    const implicit = !this.inTransaction && !this.#autocommit
+    // What runs beside the transaction of another connection starts none of its own.
+    const implicit =
+      !this.inTransaction && !this.#autocommit && this.database.transactionOwner === undefined
     if (implicit) this.#beginTransaction()
     this.run('SAVEPOINT fr_statement')
     try {
