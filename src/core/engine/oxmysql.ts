@@ -562,6 +562,19 @@ export class OxMysql {
   }
 
   /**
+   * Rolls back the transactions of startTransaction and drops what the
+   * exports started, as the pool of a script of oxmysql that stops closes
+   * its connections, whose transactions the database rolls back.
+   */
+  stopped(): void {
+    for (const { connection } of this.#transactions.values()) connection.release()
+    this.#transactions.clear()
+    this.#queued.length = 0
+    this.#waiting.length = 0
+    this.#connects.length = 0
+  }
+
+  /**
    * Runs the operations that the exports started since the last tick, in
    * the order they came, then those that wait for connections once they
    * are free, and fails those that waited too long for a lock, round after

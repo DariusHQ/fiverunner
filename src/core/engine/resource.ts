@@ -416,6 +416,8 @@ export class Resource {
   #destroyRuntime(): void {
     const runtime = this.#runtime
     if (runtime === null) return
+    // The pool of an oxmysql that stops closes its connections, whose transactions roll back.
+    if (this.emulatesOxmysql) this.manager.oxmysql!.stopped()
     this.#runtime = null
     this.#context = null
     this.manager.removeRuntime(this)

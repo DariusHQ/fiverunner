@@ -345,6 +345,46 @@ end)
     ])
   })
 
+  it('rolls back the transactions of an oxmysql that stops, which keep no other waiting', async () => {
+    const proc = await server()
+    proc.manager.getResource('oxmysql')!.start()
+    proc
+      .add(
+        'app',
+        app(
+          `CreateThread(function()
+  exports.oxmysql:awaitConnection()
+  exports.oxmysql:query_async('CREATE TABLE t (a INT)')
+  CreateThread(function()
+    MySQL.startTransaction(function(query)
+      query('INSERT INTO t VALUES (1)')
+      print('holding')
+      Wait(100000)
+    end)
+  end)
+  Wait(500)
+  local start = GetGameTimer()
+  print('insert', exports.oxmysql:query_async('INSERT INTO t VALUES (2)').affectedRows, GetGameTimer() - start)
+  print('rows', exports.oxmysql:scalar_async('SELECT COUNT(*) FROM t'))
+  print('done')
+end)`,
+          "server_script '@oxmysql/lib/MySQL.lua'\n",
+        ),
+      )
+      .start()
+    expect(await proc.run('holding')).toEqual([CONNECTED, '[script:app] holding'])
+    proc.manager.security.runAs('system.console', () =>
+      proc.manager.console.commands.invoke('restart oxmysql', ''),
+    )
+    expect(await proc.run('done')).toEqual([
+      '[resources] Stopping resource oxmysql',
+      CONNECTED,
+      '[script:app] insert\t1\t50',
+      '[script:app] rows\t1',
+      '[script:app] done',
+    ])
+  })
+
   it('runs transactions, which give false and print the error of the query that failed', async () => {
     const proc = await server()
     proc
