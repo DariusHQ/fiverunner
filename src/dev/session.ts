@@ -309,6 +309,22 @@ export class DevSession {
     this.#tell()
   }
 
+  /**
+   * Has a key of the keyboard of the client `client` go down or up, which
+   * presses the controls of its game, and runs the commands that resources
+   * bound to it on its console, as FiveM's key mappings do.
+   */
+  key(client: number, key: string, down: boolean): void {
+    const manager = this.#clients[client - 1]?.manager
+    const input = manager?.world?.input
+    if (manager === undefined || input === undefined || this.#crash !== undefined) return
+    const commands = down ? input.keyDown(key) : input.keyUp(key)
+    this.#survive(() => {
+      for (const command of commands) manager.console.commands.invoke(command, '')
+    })
+    this.#tell()
+  }
+
   /** The NUI of the client `client`, which pages make their requests of. */
   nui(client: number): Nui | undefined {
     return this.#clients[client - 1]?.manager.nui

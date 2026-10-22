@@ -503,6 +503,44 @@ end)`,
     expect(outcomes(result)).toEqual([['talks to NUI', 'passed']])
   })
 
+  it('presses the keys of the keyboards of players, which press controls and run the commands bound to them', async () => {
+    const files = {
+      'resources/radial/fxmanifest.lua': `fx_version 'cerulean'
+game 'gta5'
+client_script 'client.lua'`,
+      'resources/radial/client.lua': `RegisterKeyMapping('+radial', 'Opens the radial menu', 'keyboard', 'F1')
+RegisterCommand('+radial', function() print('radial opened') end, false)
+RegisterCommand('-radial', function() print('radial closed') end, false)
+CreateThread(function()
+    while true do
+        if IsControlJustReleased(0, 38) then print('E released') end
+        Wait(0)
+    end
+end)`,
+    }
+    const result = await run(
+      `it('presses keys', function()
+    local ann = fiverunner.connect({ name = 'Ann' })
+    fiverunner.waitFor(function() return ann:run('return GetResourceState("radial") == "started"') end, 1000)
+    ann:press('F1')
+    ann:keyDown('E')
+    Wait(0)
+    expect(ann:run('return IsControlPressed(0, 38)')).toBe(1)
+    ann:keyUp('E')
+    Wait(0)
+    Wait(0)
+    local printed = {}
+    for _, line in ipairs(ann:output()) do
+        if line:find('[script:radial]', 1, true) then printed[#printed + 1] = line end
+    end
+    expect(printed).toEqual({ '[script:radial] radial opened', '[script:radial] radial closed', '[script:radial] E released' })
+end)`,
+      files,
+      ['ensure radial'],
+    )
+    expect(outcomes(result)).toEqual([['presses keys', 'passed']])
+  })
+
   it('starts the wall clocks of the servers of tests at the same time, in UTC', async () => {
     const seconds = EPOCH / 1000
     const result = await run(`it('reads the time', function()

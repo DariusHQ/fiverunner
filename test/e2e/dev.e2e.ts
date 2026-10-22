@@ -34,6 +34,9 @@ end, false)
 `,
   'client.lua': `local blip = AddBlipForCoord(300.0, -300.0, 0.0)
 SetBlipColour(blip, 2)
+RegisterKeyMapping('+bankmenu', 'Opens the bank', 'keyboard', 'F5')
+RegisterCommand('+bankmenu', function() print('bank menu opened') end, false)
+RegisterCommand('-bankmenu', function() print('bank menu closed') end, false)
 RegisterNetEvent('bank:open', function(text)
     SendNUIMessage({ type = 'open', text = text })
     SetNuiFocus(true, true)
@@ -235,6 +238,20 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     // The name of the player, in its colour, moves the centre of its pixels a little.
     expect([Math.abs(movedX - x + 120) < 10, Math.abs(movedY - y - 60) < 10]).toEqual([true, true])
     expect(await page.evaluate(`${pixelsOf(ORANGE)} !== null`)).toBe(true)
+  })
+
+  it('gives the games of players the keys of their screens, which run the commands bound to them', async () => {
+    await page.evaluate(`(() => {
+      const screen = document.querySelector('.screen')
+      screen.focus()
+      for (const type of ['keydown', 'keyup']) {
+        screen.dispatchEvent(new KeyboardEvent(type, { code: 'F5', bubbles: true, cancelable: true }))
+      }
+    })()`)
+    const console = await page.until<string>(
+      `document.querySelector('.player .console').innerText.includes('bank menu closed') && document.querySelector('.player .console').innerText`,
+    )
+    expect(console).toContain('[script:bank] bank menu opened')
   })
 
   it('restarts the resources whose files change, with the players they had, whose frames keep their storage', async () => {

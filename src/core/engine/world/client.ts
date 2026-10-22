@@ -1,6 +1,7 @@
 import { hashString } from '../../natives/index.ts'
 import { Blips } from './blips.ts'
 import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
+import { Input } from './input.ts'
 import { Pool } from './pool.ts'
 import { decompressQuaternion, fromSector } from './quantize.ts'
 import { fromHeading, fromQuaternion, IDENTITY, type Matrix } from './rotation.ts'
@@ -152,6 +153,8 @@ export class ClientWorld {
   readonly blips = new Blips()
   /** The text of the game, which scripts build with text commands. */
   readonly text = new GameText()
+  /** The keyboard of the game, the controls it presses, and the commands that resources bound to its keys. */
+  readonly input = new Input()
   /** Whether the local player is in a solo tutorial session of the game, as character menus put it. */
   tutorial = false
 
@@ -331,8 +334,9 @@ export class ClientWorld {
     return this.#kinds.get(model) ?? EntityType.none
   }
 
-  /** Runs a tick of the world: it loads the models that scripts requested. */
+  /** Runs a tick of the world, which starts a frame of its input: it loads the models that scripts requested. */
   tick(): void {
+    this.input.frame()
     for (const model of this.#requested) this.#loaded.add(model)
     this.#requested.clear()
   }

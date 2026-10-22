@@ -48,6 +48,8 @@ The map shows the world of the server on a grid of metres, with the north up: th
 
 Each player has a console of its own, with what its client prints, and a screen: the game window of the client, 1920 by 1080 pixels, scaled to fit, which pages are laid out in. **Enlarge** has the screen take the whole width, and **Shrink** gives it back its place.
 
+While the screen of a player has the focus, which a click gives it, and NUI does not, its keys go to the game of the client: they press the controls of GTA V that they press, such as E for `INPUT_CONTEXT`, which `IsControlJustReleased(0, 38)` sees, and run the commands that resources bound to them with `RegisterKeyMapping`, `+command` as they go down and `-command` as they go up. Keys that are held go up as the screen loses the focus.
+
 ## NUI
 
 The screen of a player shows the frames of its resources as FiveM's NUI shows them: one for each resource with a `ui_page`, once its scripts loaded, in the order they came, the focused one on top, each hidden until its page loads.

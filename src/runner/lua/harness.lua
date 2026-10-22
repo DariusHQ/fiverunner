@@ -637,6 +637,29 @@ function Player:nuiFocus()
     return focus.focused, focus.cursor
 end
 
+-- Has the key `key` of the keyboard of the client of the player, by the
+-- name of FiveM's keyboard mapper, such as E or LMENU, go down before the
+-- next frame: it presses the controls of the game that it presses, and
+-- runs the commands that resources bound to it with RegisterKeyMapping.
+function Player:keyDown(key)
+    checkArgument('keyDown', 1, key, 'string')
+    ask('key', { id = self.id, key = key, down = true })
+end
+
+-- Has the key `key` go up before the next frame, which runs -command for
+-- the +command that resources bound to it.
+function Player:keyUp(key)
+    checkArgument('keyUp', 1, key, 'string')
+    ask('key', { id = self.id, key = key, down = false })
+end
+
+-- Presses the key `key`: it goes down, and up a frame later.
+function Player:press(key)
+    self:keyDown(key)
+    Wait(0)
+    self:keyUp(key)
+end
+
 -- What the server printed on its console, line by line.
 function fiverunner.output()
     return ask('output')

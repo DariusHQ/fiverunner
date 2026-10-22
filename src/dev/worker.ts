@@ -138,6 +138,9 @@ addEventListener('message', (event: MessageEvent<ToWorker>) => {
     case 'waypoint':
       session?.waypoint(message.client, message.x, message.y)
       break
+    case 'key':
+      session?.key(message.client, message.key, message.down)
+      break
     case 'cursor': {
       const nui = session?.nui(message.client)
       if (nui !== undefined) nui.cursor = { x: message.x, y: message.y }

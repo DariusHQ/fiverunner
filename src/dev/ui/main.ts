@@ -128,6 +128,7 @@ function playerView(client: number): PlayerView {
   const screen = new Screen(client, tab, port, {
     bridge,
     cursor: (x, y) => send({ type: 'cursor', client, x, y }),
+    key: (name, down) => send({ type: 'key', client, key: name, down }),
   })
   const output = document.createElement('div')
   output.className = 'console small'

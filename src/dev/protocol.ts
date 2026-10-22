@@ -35,6 +35,8 @@ export type ToWorker =
   | { readonly type: 'teleport'; readonly client: number; readonly x: number; readonly y: number }
   /** Sets the waypoint of the player of a client at coordinates of the world, from the map. */
   | { readonly type: 'waypoint'; readonly client: number; readonly x: number; readonly y: number }
+  /** A key of the keyboard of a client went down or up, by the name of FiveM's keyboard mapper. */
+  | { readonly type: 'key'; readonly client: number; readonly key: string; readonly down: boolean }
   /** Where the cursor is in the game window of a client, in pixels. */
   | { readonly type: 'cursor'; readonly client: number; readonly x: number; readonly y: number }
   /** What the service worker of the frames of a client at a host of FiveM's asks, which the worker answers by `id`. */

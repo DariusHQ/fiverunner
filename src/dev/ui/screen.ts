@@ -5,12 +5,54 @@ import { devFrameUrl } from '../hosts.ts'
 export const GAME_WIDTH = 1920
 export const GAME_HEIGHT = 1080
 
+/** The names that FiveM's keyboard mapper gives the keys of KeyboardEvent.code, but for letters, digits and function keys. */
+const KEY_NAMES: Readonly<Record<string, string>> = {
+  Escape: 'ESCAPE',
+  Enter: 'RETURN',
+  Backspace: 'BACK',
+  Tab: 'TAB',
+  Space: 'SPACE',
+  CapsLock: 'CAPITAL',
+  ShiftLeft: 'LSHIFT',
+  ShiftRight: 'RSHIFT',
+  ControlLeft: 'LCONTROL',
+  ControlRight: 'RCONTROL',
+  AltLeft: 'LMENU',
+  AltRight: 'RMENU',
+  ArrowUp: 'UP',
+  ArrowDown: 'DOWN',
+  ArrowLeft: 'LEFT',
+  ArrowRight: 'RIGHT',
+  PageUp: 'PAGEUP',
+  PageDown: 'PAGEDOWN',
+  Home: 'HOME',
+  End: 'END',
+  Insert: 'INSERT',
+  Delete: 'DELETE',
+  NumpadMultiply: 'MULTIPLY',
+  NumpadAdd: 'ADD',
+  NumpadSubtract: 'SUBTRACT',
+  NumpadDecimal: 'DECIMAL',
+  NumpadDivide: 'DIVIDE',
+}
+
+/** The name that FiveM's keyboard mapper gives the key of a KeyboardEvent.code, if FiveRunner knows of it. */
+export function keyName(code: string): string | undefined {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3)
+  if (/^Digit\d$/.test(code)) return code.slice(5)
+  if (/^F\d{1,2}$/.test(code)) return code
+  if (/^Numpad\d$/.test(code)) return `NUMPAD${code.slice(6)}`
+  return KEY_NAMES[code]
+}
+
 /** What a screen needs of the dev UI. */
 export interface ScreenHost {
   /** Loads the bridge of the origin of the frame at `url`, if the dev UI has the origin, and resolves once it is ready. */
   bridge(url: string): Promise<void>
   /** Tells the client where the cursor is in its game window. */
   cursor(x: number, y: number): void
+  /** Tells the game of the client that a key of its keyboard went down or up, by the name of FiveM's keyboard mapper. */
+  key(name: string, down: boolean): void
 }
 
 /**
@@ -18,7 +60,8 @@ export interface ScreenHost {
  * the game would be, as the root page of FiveM's NUI shows them: in the
  * order they came, the focused one on top, each hidden until its page
  * loads. Frames take the mouse while NUI shows the cursor, and the keyboard
- * while it has the focus.
+ * while it has the focus; while the screen itself has the focus, its keys
+ * go to the game.
  */
 export class Screen {
   readonly element: HTMLElement
@@ -35,6 +78,8 @@ export class Screen {
   #zStack: string[] = []
   #focusStack: string[] = []
   #scale = 1
+  /** The keys that went down to the game, which go up as the screen loses the focus. */
+  readonly #held = new Set<string>()
 
   constructor(client: number, tab: string, port: string, host: ScreenHost) {
     this.#client = client
@@ -53,6 +98,13 @@ export class Screen {
       this.#scale = this.element.clientWidth / GAME_WIDTH
       this.#viewport.style.transform = `scale(${this.#scale})`
     }).observe(this.element)
+    this.element.addEventListener('keydown', (event) => this.#key(event, true))
+    this.element.addEventListener('keyup', (event) => this.#key(event, false))
+    this.element.addEventListener('blur', () => {
+      for (const name of this.#held) this.#host.key(name, false)
+      this.#held.clear()
+    })
+    this.element.addEventListener('mousedown', () => this.element.focus())
     this.element.addEventListener('mousemove', (event) => {
       const rect = this.#viewport.getBoundingClientRect()
       this.#cursor(
@@ -154,6 +206,17 @@ export class Screen {
     this.#frames.get(resource)?.contentWindow?.blur()
     const [next] = this.#focusStack
     if (next !== undefined) this.#focusFrame(next)
+  }
+
+  /** Tells the game of a key that went down or up on the screen, which takes it from the page. */
+  #key(event: KeyboardEvent, down: boolean): void {
+    const name = keyName(event.code)
+    if (name === undefined || event.target !== this.element) return
+    event.preventDefault()
+    if (down && event.repeat) return
+    if (down) this.#held.add(name)
+    else if (!this.#held.delete(name)) return
+    this.#host.key(name, down)
   }
 
   #cursor(x: number, y: number): void {

@@ -447,6 +447,18 @@ class World<T> {
         const nui = this.#connectionOf(count(id)).client!.nui!
         return pack({ focused: nui.focused, cursor: nui.cursorShown })
       }
+      case 'key': {
+        const { id, key, down } = fields(args)
+        const client = this.#connectionOf(count(id)).client!
+        this.#actions.push(() =>
+          this.#survive(() => {
+            const { input } = client.world!
+            const commands = down === true ? input.keyDown(text(key)) : input.keyUp(text(key))
+            for (const command of commands) client.console.commands.invoke(command, '')
+          }),
+        )
+        return pack(null)
+      }
       case 'disconnect': {
         const { id, reason } = fields(args)
         const { player } = this.#connectionOf(count(id))
