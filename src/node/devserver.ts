@@ -1,4 +1,4 @@
-import { watch, readFileSync, type FSWatcher } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { basename, join } from 'node:path'
@@ -16,6 +16,7 @@ import {
 } from '../dev/remote.ts'
 import { DEV_PATH } from '../dev/routes.ts'
 import { openProject } from './project.ts'
+import { watchProject } from './watch.ts'
 
 /** The port that the dev server listens on unless told otherwise, or the next that is free. */
 export const DEFAULT_PORT = 30120
@@ -52,9 +53,6 @@ const TYPES: Readonly<Record<string, string>> = {
   svg: 'image/svg+xml',
   png: 'image/png',
 }
-
-/** Milliseconds that the server waits for changes to stop before it tells of them. */
-const SETTLE = 150
 
 /**
  * Starts the dev server of a project, which serves the dev UI, at
@@ -181,37 +179,22 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   })
   port = await listen(server, options.port ?? DEFAULT_PORT)
 
-  let timer: ReturnType<typeof setTimeout> | undefined
-  /** The paths of the files that changed since the dev UIs were last told, or none when the watcher did not say which. */
-  let paths: Set<string> | undefined = new Set()
-  const changed = (file: string | null) => {
-    const parts = (file ?? '').split(/[\\/]/)
-    if (parts.some((part) => part === 'node_modules' || part.startsWith('.'))) return
-    if (file === null) paths = undefined
-    else paths?.add(parts.join('/'))
-    clearTimeout(timer)
-    timer = setTimeout(() => {
-      project = openProject(options.root) ?? project
-      const data = JSON.stringify(paths === undefined ? null : [...paths].sort())
-      paths = new Set()
-      for (const listener of listeners) listener.write(`event: change\ndata: ${data}\n\n`)
-      options.onChange?.()
-    }, SETTLE)
-  }
-  let watcher: FSWatcher | undefined
-  try {
-    watcher = watch(options.root, { recursive: true }, (_, file) => changed(file))
-    watcher.on('error', () => {})
-  } catch {
-    watcher = undefined
-  }
+  const stopWatching = watchProject(options.root, (paths) => {
+    project = openProject(options.root) ?? project
+    const data = JSON.stringify(paths ?? null)
+    for (const listener of listeners)
+      listener.write(`event: change
+data: ${data}
+
+`)
+    options.onChange?.()
+  })
 
   return {
     url: `http://${DEV_DOMAIN}:${port}/`,
     port,
     close: () => {
-      clearTimeout(timer)
-      watcher?.close()
+      stopWatching()
       for (const listener of listeners) listener.end()
       return new Promise((resolve) => server.close(() => resolve()))
     },
