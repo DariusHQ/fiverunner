@@ -18,6 +18,7 @@ import { pack, type PackedValue } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
 import type { Project } from '../runner/index.ts'
 import { LineOutput, type OutputLine } from '../runner/output.ts'
+import { describeMap, type DevMap } from './map.ts'
 import { describeArgs, describeValue } from './values.ts'
 
 /** Interrupts the scripts that run for 5 seconds without returning, which would hang the session. */
@@ -63,6 +64,8 @@ export interface DevState {
   readonly players: readonly DevPlayer[]
   /** The state bags of the server that have keys, in the order they were created, with their keys in the order of their bytes. */
   readonly bags: readonly DevBag[]
+  /** What the map shows: the entities of the server, and the blips of the clients. */
+  readonly map: DevMap
 }
 
 /** An event that the server and a client sent each other, which the server or the client got. */
@@ -286,6 +289,26 @@ export class DevSession {
     }
   }
 
+  /**
+   * Puts the ped of the player of the client `client` at `x`, `y`, at the
+   * height it has, as a script of the client would, which syncs it.
+   */
+  teleport(client: number, x: number, y: number): void {
+    const found = this.#clients[client - 1]
+    const ped = found?.manager.world?.playerPed
+    if (ped === undefined || this.#crash !== undefined) return
+    ped.moveTo(Math.fround(x), Math.fround(y), ped.z)
+    this.#tell()
+  }
+
+  /** Sets the waypoint of the player of the client `client` at `x`, `y`, as the map of the game does. */
+  waypoint(client: number, x: number, y: number): void {
+    const world = this.#clients[client - 1]?.manager.world
+    if (world === undefined || this.#crash !== undefined) return
+    world.blips.setWaypoint(Math.fround(x), Math.fround(y))
+    this.#tell()
+  }
+
   /** The NUI of the client `client`, which pages make their requests of. */
   nui(client: number): Nui | undefined {
     return this.#clients[client - 1]?.manager.nui
@@ -309,6 +332,11 @@ export class DevSession {
         name: bag.name,
         keys: bag.keys().map((key) => ({ key, value: this.#describe(bag.get(key)!) })),
       })),
+      map: describeMap(
+        this.#engine.server,
+        this.#clients.map(({ manager }) => manager),
+        (netId) => this.#clientOf(netId),
+      ),
     }
     const json = JSON.stringify(state)
     if (json === this.#told) return

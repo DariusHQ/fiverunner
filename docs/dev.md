@@ -35,6 +35,13 @@ The form under it triggers an event as the network would: on the server, as a pl
 
 The state bags panel shows the state bags of the server that have keys, such as `global`, which `GlobalState` sets, and `player:<id>`, which `Player(id).state` sets, with the values of their keys, as they change.
 
+## Map
+
+The map shows the world of the server on a grid of metres, with the north up: the entities of its game state, where their owners last synced them, the peds of players as arrows that turn as they do, with their names, and the blips that the scripts of the players put on their maps, with the circles and areas of those around coordinates, and lines to those that show routes. There is no map of GTA V under them, whose pictures are Rockstar's, but the blips of garages, shops and jobs draw the city well enough. The map fits what is on it as it changes, until the wheel zooms it, dragging moves it or a player is dragged on it, and **Fit** has it fit again. The names of blips show as the map zooms in, and hovering a blip or an entity tells of it.
+
+- Dragging the ped of a player puts it where it is dropped, at the height it had, as a script of the client would with `SetEntityCoords`, which its client syncs to the server.
+- A double click sets the waypoint of a player there, as the map of the game does: that of the player whose blips the map shows, or of the first that joined.
+
 ## Players
 
 **Connect a player** starts a client and connects it to the server with the name in the box, and a license of the name, `license:` and the SHA-1 of the name, as players of FiveM have the license of their Rockstar account, which frameworks such as QBox and ESX keep their characters by. It joins as a FiveM client does: the server's `playerConnecting` handlers and deferrals run, then the client downloads its resources and starts them. While deferrals present an adaptive card, the player shows it, with a box for the JSON that its `Action.Submit` would give, which **Submit card** submits. **Disconnect** quits the client, as the player leaving the game does.

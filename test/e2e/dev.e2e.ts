@@ -32,7 +32,9 @@ RegisterCommand('open', function()
     TriggerClientEvent('bank:open', -1, 'Opened by the server')
 end, false)
 `,
-  'client.lua': `RegisterNetEvent('bank:open', function(text)
+  'client.lua': `local blip = AddBlipForCoord(300.0, -300.0, 0.0)
+SetBlipColour(blip, 2)
+RegisterNetEvent('bank:open', function(text)
     SendNUIMessage({ type = 'open', text = text })
     SetNuiFocus(true, true)
 end)
@@ -76,6 +78,32 @@ let page: Page
 function frameOrigins(): Promise<string[]> {
   return page.evaluate<string[]>(
     `[...document.querySelectorAll('.viewport iframe')].map((frame) => new URL(frame.src).origin)`,
+  )
+}
+
+/** An expression of where the pixels of a colour are on the canvas of the map, in the pixels of the page, or null if it drew none. */
+function pixelsOf([r, g, b]: readonly [number, number, number]): string {
+  return `(() => {
+    const canvas = document.querySelector('#map canvas')
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
+    let x = 0, y = 0, count = 0
+    for (let i = 0; i < data.length; i += 4) {
+      if (Math.abs(data[i] - ${r}) < 6 && Math.abs(data[i + 1] - ${g}) < 6 && Math.abs(data[i + 2] - ${b}) < 6) {
+        x += (i / 4) % canvas.width
+        y += Math.floor(i / 4 / canvas.width)
+        count++
+      }
+    }
+    const rect = canvas.getBoundingClientRect()
+    const ratio = canvas.width / rect.width
+    return count === 0 ? null : [rect.left + x / count / ratio, rect.top + y / count / ratio]
+  })()`
+}
+
+/** Has the mouse do `type` at `x`, `y` of the page, on the canvas of the map. */
+function mouse(type: string, x: number, y: number): Promise<unknown> {
+  return page.evaluate(
+    `document.querySelector('#map canvas').dispatchEvent(new MouseEvent('${type}', { clientX: ${x}, clientY: ${y}, bubbles: true }))`,
   )
 }
 
@@ -149,6 +177,7 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     await page.until(`document.querySelector('.screen').classList.contains('nui-cursor')`)
     // The button of the page, which is laid out at 1920 by 1080, on the screen of the first player.
     const [x, y] = await page.evaluate<[number, number]>(`(() => {
+      document.querySelector('.screen').scrollIntoView({ block: 'center' })
       const rect = document.querySelector('.screen').getBoundingClientRect()
       const scale = rect.width / 1920
       return [rect.x + 250 * scale, rect.y + 150 * scale]
@@ -183,6 +212,29 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
       expect.stringContaining('[Player -> server] bank:ping(7)'),
       expect.stringMatching(/global\s+bank\s+"open"/),
     ])
+  })
+
+  it('shows the players and the blips of their maps on its map, and moves the players that it drags', async () => {
+    const GREEN = [0x6f, 0xcf, 0x6f] as const
+    const ORANGE = [0xf0, 0xa0, 0x30] as const
+    const CYAN = [0x4f, 0xd6, 0xe0] as const
+    await page.evaluate(`document.getElementById('map').scrollIntoView()`)
+    // The blips of the players are green, and their peds, at the start of the world, orange and cyan, the second over the first.
+    const [x, y] = await page.until<[number, number]>(pixelsOf(CYAN))
+    expect([
+      await page.evaluate(`${pixelsOf(GREEN)} !== null`),
+      await page.evaluate(pixelsOf(ORANGE)),
+    ]).toEqual([true, null])
+    await mouse('mousedown', x, y)
+    await mouse('mousemove', x - 120, y + 60)
+    await mouse('mouseup', x - 120, y + 60)
+    // The client of the second player syncs its ped where it was dropped, which uncovers that of the first.
+    const [movedX, movedY] = await page.until<[number, number]>(
+      `(() => { const point = ${pixelsOf(CYAN)}; return point !== null && Math.abs(point[0] - ${x}) > 60 && point })()`,
+    )
+    // The name of the player, in its colour, moves the centre of its pixels a little.
+    expect([Math.abs(movedX - x + 120) < 10, Math.abs(movedY - y - 60) < 10]).toEqual([true, true])
+    expect(await page.evaluate(`${pixelsOf(ORANGE)} !== null`)).toBe(true)
   })
 
   it('restarts the resources whose files change, with the players they had, whose frames keep their storage', async () => {

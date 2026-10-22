@@ -86,7 +86,14 @@ describe('Dev sessions', () => {
         'server: [script:bank] bank started',
         'server: [resources] Started resource bank',
       ],
-      [{ resources: [{ name: 'bank', state: 'started' }], players: [], bags: [] }],
+      [
+        {
+          resources: [{ name: 'bank', state: 'started' }],
+          players: [],
+          bags: [],
+          map: { entities: [], blips: [] },
+        },
+      ],
       [],
     ])
   })
@@ -144,7 +151,14 @@ describe('Dev sessions', () => {
         'server: [resources] Stopping resource bank',
         'server: [cmd] No such command nope.',
       ],
-      [{ resources: [{ name: 'bank', state: 'stopped' }], players: [], bags: [] }],
+      [
+        {
+          resources: [{ name: 'bank', state: 'stopped' }],
+          players: [],
+          bags: [],
+          map: { entities: [], blips: [] },
+        },
+      ],
     ])
   })
 
@@ -385,6 +399,66 @@ end)`)
         { name: 'player:1', keys: [{ key: 'deposits', value: '5' }] },
       ],
     ])
+  })
+
+  it('tell where the entities of the server and the blips of the clients are, which they move players and set waypoints on', async () => {
+    const { session, told } = await sessionOf(
+      '',
+      `local blip = AddBlipForRadius(100.0, 200.0, 30.0, 25.0)
+SetBlipColour(blip, 3)
+SetBlipRoute(blip, true)
+BeginTextCommandSetBlipName('STRING')
+AddTextComponentSubstringPlayerName('Bank')
+EndTextCommandSetBlipName(blip)`,
+    )
+    await session.connect({ name: 'Ann' })
+    session.advance(200)
+    session.teleport(1, 50.5, -60.25)
+    session.waypoint(1, 10, 20)
+    session.advance(100)
+    expect(states(told()).at(-1)!.map).toEqual({
+      entities: [
+        // The ped of the player, where its client has it.
+        {
+          id: 1,
+          kind: 'player',
+          x: 50.5,
+          y: -60.25,
+          z: 0,
+          heading: 0,
+          model: 225514697,
+          owner: 1,
+        },
+      ],
+      blips: [
+        {
+          client: 1,
+          handle: 1,
+          x: 100,
+          y: 200,
+          sprite: 9,
+          colour: 3,
+          alpha: 255,
+          shape: 'radius',
+          radius: 25,
+          name: 'Bank',
+          script: 'bank',
+          route: true,
+        },
+        // The waypoint of the player.
+        {
+          client: 1,
+          handle: 257,
+          x: 10,
+          y: 20,
+          sprite: 8,
+          colour: 0,
+          alpha: 255,
+          shape: 'coord',
+          route: false,
+        },
+      ],
+    })
   })
 
   it('tell of the deferrals of connections, whose cards players submit', async () => {

@@ -1,8 +1,8 @@
 /**
  * The dev UI: the console of the server, its resources, the events that
- * the server and its clients send each other, its state bags, and the
- * players that connect to it, each with a screen that shows the frames of
- * its NUI.
+ * the server and its clients send each other, its state bags, a map of its
+ * world, and the players that connect to it, each with a screen that shows
+ * the frames of its NUI.
  * Its worker runs the engine, and the bridges of the origins of frames
  * pass the requests of their pages on to it.
  */
@@ -16,6 +16,7 @@ import { DEV_PATH } from '../routes.ts'
 import type { DevPlayer, DevState, NuiEvent } from '../session.ts'
 import { Console } from './console.ts'
 import { Events, showBags } from './inspect.ts'
+import { WorldMap } from './map.ts'
 import { Screen } from './screen.ts'
 
 /** The element with the id `id`, which the page has. */
@@ -51,6 +52,10 @@ const events = new Events(byId('events'), byId<HTMLFormElement>('emit'), {
   emit: (name, args, target) => send({ type: 'emit', name, args, target }),
 })
 const bags = byId<HTMLElement>('bags')
+const map = new WorldMap(byId('map'), {
+  teleport: (client, x, y) => send({ type: 'teleport', client, x, y }),
+  waypoint: (client, x, y) => send({ type: 'waypoint', client, x, y }),
+})
 
 /** What the dev UI shows of a player. */
 interface PlayerView {
@@ -179,6 +184,7 @@ function showState(state: DevState): void {
   )
   events.players(state.players)
   showBags(bags, state.bags)
+  map.show(state.map, state.players)
   for (const player of state.players) {
     const view = playerView(player.client)
     const gone = player.state === 'dropped' || player.state === 'rejected'
