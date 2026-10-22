@@ -381,21 +381,31 @@ end)
       'sql/install.sql': "INSERT INTO items VALUES ('water');\n\nNOPE;",
       'sql/tables.sql': 'CREATE TABLE items (name VARCHAR(10));',
     })
+    // So do those of categories, as ESX keeps the SQL that installs it.
+    proc.manager.files.makeDirectory('resources/[SQL]')
+    proc.manager.files.write(
+      'resources/[SQL]/legacy.sql',
+      new TextEncoder().encode("INSERT INTO items VALUES ('bread');"),
+    )
     proc.manager.getResource('oxmysql')!.start()
     proc
       .add(
         'app',
         app(
-          `CreateThread(function() Wait(0) print(MySQL.scalar.await('SELECT name FROM items')) print('done') end)`,
+          `CreateThread(function() Wait(0) print(MySQL.scalar.await('SELECT GROUP_CONCAT(name ORDER BY name) FROM items')) print('done') end)`,
           "server_script '@oxmysql/lib/MySQL.lua'\n",
         ),
       )
       .start()
-    expect(await proc.run('done')).toEqual([CONNECTED, '[script:app] water', '[script:app] done'])
+    expect(await proc.run('done')).toEqual([
+      CONNECTED,
+      '[script:app] bread,water',
+      '[script:app] done',
+    ])
     expect(proc.diagnostics).toEqual([
       "oxmysql: FiveRunner runs only Lua scripts, so it skips dist/build.js, and runs its own emulation of oxmysql in its place, which gives oxmysql's exports.",
       "oxmysql: FiveRunner's database failed to run a statement: resources/schema/sql/install.sql:3: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'NOPE' at line 1 (NOPE)",
-      "oxmysql: FiveRunner's database starts empty, with the tables of the .sql files of the resources, which it ran: resources/schema/sql/install.sql, resources/schema/sql/tables.sql.",
+      "oxmysql: FiveRunner's database starts empty, with the tables of the .sql files of the resources, which it ran: resources/[SQL]/legacy.sql, resources/schema/sql/install.sql, resources/schema/sql/tables.sql.",
     ])
   })
 })

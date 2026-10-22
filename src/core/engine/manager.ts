@@ -56,7 +56,7 @@ import { addPermissionCommands, FilesystemPermissions } from './permissions.ts'
 import { engineNatives } from './natives/index.ts'
 import { Resource, type ResourceDefinition } from './resource.ts'
 import { ClientRpc } from './rpc.ts'
-import { ResourceScanner } from './scan.ts'
+import { RESOURCES, ResourceScanner } from './scan.ts'
 import type { Player, Session } from './session.ts'
 import { StateBags } from './statebags.ts'
 import { OpenFiles } from './streams.ts'
@@ -610,7 +610,11 @@ export class ResourceManager {
     return this.#oxmysql
   }
 
-  /** The .sql files of the resources of the server, in the order the resources were found, with those in each by path. */
+  /**
+   * The .sql files of the resources directory of the server, by path, such
+   * as those of resources and of categories like ESX's [SQL], then those of
+   * the resources outside it.
+   */
   #sqlFiles(): { path: string; sql: string }[] {
     const found: { path: string; sql: string }[] = []
     const decoder = new TextDecoder()
@@ -628,7 +632,11 @@ export class ResourceManager {
         }
       }
     }
-    for (const resource of this.#resources.values()) visit(normalizePath(resource.path))
+    visit(RESOURCES)
+    for (const resource of this.#resources.values()) {
+      const path = normalizePath(resource.path)
+      if (!path.startsWith(`${RESOURCES}/`)) visit(path)
+    }
     return found
   }
 

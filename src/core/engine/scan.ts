@@ -6,7 +6,7 @@ import { pack } from './msgpack.ts'
 import { isCategory, type Resource } from './resource.ts'
 
 /** The directory that FiveM's server finds resources in, relative to the one it runs in. */
-const RESOURCES = 'resources'
+export const RESOURCES = 'resources'
 
 /** The first manifest version of __resource.lua that FiveM's server takes as up to date. */
 const UP_TO_DATE_MANIFEST = '44febabe-d386-4d18-afbe-5e627f4af937'
