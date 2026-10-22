@@ -1,5 +1,6 @@
 import packageJson from '../../package.json' with { type: 'json' }
 import { dev } from './dev.ts'
+import { init } from './init.ts'
 import { test } from './test.ts'
 
 /** What the command line tool runs with: where it runs, what it writes to, and cfxlua.wasm. */
@@ -31,6 +32,7 @@ const USAGE = `Usage: fiverunner <command> [options]
 Commands:
   test [paths...]  Run the tests of the project in this directory
   dev              Run the project in this directory in the dev UI, in the browser
+  init             Add a test file and a GitHub workflow to the project in this directory
 
 Options:
   -h, --help       Show this help
@@ -46,6 +48,7 @@ export async function main(args: readonly string[], host: CliHost): Promise<numb
   const [first, ...rest] = args
   if (first === 'test') return test(rest, host)
   if (first === 'dev') return dev(rest, host)
+  if (first === 'init') return init(rest, host)
   if (rest.length === 0 && (first === undefined || first === '-h' || first === '--help')) {
     host.stdout(`FiveRunner ${packageJson.version}\n\n${USAGE}`)
     return 0

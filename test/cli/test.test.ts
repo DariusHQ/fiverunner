@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -27,6 +27,30 @@ function write(path: string, files: Record<string, string>): string {
     writeFileSync(join(directory, file), text)
   }
   return directory
+}
+
+/** Runs fiverunner init in `cwd`, and returns its exit code with what it wrote. */
+async function init(cwd: string): Promise<{ code: number; stdout: string; stderr: string }> {
+  let stdout = ''
+  let stderr = ''
+  const code = await main(['init'], {
+    cwd,
+    env: {},
+    stdout: (text) => {
+      stdout += text
+    },
+    stderr: (text) => {
+      stderr += text
+    },
+    color: false,
+    cfxlua,
+    sqlite,
+    wasm: () => new Uint8Array(),
+    assets: '',
+    interrupted: () => Promise.resolve(),
+    now: () => 0,
+  })
+  return { code, stdout, stderr }
 }
 
 /** Runs fiverunner test with `args` in `cwd`, and returns its exit code with what it wrote. */
@@ -314,6 +338,46 @@ Duration: 0.63 s
       '\x1b[31m×\x1b[39m tests/b.test.lua \x1b[2m(1 test, 1 failed)\x1b[22m',
       '   \x1b[31m×\x1b[39m b',
       '\x1b[33m↓\x1b[39m tests/c.test.lua \x1b[2m(1 test, 1 skipped)\x1b[22m',
+    ])
+  })
+})
+
+describe('fiverunner init', () => {
+  it('adds a test of the start of the project, and a workflow at the roots of repositories, over nothing that is there', async () => {
+    const resource = bank({ '.git/HEAD': 'ref: refs/heads/main\n' })
+    const server = write('server', {
+      'resources/shop/fxmanifest.lua': MANIFEST,
+      'resources/shop/server.lua': `print('shop')`,
+      'server.cfg': 'ensure shop',
+    })
+    const broken = write('broken', { 'fxmanifest.lua': MANIFEST, 'server.lua': `error('broken')` })
+    const run = 'Run the tests with npx fiverunner test\n'
+    expect([
+      await init(resource),
+      (await init(resource)).stdout,
+      (await init(server)).stdout,
+      (await init(broken)).code,
+      readFileSync(join(resource, '.github/workflows/fiverunner.yml'), 'utf8').includes(
+        'npx fiverunner test',
+      ),
+      (await test(resource)).code,
+      (await test(server)).code,
+      (await test(broken)).code,
+      (await init(root)).code,
+    ]).toEqual([
+      {
+        code: 0,
+        stdout: `Wrote tests/bank.test.lua\nWrote .github/workflows/fiverunner.yml\n${run}`,
+        stderr: '',
+      },
+      `Kept tests/bank.test.lua, which is there\nKept .github/workflows/fiverunner.yml, which is there\n${run}`,
+      `Wrote tests/server.test.lua\nWrote no GitHub workflow, as GitHub looks for them at the root of a git repository, which this is not\n${run}`,
+      0,
+      true,
+      0,
+      0,
+      1,
+      2,
     ])
   })
 })

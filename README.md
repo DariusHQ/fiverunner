@@ -6,6 +6,12 @@ Run FiveM resources in your browser and in CI. No GTA V, no FXServer, no restart
 
 ## Testing resources
 
+Start with a test that your resource or server starts without script errors, and a GitHub workflow that runs it on each push:
+
+```bash
+npx fiverunner init
+```
+
 Write tests in files whose names end in `.test.lua`, next to your resource:
 
 ```lua
