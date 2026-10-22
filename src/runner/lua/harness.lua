@@ -598,6 +598,45 @@ function Player:mock(name, fn)
     mock(self.id, name, fn)
 end
 
+-- What the scripts of the client of the player sent the frame of the NUI
+-- of `resource`, as SendNUIMessage gives it, in the order they sent it.
+function Player:nuiMessages(resource)
+    checkArgument('nuiMessages', 1, resource, 'string')
+    local messages = {}
+    for i, text in ipairs(ask('nuiMessages', { id = self.id, resource = resource })) do
+        messages[i] = json.decode(text)
+    end
+    return messages
+end
+
+-- Calls the NUI callback `name` of `resource` on the client of the
+-- player, as the page of the resource does, with `data` as JSON, and
+-- returns what the callback answered once it did, as JSON reads it, or as
+-- it is when it is no JSON, and the status of the answer.
+function Player:nuiCallback(resource, name, data)
+    checkArgument('nuiCallback', 1, resource, 'string')
+    checkArgument('nuiCallback', 2, name, 'string')
+    local request = ask('nuiCallback', { id = self.id, resource = resource, name = name, data = json.encode(data or {}) })
+    while true do
+        local answer = ask('nuiAnswer', request)
+        if answer.status ~= nil then
+            local ok, value = pcall(json.decode, answer.body)
+            if ok then
+                return value, answer.status
+            end
+            return answer.body, answer.status
+        end
+        Wait(0)
+    end
+end
+
+-- Whether NUI has the focus on the client of the player, and whether it
+-- shows the cursor, as SetNuiFocus left them.
+function Player:nuiFocus()
+    local focus = ask('nuiFocus', { id = self.id })
+    return focus.focused, focus.cursor
+end
+
 -- What the server printed on its console, line by line.
 function fiverunner.output()
     return ask('output')

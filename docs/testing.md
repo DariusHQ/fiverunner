@@ -93,15 +93,19 @@ local ann = fiverunner.connect({
 
 Every field is optional. Each player runs a client of its own, with the client scripts of your resources.
 
-| Field or method             |                                                                                                                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `player.id`                 | The id of the player on the server, its `source`                                                                                      |
-| `player.name`               | Its name                                                                                                                              |
-| `player:run(code, ...)`     | Runs the Lua code `code` in the client of the player, with `...` as its arguments, and returns what it returns. Raises what it raises |
-| `player:emit(event, ...)`   | Triggers `event` on the server from the client, with `...`, and returns once the server got it                                        |
-| `player:received(event)`    | The arguments of each `event` that the client got from the server, in the order they came                                             |
-| `player:output()`           | What the client printed, line by line, as `[channel] text`, without colors                                                            |
-| `player:disconnect(reason)` | Disconnects the player, as players quit, and returns once the server dropped it                                                       |
+| Field or method                            |                                                                                                                                                |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `player.id`                                | The id of the player on the server, its `source`                                                                                               |
+| `player.name`                              | Its name                                                                                                                                       |
+| `player:run(code, ...)`                    | Runs the Lua code `code` in the client of the player, with `...` as its arguments, and returns what it returns. Raises what it raises          |
+| `player:emit(event, ...)`                  | Triggers `event` on the server from the client, with `...`, and returns once the server got it                                                 |
+| `player:received(event)`                   | The arguments of each `event` that the client got from the server, in the order they came                                                      |
+| `player:output()`                          | What the client printed, line by line, as `[channel] text`, without colors                                                                     |
+| `player:disconnect(reason)`                | Disconnects the player, as players quit, and returns once the server dropped it                                                                |
+| `player:nuiMessages(resource)`             | What the client sent the NUI frame of `resource` with `SendNUIMessage`, as tables, in the order it sent them                                   |
+| `player:nuiCallback(resource, name, data)` | Calls the NUI callback `name` of `resource`, as its page does, with `data` as JSON, and returns what it answered, read as JSON, and the status |
+| `player:nuiFocus()`                        | Whether NUI has the focus on the client, and whether it shows the cursor                                                                       |
+| `player:mock(name, fn)`                    | Mocks a native on the client, as [fiverunner.mock](#mocks) does on the server                                                                  |
 
 `player:run` runs code given as a string, as Lua cannot send functions with their upvalues to another state: give the code what it needs as arguments.
 

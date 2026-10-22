@@ -213,6 +213,8 @@ interface Connection {
   readonly process: string
   player: Player | undefined
   client: ResourceManager | undefined
+  /** The JSON of what the scripts of the client sent the frames of resources, by the resources. */
+  readonly messages: { readonly resource: string; readonly json: string }[]
 }
 
 /** An event that the client of a player got from the network. */
@@ -239,6 +241,8 @@ class World<T> {
   readonly #pending: Promise<unknown>[]
   /** What tests asked the runner to do between frames, in the order they asked. */
   readonly #actions: (() => Promise<void> | void)[] = []
+  /** The answers of the NUI callbacks that tests called, by their requests, from 1, once they came. */
+  readonly #answers: { status?: number; body?: string }[] = []
   /** The connections that tests asked for, in the order they asked. */
   readonly #connections: Connection[] = []
   readonly #received: Received[] = []
@@ -351,7 +355,8 @@ class World<T> {
     const { clock } = this.engine
     while (this.#report === undefined && this.crash === undefined && clock.now < timeout) {
       for (const action of this.#actions.splice(0)) await action()
-      if (this.#pending.length > 0) await Promise.allSettled(this.#pending.splice(0))
+      // What settles meanwhile, such as the answers of NUI callbacks, settles before the next frame.
+      await Promise.allSettled(this.#pending.splice(0))
       this.#survive(() => this.engine.advance(Math.min(SERVER_FRAME_TIME, timeout - clock.now)))
     }
     return this.#report
@@ -401,6 +406,47 @@ class World<T> {
         )
         return pack(lines.map(({ channel, text }) => `[${channel}] ${text.replace(/\^\d/g, '')}`))
       }
+      case 'nuiMessages': {
+        const { id, resource } = fields(args)
+        const { messages } = this.#connectionOf(count(id))
+        return pack(
+          messages.filter((message) => message.resource === text(resource)).map(({ json }) => json),
+        )
+      }
+      case 'nuiCallback': {
+        const { id, resource, name, data } = fields(args)
+        const nui = this.#connectionOf(count(id)).client!.nui!
+        const answer: { status?: number; body?: string } = {}
+        // Pages of the frame of the resource call its callbacks, which strict mode lets through.
+        const request = nui.request(text(resource), {
+          method: 'POST',
+          path: `/${text(name)}`,
+          query: '',
+          headers: [
+            ['Content-Type', 'application/json; charset=UTF-8'],
+            ['Origin', `https://cfx-nui-${text(resource)}`],
+          ],
+          body: encoder.encode(text(data)),
+        })
+        void request.then((response) => {
+          answer.status = response.status
+          answer.body = decoder.decode(response.body)
+        })
+        this.#answers.push(answer)
+        return pack(this.#answers.length)
+      }
+      case 'nuiAnswer': {
+        const answer = this.#answers[count(args) - 1]
+        if (answer === undefined) throw new Error('Unknown request')
+        return pack(
+          answer.status === undefined ? {} : { status: answer.status, body: answer.body! },
+        )
+      }
+      case 'nuiFocus': {
+        const { id } = fields(args)
+        const nui = this.#connectionOf(count(id)).client!.nui!
+        return pack({ focused: nui.focused, cursor: nui.cursorShown })
+      }
       case 'disconnect': {
         const { id, reason } = fields(args)
         const { player } = this.#connectionOf(count(id))
@@ -423,6 +469,7 @@ class World<T> {
       process: `client ${this.#connections.length + 1}`,
       player: undefined,
       client: undefined,
+      messages: [],
     }
     this.#connections.push(connection)
     this.#actions.push(async () => {
@@ -430,6 +477,9 @@ class World<T> {
       const { client, player } = await this.engine.connect(identity, { watchdog })
       connection.player = player
       connection.client = client
+      client.nui!.onMessage.connect((resource, json) => {
+        connection.messages.push({ resource, json })
+      })
       client.events.onTrigger.connect((name, payload, source) => {
         // The events of the resource that runs the tests are its own.
         if (source.startsWith('net:') && !name.startsWith(`${TEST_RESOURCE}:`)) {
@@ -484,6 +534,7 @@ class Output {
 }
 
 const decoder = new TextDecoder()
+const encoder = new TextEncoder()
 
 /** A msgpack value as JavaScript has it, with maps as objects by their keys as strings. */
 function plain(object: MsgpackObject): unknown {

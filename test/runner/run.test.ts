@@ -467,6 +467,42 @@ end)`,
     expect(outcomes(result)).toEqual([['mocks', 'passed']])
   })
 
+  it('tells what the clients of players send their NUI, and calls their NUI callbacks as pages do', async () => {
+    const files = {
+      'resources/bank/fxmanifest.lua': `fx_version 'cerulean'
+game 'gta5'
+client_script 'client.lua'
+ui_page 'index.html'
+file 'index.html'
+nui_callback_strict_mode 'true'`,
+      'resources/bank/index.html': '<p>bank</p>',
+      'resources/bank/client.lua': `RegisterNetEvent('bank:open', function(amount)
+    SendNUIMessage({ type = 'open', amount = amount })
+    SetNuiFocus(true, true)
+end)
+RegisterNUICallback('close', function(data, cb)
+    SetNuiFocus(false, false)
+    cb({ closed = data.reason })
+end)`,
+    }
+    const result = await run(
+      `it('talks to NUI', function()
+    local ann = fiverunner.connect({ name = 'Ann' })
+    TriggerClientEvent('bank:open', ann.id, 5)
+    fiverunner.waitFor(function() return #ann:nuiMessages('bank') > 0 end, 1000)
+    expect(ann:nuiMessages('bank')).toEqual({ { type = 'open', amount = 5 } })
+    expect({ ann:nuiFocus() }).toEqual({ true, true })
+    local answer, status = ann:nuiCallback('bank', 'close', { reason = 'click' })
+    expect({ answer, status }).toEqual({ { closed = 'click' }, 200 })
+    expect({ ann:nuiFocus() }).toEqual({ false, false })
+    expect(select(2, ann:nuiCallback('bank', 'none'))).toBe(404)
+end)`,
+      files,
+      ['ensure bank'],
+    )
+    expect(outcomes(result)).toEqual([['talks to NUI', 'passed']])
+  })
+
   it('starts the wall clocks of the servers of tests at the same time, in UTC', async () => {
     const seconds = EPOCH / 1000
     const result = await run(`it('reads the time', function()
