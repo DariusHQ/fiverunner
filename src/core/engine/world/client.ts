@@ -38,10 +38,17 @@ export class ClientEntity {
   owner: number | undefined = undefined
   /** The creation token of an entity that the client created for its server, which it creates it on its server with. */
   creationToken: number | undefined = undefined
+  /** The health of the entity: peds have 200, as GTA V's players do, whatever their models, and other entities 1000. */
+  health: number
+  /** The most health the entity can have, which it starts with. */
+  maxHealth: number
+  /** The armour of a ped. */
+  armour = 0
 
   constructor(type: NetObjType, model: number) {
     this.type = type
     this.model = model
+    this.health = this.maxHealth = entityTypeOf(type) === EntityType.ped ? 200 : 1000
   }
 
   /** Puts the entity at a position, which natives give in single precision. */
@@ -51,7 +58,7 @@ export class ClientEntity {
     this.z = z
   }
 
-  /** Puts and turns the entity as a sync tree says, and gives it the model of the tree. */
+  /** Puts and turns the entity as a sync tree says, and gives it the model and the health of the tree, if a client synced one. */
   take(state: SyncState): void {
     this.moveTo(...fromSector(state.position))
     const { orientation } = state
@@ -60,6 +67,9 @@ export class ClientEntity {
         ? fromHeading((orientation.heading * 180) / Math.PI)
         : fromQuaternion(...decompressQuaternion(orientation.quaternion))
     this.model = state.model
+    this.health = state.health ?? this.health
+    this.maxHealth = state.maxHealth ?? this.maxHealth
+    this.armour = state.armour ?? this.armour
   }
 }
 

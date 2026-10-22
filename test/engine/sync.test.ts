@@ -132,6 +132,28 @@ SetEntityHeading(PlayerPedId(), 90.0)`,
     ])
   })
 
+  it('sync the health of peds and of vehicles, and the armour of peds', async () => {
+    const test = await session(
+      `RegisterNetEvent('vehicle', function(netId)
+    local vehicle = NetworkGetEntityFromNetworkId(netId)
+    local ped = GetPlayerPed(source)
+    print(GetEntityHealth(ped), GetEntityMaxHealth(ped), GetPedArmour(ped))
+    print(GetEntityHealth(vehicle), GetEntityMaxHealth(vehicle), GetPedArmour(vehicle))
+end)`,
+      withAdder(`SetEntityHealth(PlayerPedId(), 150)
+    SetPedArmour(PlayerPedId(), 25)
+    local vehicle = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, true, false)
+    SetEntityHealth(vehicle, 900)
+    Wait(0)
+    TriggerServerEvent('vehicle', NetworkGetNetworkIdFromEntity(vehicle))`),
+    )
+    expect([...step(test), ...step(test), ...step(test)]).toEqual([
+      'server [script:srv] 150\t200\t25',
+      // Vehicles sync no most health, and have no armour.
+      'server [script:srv] 900\t0\t0',
+    ])
+  })
+
   it('are removed on servers as their clients delete them, and their object ids are free once servers took it', async () => {
     const test = await session(
       `AddEventHandler('entityRemoved', function(entity) print('removed', entity, NetworkGetNetworkIdFromEntity(entity)) end)

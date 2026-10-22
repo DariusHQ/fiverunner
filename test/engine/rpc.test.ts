@@ -163,16 +163,35 @@ RegisterCommand('turned', function() print('turned', GetEntityHeading(NetworkGet
     ])
   })
 
-  it('say once on clients that they do not implement a native, for the resource that ran it', async () => {
+  it('arm the peds of players, whose clients sync their armour back', async () => {
     const test = await session(
-      `RegisterCommand('armour', function() SetPedArmour(GetPlayerPed(1), 50) end, false)`,
+      `RegisterCommand('armour', function() SetPedArmour(GetPlayerPed(1), 50) end, false)
+RegisterCommand('armoured', function() print('armoured', GetPedArmour(GetPlayerPed(1))) end, false)`,
+      `RegisterCommand('mine', function() print('mine', GetPedArmour(PlayerPedId())) end, false)`,
     )
     command(test, 'armour')
-    command(test, 'armour')
+    command(test, 'armoured')
+    const before = step(test)
+    const mine = ask(test, 'mine')
+    step(test)
+    command(test, 'armoured')
+    expect([...before, ...mine, ...step(test)]).toEqual([
+      'server [script:srv] armoured\t0',
+      '[script:run0] mine\t50',
+      'server [script:srv] armoured\t50',
+    ])
+  })
+
+  it('say once on clients that they do not implement a native, for the resource that ran it', async () => {
+    const test = await session(
+      `RegisterCommand('ragdoll', function() SetPedCanRagdoll(GetPlayerPed(1), false) end, false)`,
+    )
+    command(test, 'ragdoll')
+    command(test, 'ragdoll')
     step(test)
     expect([test.client.diagnostics, test.server.diagnostics]).toEqual([
       [
-        'srv: SetPedArmour is not implemented in FiveRunner yet: it does nothing and returns zero values.',
+        'srv: SetPedCanRagdoll is not implemented in FiveRunner yet: it does nothing and returns zero values.',
       ],
       [],
     ])
@@ -422,16 +441,16 @@ RegisterCommand('give', function() GiveWeaponToPed(GetPlayerPed(1), GetHashKey('
 
   it('run them for the last of their resources whose names have the hash of the name given', async () => {
     const test = await session(
-      `RegisterCommand('armour', function() SetPedArmour(GetPlayerPed(1), 50) end, false)`,
+      `RegisterCommand('ragdoll', function() SetPedCanRagdoll(GetPlayerPed(1), false) end, false)`,
     )
     test.server.add('SRV', { 'main.lua': '' }).start()
     step(test)
     step(test)
-    command(test, 'armour')
+    command(test, 'ragdoll')
     step(test)
     // SRV came after srv, and runs what srv asked for.
     expect(test.client.diagnostics).toEqual([
-      'SRV: SetPedArmour is not implemented in FiveRunner yet: it does nothing and returns zero values.',
+      'SRV: SetPedCanRagdoll is not implemented in FiveRunner yet: it does nothing and returns zero values.',
     ])
   })
 

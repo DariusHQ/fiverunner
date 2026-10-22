@@ -71,8 +71,9 @@ export type Orientation =
 
 /**
  * What the sync tree of an entity holds, as FiveM's server reads it:
- * where it is, how it turns, its model, its population, and the hash of the
- * resource whose script created it, which is 0 for none.
+ * where it is, how it turns, its model, its population, the hash of the
+ * resource whose script created it, which is 0 for none, and the health
+ * that clients synced, which the trees of server setters have none of yet.
  */
 export interface SyncState {
   position: SectorPosition
@@ -80,6 +81,12 @@ export interface SyncState {
   model: number
   popType: number
   scriptHash: number
+  /** The health of a ped or of a vehicle. */
+  health?: number
+  /** The most health a ped can have. */
+  maxHealth?: number
+  /** The armour of a ped. */
+  armour?: number
 }
 
 /** A client of a server, as its game state knows it. */

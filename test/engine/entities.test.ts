@@ -200,6 +200,18 @@ print(pcall(DeleteEntity, 131073))`),
     ])
   })
 
+  it('have no health until their owners sync it, as their trees have none', async () => {
+    const { run } = await serverOf()
+    expect(
+      run(`local v = CreateVehicleServerSetter('adder', 'automobile', 0.0, 0.0, 0.0, 0.0)
+local p = CreatePed(4, 'mp_m_freemode_01', 0.0, 0.0, 0.0, 0.0, true, false)
+local o = CreateObjectNoOffset('prop_atm_01', 0.0, 0.0, 0.0, true, false, false)
+print(GetEntityHealth(v), GetEntityMaxHealth(v), GetPedArmour(v))
+print(GetEntityHealth(p), GetEntityMaxHealth(p), GetPedArmour(p))
+print(GetEntityHealth(o), GetEntityMaxHealth(o), GetPedArmour(o), GetEntityHealth(0))`),
+    ).toEqual(['0\t0\t0', '0\t0\t0', '0\t0\t0\t0'].map((line) => `[script:run0] ${line}`))
+  })
+
   it('are created with serverEntityCreated, which is queued', async () => {
     const { run, tick } = await serverOf()
     expect(
@@ -384,6 +396,23 @@ print(IsEntityPositionFrozen(ped), IsEntityVisible(ped), GetEntityCoords(ped))`)
     ).toEqual(['1\tfalse', 'false\t1\tvec3(1.000000, 2.000000, 3.000000)'])
   })
 
+  it('have health, peds 200 as the players of GTA V have, and armour, which scripts set', async () => {
+    const { run, client } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+print(GetEntityHealth(ped), GetEntityMaxHealth(ped), GetPedMaxHealth(ped), GetPedArmour(ped))
+SetEntityHealth(ped, 150)
+SetEntityMaxHealth(ped, 300)
+SetPedArmour(ped, 50)
+print(GetEntityHealth(ped), GetEntityMaxHealth(ped), GetPedMaxHealth(ped), GetPedArmour(ped))
+SetPedMaxHealth(ped, 250)
+print(GetEntityMaxHealth(ped), GetEntityHealth(2), GetEntityMaxHealth(2), GetPedArmour(2))
+SetEntityHealth(2, 1)
+SetPedArmour(2, 1)`),
+    ).toEqual(['200\t200\t200\t0', '150\t300\t300\t50', '250\t0\t0\t0'])
+    expect(client.diagnostics).toEqual([])
+  })
+
   it('give natives their defaults for handles of no entity, as GTA V does', async () => {
     const { run, client } = await clientOf()
     expect(
@@ -506,6 +535,19 @@ end)`)
       '513\t3\tvec3(4.000000, 5.000000, 6.000000)\t0.0\t128',
       '769\t3\tvec3(7.000000, 8.000000, 9.000000)\t-1',
     ])
+  })
+
+  it('have 1000 health but for peds, and no armour as natives of peds find no ped of them', async () => {
+    const { lines } = await onClient(
+      withAdder(`local vehicle = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    local ped = CreatePed(4, adder, 0.0, 0.0, 0.0, 0.0, false, false)
+    local object = CreateObject(adder, 0.0, 0.0, 0.0, false, false, false)
+    SetPedArmour(vehicle, 50)
+    SetPedMaxHealth(vehicle, 50)
+    print(GetEntityHealth(vehicle), GetEntityMaxHealth(vehicle), GetPedMaxHealth(vehicle), GetPedArmour(vehicle))
+    print(GetEntityHealth(ped), GetEntityMaxHealth(ped), GetEntityHealth(object), GetEntityMaxHealth(object))`),
+    )
+    expect(lines).toEqual(['1000\t1000\t0\t0', '200\t200\t1000\t1000'])
   })
 
   it('have no network objects out of network games', async () => {

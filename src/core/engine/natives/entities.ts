@@ -62,6 +62,14 @@ function entityOf(ctx: NativeContext, handle: number): SyncEntity | undefined {
   return entity
 }
 
+/** The sync tree of the ped that a handle names, if it names a ped, as natives of FiveM's server that read the health of peds find it. */
+function pedStateOf(ctx: NativeContext, handle: number): SyncState | undefined {
+  const found = entityOf(ctx, handle)
+  return found !== undefined && entityTypeOf(found.type) === EntityType.ped
+    ? found.state
+    : undefined
+}
+
 /** The rotation of an entity in degrees, as FiveM's server gives it: peds turn about z alone. */
 function rotationOf(entity: SyncEntity): Vector3Like {
   const { orientation } = entity.state
@@ -173,6 +181,37 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
         return found !== undefined && entityTypeOf(found.type) === type
       },
     )
+  /**
+   * A native that gives a number of the health of entities, and one that sets
+   * it: of peds alone for natives of peds, which GTA V finds no ped for the
+   * handles of other entities with.
+   */
+  const healthNatives = (
+    key: 'health' | 'maxHealth' | 'armour',
+    of: 'Entity entity' | 'Ped ped',
+    [getter, getterHash]: readonly [string, bigint],
+    [setter, setterHash]: readonly [string, bigint],
+  ) => {
+    const find = (ctx: NativeContext, handle: number) => {
+      const found = clientEntityOf(ctx, handle)
+      return of === 'Ped ped' && found !== undefined && entityTypeOf(found.type) !== EntityType.ped
+        ? undefined
+        : found
+    }
+    return [
+      defineNative(
+        { name: getter, hash: getterHash, result: 'int', params: [of] },
+        (ctx: NativeContext, handle) => find(ctx, handle)?.[key] ?? 0,
+      ),
+      defineNative(
+        { name: setter, hash: setterHash, result: 'void', params: [of, 'int value'] },
+        (ctx: NativeContext, handle, value) => {
+          const found = find(ctx, handle)
+          if (found !== undefined) found[key] = value
+        },
+      ),
+    ]
+  }
   /** Puts an entity at a position, as SET_ENTITY_COORDS does without the size of its model, which FiveRunner does not know. */
   const moveTo = (ctx: NativeContext, entity: number, x: number, y: number, z: number) => {
     clientEntityOf(ctx, entity)?.moveTo(x, y, z)
@@ -313,6 +352,30 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
     isOfType('IS_ENTITY_A_PED', 0x524ac5ecea15343en, EntityType.ped),
     isOfType('IS_ENTITY_A_VEHICLE', 0x6ac7003fa6e5575en, EntityType.vehicle),
     isOfType('IS_ENTITY_AN_OBJECT', 0x8d68c8fd0faca94en, EntityType.object),
+    ...healthNatives(
+      'health',
+      'Entity entity',
+      ['GET_ENTITY_HEALTH', 0xeef059fad016d209n],
+      ['SET_ENTITY_HEALTH', 0x6b76dc1f3ae6e6a3n],
+    ),
+    ...healthNatives(
+      'maxHealth',
+      'Entity entity',
+      ['GET_ENTITY_MAX_HEALTH', 0x15d757606d170c3cn],
+      ['SET_ENTITY_MAX_HEALTH', 0x166e7cf68597d8b5n],
+    ),
+    ...healthNatives(
+      'maxHealth',
+      'Ped ped',
+      ['GET_PED_MAX_HEALTH', 0x4700a416e8324ef3n],
+      ['SET_PED_MAX_HEALTH', 0xf5f6378c4f3419d3n],
+    ),
+    ...healthNatives(
+      'armour',
+      'Ped ped',
+      ['GET_PED_ARMOUR', 0x9483af821605b1d8n],
+      ['SET_PED_ARMOUR', 0xcea04d83135264ccn],
+    ),
     defineNative(
       {
         name: 'FREEZE_ENTITY_POSITION',
@@ -978,6 +1041,26 @@ function serverEntityNatives(): NativeDefinition<NativeContext>[] {
     defineNative(
       { name: 'GET_NET_TYPE_FROM_ENTITY', result: 'int', params: ['Entity entity'] },
       (ctx: NativeContext, entity) => entityOf(ctx, entity)?.type ?? -1,
+    ),
+    // FiveM's server reads the health of peds and vehicles from their trees, which have none until their owners sync them.
+    defineNative(
+      { name: 'GET_ENTITY_HEALTH', result: 'int', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => {
+        const found = entityOf(ctx, entity)
+        if (found === undefined) return 0
+        const type = entityTypeOf(found.type)
+        return type === EntityType.ped || type === EntityType.vehicle
+          ? (found.state.health ?? 0)
+          : 0
+      },
+    ),
+    defineNative(
+      { name: 'GET_ENTITY_MAX_HEALTH', result: 'int', params: ['Entity entity'] },
+      (ctx: NativeContext, entity) => pedStateOf(ctx, entity)?.maxHealth ?? 0,
+    ),
+    defineNative(
+      { name: 'GET_PED_ARMOUR', result: 'int', params: ['Ped ped'] },
+      (ctx: NativeContext, ped) => pedStateOf(ctx, ped)?.armour ?? 0,
     ),
     defineNative(
       { name: 'GET_GAME_POOL', result: 'object', params: ['char* poolName'] },

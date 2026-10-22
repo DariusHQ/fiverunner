@@ -9,14 +9,16 @@ import { headingOf, toQuaternion } from './rotation.ts'
  * FiveM's server reads it: its position in steps of its sector, peds
  * turned by their headings in 8 bits and other entities by quaternions
  * in 11, the population of missions for the entities that scripts
- * created, and the hash of the name of the resource whose script owns it.
+ * created, the hash of the name of the resource whose script owns it, and
+ * the health of peds and vehicles, with the armour of peds.
  */
 export function syncStateOf(entity: ClientEntity): SyncState {
   const heading = headingOf(entity.rotation)
+  const type = entityTypeOf(entity.type)
   return {
     position: syncSector(entity.x, entity.y, entity.z),
     orientation:
-      entityTypeOf(entity.type) === EntityType.ped
+      type === EntityType.ped
         ? {
             kind: 'heading',
             // GTA V keeps the headings of peds in radians from -pi to pi.
@@ -28,6 +30,11 @@ export function syncStateOf(entity: ClientEntity): SyncState {
     model: entity.model,
     popType: entity.type === NetObjType.player ? PopType.unknown : PopType.mission,
     scriptHash: entity.script === undefined ? 0 : hashString(entity.script),
+    ...(type === EntityType.ped
+      ? { health: entity.health, maxHealth: entity.maxHealth, armour: entity.armour }
+      : type === EntityType.vehicle
+        ? { health: entity.health }
+        : {}),
   }
 }
 
