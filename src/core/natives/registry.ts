@@ -106,6 +106,8 @@ export interface RegisteredNative<Ctx> extends PreparedNative<Ctx> {
 export class NativeRegistry<Ctx extends NativeCaller> {
   readonly #byHash = new Map<bigint, RegisteredNative<Ctx>>()
   readonly #byName = new Map<string, RegisteredNative<Ctx>>()
+  /** What runs in place of natives, as tests mock them, by their hashes. */
+  readonly #mocks = new Map<bigint, (ctx: Ctx, ...args: unknown[]) => unknown>()
 
   /**
    * Adds natives. One with the hash or the Lua name of a native already here
@@ -159,8 +161,26 @@ export class NativeRegistry<Ctx extends NativeCaller> {
     return this.#byHash.size
   }
 
+  /**
+   * Has `impl` run in place of the native that a Lua global stands for,
+   * with the arguments and the result of the native's types, and gives the
+   * native, if there is one.
+   */
+  mock(
+    name: string,
+    impl: (ctx: Ctx, ...args: unknown[]) => unknown,
+  ): RegisteredNative<Ctx> | undefined {
+    const native = this.#byName.get(name)
+    if (native !== undefined) this.#mocks.set(native.hash, impl)
+    return native
+  }
+
   /** Runs a call cfxlua.wasm marshalled; see invokeNative. */
   invoke(ctx: Ctx, ptr: number): LuaValue[] {
-    return invokeNative(ctx, ptr, (hash) => this.#byHash.get(hash))
+    return invokeNative(ctx, ptr, (hash) => {
+      const native = this.#byHash.get(hash)
+      const mock = this.#mocks.get(hash)
+      return mock === undefined || native === undefined ? native : { ...native, impl: mock }
+    })
   }
 }

@@ -578,6 +578,26 @@ function Player:disconnect(reason)
     end
 end
 
+-- Has `fn` run in place of the native that the Lua global `name` stands
+-- for, on the server or on the client of a player, for the rest of the
+-- test, with the arguments of the native, for the first of its results to
+-- be what the native returns.
+local function mock(id, name, fn)
+    checkArgument('mock', 1, name, 'string')
+    checkArgument('mock', 2, fn, 'function')
+    if not ask('mock', { id = id, name = name, fn = fn }) then
+        raise(string_format('there is no native %s to mock', show(name)))
+    end
+end
+
+function fiverunner.mock(name, fn)
+    mock(nil, name, fn)
+end
+
+function Player:mock(name, fn)
+    mock(self.id, name, fn)
+end
+
 -- What the server printed on its console, line by line.
 function fiverunner.output()
     return ask('output')

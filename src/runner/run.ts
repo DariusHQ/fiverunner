@@ -8,6 +8,7 @@ import {
   type Player,
   type PlayerIdentity,
   type ProcessOutput,
+  type ResourceManager,
 } from '../core/engine/index.ts'
 import {
   pack,
@@ -17,7 +18,8 @@ import {
   type PackedValue,
 } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
-import { defineNative } from '../core/natives/index.ts'
+import { defineNative, type ResultType } from '../core/natives/index.ts'
+import { typeInfo } from '../core/natives/types.ts'
 import { UTC } from '../core/scripting/time.ts'
 import client from './lua/client.lua?raw'
 import harness from './lua/harness.lua?raw'
@@ -210,6 +212,7 @@ function sameNames(a: readonly string[], b: readonly string[]): boolean {
 interface Connection {
   readonly process: string
   player: Player | undefined
+  client: ResourceManager | undefined
 }
 
 /** An event that the client of a player got from the network. */
@@ -277,7 +280,8 @@ class World<T> {
       (ctx: NativeContext, method, args) => {
         if (ctx.resource.name !== TEST_RESOURCE) throw new Error('Only the tests may call this')
         // Scripts run once the world is there.
-        return world!.#answer(method, args === null ? undefined : plain(unpackObject(args)))
+        const object = args === null ? undefined : unpackObject(args)
+        return world!.#answer(method, object === undefined ? undefined : plain(object), object)
       },
     )
     const sqlite = options.sqlite === undefined ? undefined : sqliteDatabase(options.sqlite)
@@ -353,9 +357,25 @@ class World<T> {
     return this.#report
   }
 
-  /** Answers what the harness asks with `method`, and the arguments it gave, as msgpack. */
-  #answer(method: string | null, args: unknown): Uint8Array {
+  /** Answers what the harness asks with `method`, and the arguments it gave, as JavaScript has them and as msgpack. */
+  #answer(method: string | null, args: unknown, object?: MsgpackObject): Uint8Array {
     switch (method) {
+      case 'mock': {
+        const { name, id } = fields(args)
+        const fn =
+          object?.type === 'map' ? object.entries.find(([key]) => plain(key) === 'fn') : undefined
+        const reference = fn?.[1]
+        if (reference?.type !== 'ext') throw new Error('Mocks need a function')
+        const ref = decoder.decode(reference.extension.data)
+        const { server } = this.engine
+        const manager = id === undefined ? server : this.#connectionOf(count(id)).client!
+        const native = manager.natives.mock(text(name), (_, ...values) => {
+          const results = server.invokeFunctionReference(ref, pack(values as PackedValue[]))
+          if (results == null) throw new Error(`the mock of ${text(name)} failed`)
+          return resultOf(native!.sets ?? native!.result, unpackObject(results))
+        })
+        return pack(native !== undefined)
+      }
       case 'target':
         return pack(this.#target)
       case 'report':
@@ -402,12 +422,14 @@ class World<T> {
     const connection: Connection = {
       process: `client ${this.#connections.length + 1}`,
       player: undefined,
+      client: undefined,
     }
     this.#connections.push(connection)
     this.#actions.push(async () => {
       const watchdog = this.#options.watchdog ?? WATCHDOG
       const { client, player } = await this.engine.connect(identity, { watchdog })
       connection.player = player
+      connection.client = client
       client.events.onTrigger.connect((name, payload, source) => {
         // The events of the resource that runs the tests are its own.
         if (source.startsWith('net:') && !name.startsWith(`${TEST_RESOURCE}:`)) {
@@ -484,6 +506,30 @@ function plain(object: MsgpackObject): unknown {
     case 'map':
       return Object.fromEntries(object.entries.map(([key, value]) => [plain(key), plain(value)]))
   }
+}
+
+/**
+ * What the first of the results of a mock gives a native that returns
+ * `type`, as its implementation would return it: numbers, booleans,
+ * strings, vectors as their x, y and z, and objects as msgpack.
+ */
+function resultOf(type: ResultType, results: MsgpackObject): unknown {
+  const first = results.type === 'array' ? results.items[0] : undefined
+  if (first === undefined || first.type === 'nil') return undefined
+  if (type === 'void') return undefined
+  if (type === 'object') return packObject(first)
+  const kind = type === 'Any*' ? 'long' : typeInfo(type).kind
+  if (kind === 'vector3') {
+    // Lua packs vectors as extensions 20 to 22, of floats of 32 bits, little-endian.
+    if (first.type !== 'ext' || first.extension.type !== 21) return undefined
+    const { data } = first.extension
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+    return { x: view.getFloat32(0, true), y: view.getFloat32(4, true), z: view.getFloat32(8, true) }
+  }
+  const value = plain(first)
+  if (kind === 'bool') return value !== false && value !== 0
+  if (kind === 'string') return typeof value === 'string' ? value : null
+  return typeof value === 'number' ? value : typeof value === 'boolean' ? Number(value) : 0
 }
 
 function loadedOf(value: unknown): Loaded {

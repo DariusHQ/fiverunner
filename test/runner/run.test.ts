@@ -438,6 +438,35 @@ end`,
     ])
   })
 
+  it('mocks natives on the server and on the clients of players, with the types of their results', async () => {
+    const files = resource(
+      'garage',
+      `exports('where', function(entity) return GetEntityCoords(entity) end)
+exports('plate', function(vehicle) return GetVehicleNumberPlateText(vehicle) end)
+exports('ping', function(player) return GetPlayerPing(player) end)`,
+    )
+    const result = await run(
+      `it('mocks', function()
+    fiverunner.mock('GetEntityCoords', function(entity) return vector3(entity, 2.5, -3) end)
+    fiverunner.mock('GetVehicleNumberPlateText', function(vehicle) return 'PLATE' .. vehicle end)
+    fiverunner.mock('GetPlayerPing', function() return 120 end)
+    local where = exports.garage:where(7)
+    expect({ where.x, where.y, where.z }).toEqual({ 7, 2.5, -3 })
+    expect(exports.garage:plate(4)).toBe('PLATE4')
+    local ann = fiverunner.connect({ name = 'Ann' })
+    expect(exports.garage:ping(ann.id)).toBe(120)
+    ann:mock('IsControlPressed', function(pad, control) return control == 38 end)
+    local pressed, other = ann:run('return IsControlPressed(0, 38), IsControlPressed(0, 1)')
+    expect({ pressed, other }).toEqual({ 1, false })
+    local ok, message = pcall(fiverunner.mock, 'NoSuchNative', function() end)
+    expect(message).toContain('there is no native')
+end)`,
+      files,
+      ['ensure garage'],
+    )
+    expect(outcomes(result)).toEqual([['mocks', 'passed']])
+  })
+
   it('starts the wall clocks of the servers of tests at the same time, in UTC', async () => {
     const seconds = EPOCH / 1000
     const result = await run(`it('reads the time', function()

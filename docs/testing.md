@@ -118,6 +118,15 @@ local x, y = ann:run('local a, b = ... return a + b, GetCurrentResourceName()', 
 fiverunner.waitFor(function() return #ann:received('bank:balance') > 0 end)
 ```
 
+## Mocks
+
+`fiverunner.mock(name, fn)` has `fn` run in place of the native that the Lua global `name` stands for, on the server, for every resource, for the rest of the test, and `player:mock(name, fn)` on the client of a player. `fn` gets the arguments of the native, and the first of its results is what the native returns, as the type of its result has it: a number, a boolean, a string, a vector3, or anything that msgpack packs for natives that return objects. Natives that FiveRunner does not implement can be mocked too, which gives them what the game would.
+
+```lua
+fiverunner.mock('GetEntityCoords', function(entity) return vector3(100.0, 200.0, 30.0) end)
+ann:mock('IsControlPressed', function(pad, control) return control == 38 end)
+```
+
 ## Time
 
 The clock of the server of a test moves only as FiveRunner moves it, frame by frame, as fast as it can: `Wait(60000)` takes no time. Timeouts are by that clock. `GetGameTimer` starts at 0, and the wall clock of each server starts at 2026-01-01 00:00:00 UTC, in UTC, so `os.time` and `os.date` give the same results on every run.
