@@ -350,8 +350,9 @@ end)
     })
     proc.add('schema', {
       'fxmanifest.lua': "fx_version 'cerulean'\ngame 'common'\n",
-      'sql/install.sql':
-        "CREATE TABLE items (name VARCHAR(10));\nINSERT INTO items VALUES ('water');\nNOPE;",
+      // The statements that need the tables of a file that comes after run again once it ran.
+      'sql/install.sql': "INSERT INTO items VALUES ('water');\n\nNOPE;",
+      'sql/tables.sql': 'CREATE TABLE items (name VARCHAR(10));',
     })
     proc.manager.getResource('oxmysql')!.start()
     proc
@@ -366,8 +367,8 @@ end)
     expect(await proc.run('done')).toEqual([CONNECTED, '[script:app] water', '[script:app] done'])
     expect(proc.diagnostics).toEqual([
       "oxmysql: FiveRunner runs only Lua scripts, so it skips dist/build.js, and runs its own emulation of oxmysql in its place, which gives oxmysql's exports.",
-      "oxmysql: FiveRunner's database failed to run a statement of resources/schema/sql/install.sql: resources/schema/sql/install.sql:3: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'NOPE' at line 1 (NOPE)",
-      "oxmysql: FiveRunner's database starts empty, with the tables of the .sql files of the resources, which it ran: resources/schema/sql/install.sql.",
+      "oxmysql: FiveRunner's database failed to run a statement: resources/schema/sql/install.sql:3: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'NOPE' at line 1 (NOPE)",
+      "oxmysql: FiveRunner's database starts empty, with the tables of the .sql files of the resources, which it ran: resources/schema/sql/install.sql, resources/schema/sql/tables.sql.",
     ])
   })
 })

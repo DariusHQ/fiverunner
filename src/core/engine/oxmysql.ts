@@ -516,12 +516,8 @@ export class OxMysql {
         const seed = client.seed?.bind(client)
         if (seed !== undefined) {
           const seeds = this.#host.seeds()
-          for (const { path, sql } of seeds) {
-            for (const error of seed(path, sql)) {
-              this.#host.diagnose(
-                `FiveRunner's database failed to run a statement of ${path}: ${error}`,
-              )
-            }
+          for (const error of seed(seeds)) {
+            this.#host.diagnose(`FiveRunner's database failed to run a statement: ${error}`)
           }
           if (seeds.length > 0) {
             this.#host.diagnose(

@@ -1,7 +1,7 @@
 import type { TimeZone } from '../scripting/time.ts'
 import { MariaDb, type Connection, type Result } from './database.ts'
 import { SqlError } from './lexer.ts'
-import { parseScript } from './parser.ts'
+import { parseScript, type ScriptStatement } from './parser.ts'
 import type { SqlValue } from './sqlite.ts'
 import { format } from './sqlstring.ts'
 import { readValue, type JsValue, type ReadMode } from './values.ts'
@@ -89,8 +89,8 @@ export interface DatabaseClient {
   readonly version: string
   /** A connection of the pool, which keeps the session it had when it was given back. */
   connection(): DatabaseConnection | Promise<DatabaseConnection>
-  /** Runs the statements of a .sql file, as importing it does, and gives the errors of those that failed. */
-  seed?(path: string, sql: string): string[]
+  /** Runs the statements of .sql files, as importing them does, and gives the errors of those that failed. */
+  seed?(files: readonly { readonly path: string; readonly sql: string }[]): string[]
 }
 
 /** The JS value of a result, as mysql2 reads it, with oxmysql's typeCast for `mode`. */
@@ -227,25 +227,46 @@ export class SqliteClient implements DatabaseClient {
     if (!this.#idle.includes(connection)) this.#idle.push(connection)
   }
 
-  seed(path: string, sql: string): string[] {
-    let script: ReturnType<typeof parseScript>
-    try {
-      script = parseScript(sql)
-    } catch (error) {
-      if (!(error instanceof SqlError)) throw error
-      return [`${path}: ${error.message}`]
-    }
-    const connection = this.#database.connect()
+  /**
+   * Runs the statements of .sql files, in their order, then again those
+   * that failed, while more of them succeed, as those of a file may need the
+   * tables of one that came after it. Gives the errors of those that still
+   * fail.
+   */
+  seed(files: readonly { readonly path: string; readonly sql: string }[]): string[] {
     const errors: string[] = []
-    for (const entry of script) {
+    let pending: { path: string; sql: string; entry: ScriptStatement; error?: SqlError }[] = []
+    for (const { path, sql } of files) {
       try {
-        if ('error' in entry) throw entry.error
-        connection.runStatement(entry.statement, sql)
+        for (const entry of parseScript(sql)) pending.push({ path, sql, entry })
       } catch (error) {
         if (!(error instanceof SqlError)) throw error
-        const line = sql.slice(0, entry.start).split('\n').length
-        errors.push(`${path}:${line}: ${error.message} (${[...entry.text].slice(0, 80).join('')})`)
+        errors.push(`${path}: ${error.message}`)
       }
+    }
+    const connection = this.#database.connect()
+    for (;;) {
+      const failed = pending.filter((statement) => {
+        try {
+          if ('error' in statement.entry) throw statement.entry.error
+          connection.runStatement(statement.entry.statement, statement.sql)
+          return false
+        } catch (error) {
+          if (!(error instanceof SqlError)) throw error
+          statement.error = error
+          return true
+        }
+      })
+      if (failed.length === 0 || failed.length === pending.length) {
+        for (const { path, sql, entry, error } of failed) {
+          const line = sql.slice(0, entry.start).split('\n').length
+          errors.push(
+            `${path}:${line}: ${error!.message} (${[...entry.text].slice(0, 80).join('')})`,
+          )
+        }
+        break
+      }
+      pending = failed
     }
     connection.close()
     return errors
