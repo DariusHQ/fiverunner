@@ -265,6 +265,33 @@ end)
     ])
   })
 
+  it('runs the queries that callbacks start in the same tick, as if each took a millisecond', async () => {
+    const proc = await server()
+    proc
+      .add(
+        'app',
+        app(`
+MySQL.ready(function()
+  Wait(0)
+  for _, count in ipairs({ 10, 100 }) do
+    local start = GetGameTimer()
+    for i = 1, count do MySQL.scalar.await('SELECT ?', { i }) end
+    print(count, GetGameTimer() - start)
+    Wait(0)
+  end
+  print('done')
+end)
+`),
+      )
+      .start()
+    expect(await proc.run('done')).toEqual([
+      CONNECTED,
+      '[script:app] 10\t50',
+      '[script:app] 100\t100',
+      '[script:app] done',
+    ])
+  })
+
   it('runs transactions, which give false and print the error of the query that failed', async () => {
     const proc = await server()
     proc

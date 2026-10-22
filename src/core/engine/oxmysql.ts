@@ -389,6 +389,14 @@ const LOCK_WAIT_TIMEOUT = 50_000
 /** How long oxmysql waits before it tries to connect again, in milliseconds. */
 const RECONNECT_DELAY = 30_000
 
+/**
+ * How many round trips to the database a tick of the server makes room
+ * for, as if each took a millisecond of its 50: the operations that the
+ * callbacks of others start run in the same tick, as those of oxmysql
+ * would, up to that many one after another.
+ */
+const ROUND_TRIPS = 50
+
 /** The steps of an operation: a generator whose yields await what they yield, as the awaits of async functions do. */
 type Steps = Generator<unknown, void, unknown>
 
@@ -554,18 +562,24 @@ export class OxMysql {
   /**
    * Runs the operations that the exports started since the last tick, in
    * the order they came, then those that wait for connections once they
-   * are free, and fails those that waited too long for a lock. It connects
-   * again once it is time to.
+   * are free, and fails those that waited too long for a lock, round after
+   * round while callbacks start more. It connects again once it is time to.
    */
   tick(): void {
-    if (this.#retryAt !== undefined && this.#host.now() >= this.#retryAt) {
+    const now = this.#host.now()
+    if (this.#retryAt !== undefined && now >= this.#retryAt) {
       this.#retryAt = undefined
       this.connect()
     }
-    for (const run of this.#queued.splice(0)) run()
-    const client = this.#client
-    if (client === undefined) return
-    const now = this.#host.now()
+    for (let round = 0; round < ROUND_TRIPS; round++) {
+      for (const run of this.#queued.splice(0)) run()
+      if (this.#client !== undefined) this.#runWaiting(this.#client, now)
+      if (this.#queued.length === 0) return
+    }
+  }
+
+  /** Runs the operations that wait for connections once they are free, and fails those that waited too long for a lock. */
+  #runWaiting(client: DatabaseClient, now: number): void {
     for (const waiting of [...this.#waiting]) {
       const index = this.#waiting.indexOf(waiting)
       if (index === -1) continue

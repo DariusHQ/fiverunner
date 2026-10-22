@@ -9,8 +9,11 @@ local CHARINFO = {
     nationality = 'Romania',
 }
 
---- Connects a player with a license, and logs it in with a new character.
+--- Connects a player with a license once the server started, as players join started servers, and logs it in with a new character.
 local function login(name)
+    while GetGameTimer() < 1000 do Wait(100) end
+    -- The table of the skins of the appearance resource, which the suite does not run, but whose skins characters preview.
+    exports.oxmysql:query_async('CREATE TABLE IF NOT EXISTS playerskins (id INT AUTO_INCREMENT PRIMARY KEY, citizenid VARCHAR(50) NOT NULL, model VARCHAR(255) NOT NULL, skin TEXT NOT NULL, active TINYINT NOT NULL DEFAULT 1)')
     local player = fiverunner.connect({ name = name, identifiers = { 'license:' .. name } })
     expect(exports.qbx_core:Login(player.id, nil, { charinfo = CHARINFO })).toBe(true)
     -- ox_inventory loads the inventory of the character as it logs in.
