@@ -49,6 +49,9 @@ export function scriptingNatives(side: Side): NativeDefinition<NativeContext>[] 
       { name: 'IS_DUPLICITY_VERSION', result: 'BOOL', params: [] },
       (ctx: NativeContext) => ctx.manager.side === 'server',
     ),
+    defineNative({ name: 'GET_GAME_NAME', result: 'char*', params: [] }, (ctx: NativeContext) =>
+      ctx.manager.side === 'server' ? 'fxserver' : 'fivem',
+    ),
     defineNative(
       { name: 'FORMAT_STACK_TRACE', result: 'char*', params: ['object traceData'] },
       (ctx: NativeContext, traceData) => ctx.manager.formatStackTrace(traceData),

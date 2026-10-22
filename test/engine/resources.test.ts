@@ -629,11 +629,11 @@ CreateThread(function() print(GetCurrentResourceName(), GetInvokingResource()) e
   it('tell the server from clients', async () => {
     // Like other BOOL natives, IsDuplicityVersion returns 1 or false to Lua.
     for (const [side, duplicity] of [
-      ['server', '1'],
-      ['client', 'false'],
+      ['server', '1	fxserver'],
+      ['client', 'false	fivem'],
     ] as const) {
       const proc = await createProcess({ side })
-      proc.add('a', { 'main.lua': `print(IsDuplicityVersion())` }).start()
+      proc.add('a', { 'main.lua': `print(IsDuplicityVersion(), GetGameName())` }).start()
       expect(proc.take()[1]).toBe(`[script:a] ${duplicity}`)
     }
   })
