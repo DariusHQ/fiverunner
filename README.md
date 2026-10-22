@@ -36,6 +36,10 @@ npx fiverunner dev
 
 The dev UI has the console of your server, where you run commands, its resources, which you start, stop and restart, the events that the server and the players send each other, which you trigger too, and its state bags. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI runs your project anew, with the players it had. [docs/dev.md](docs/dev.md) tells all that it does.
 
+## Frameworks
+
+QBox runs on FiveRunner: CI runs qbx_core, ox_lib, ox_inventory and qbx_vehicles, as they are released, on every change, with players who log in, earn money, carry items and get jobs. [docs/compatibility.md](docs/compatibility.md) lists what passes.
+
 ## Planned
 
 - A playground in the browser, which runs resources without installing anything.
