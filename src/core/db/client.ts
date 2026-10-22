@@ -1,5 +1,5 @@
 import type { TimeZone } from '../scripting/time.ts'
-import { locksNothing, MariaDb, type Connection, type Result } from './database.ts'
+import { MariaDb, locksNothing, type Connection, type Result } from './database.ts'
 import { SqlError } from './lexer.ts'
 import { parseScript, type ScriptStatement } from './parser.ts'
 import type { SqlValue } from './sqlite.ts'
@@ -72,11 +72,10 @@ export type QueryResult = JsValue
 
 /** A connection of a database, as mysql2's connections of a pool are. */
 export interface DatabaseConnection {
-  readonly threadId: number
   /** Runs a statement as mysql2's query does: with its values written into its SQL. */
-  query(sql: string, values?: unknown): QueryResult | Promise<QueryResult>
+  query(sql: string, values?: unknown): QueryResult
   /** Runs a statement as mysql2's execute does, with its values bound, as oxmysql's typeCastExecute reads them. */
-  execute(sql: string, values?: readonly unknown[]): QueryResult | Promise<QueryResult>
+  execute(sql: string, values?: readonly unknown[]): QueryResult
   /** Whether a statement of `sql`, or one that writes, would wait for the transaction of another connection to end: all but those that lock nothing do. */
   blocked(sql?: string): boolean
   /** Gives the connection back to the pool, rolling back the transaction it has open. */
@@ -88,9 +87,9 @@ export interface DatabaseClient {
   /** What VERSION() gives, as oxmysql shows it as it connects. */
   readonly version: string
   /** A connection of the pool, which keeps the session it had when it was given back. */
-  connection(): DatabaseConnection | Promise<DatabaseConnection>
+  connection(): DatabaseConnection
   /** Runs the statements of .sql files, as importing them does, and gives the errors of those that failed. */
-  seed?(files: readonly { readonly path: string; readonly sql: string }[]): string[]
+  seed(files: readonly { readonly path: string; readonly sql: string }[]): string[]
 }
 
 /** The JS value of a result, as mysql2 reads it, with oxmysql's typeCast for `mode`. */
@@ -157,10 +156,6 @@ class SqliteConnection implements DatabaseConnection {
     this.#connection = connection
   }
 
-  get threadId(): number {
-    return this.#connection.id
-  }
-
   query(sql: string, values?: unknown): QueryResult {
     const formatted = values === undefined ? sql : format(sql, values)
     return this.#run(formatted, () => this.#connection.query(formatted), 'query')
@@ -211,11 +206,6 @@ export class SqliteClient implements DatabaseClient {
   ): Promise<SqliteClient> {
     const database = await MariaDb.create(module, options)
     return new SqliteClient(database, options.zone)
-  }
-
-  /** The database, for those that read it outside of connections, as tests do. */
-  get database(): MariaDb {
-    return this.#database
   }
 
   connection(): DatabaseConnection {

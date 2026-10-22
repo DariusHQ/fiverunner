@@ -385,11 +385,11 @@ export interface Callback {
   readonly isPromise: boolean
 }
 
+/** No callback, as the transactions of startTransaction report their errors. */
+const NO_CALLBACK: Callback = { given: false, isPromise: false }
+
 /** innodb_lock_wait_timeout, in milliseconds. */
 const LOCK_WAIT_TIMEOUT = 50_000
-
-/** How long oxmysql waits before it tries to connect again, in milliseconds. */
-const RECONNECT_DELAY = 30_000
 
 /**
  * How many round trips to the database a tick of the server makes room
@@ -399,50 +399,11 @@ const RECONNECT_DELAY = 30_000
  */
 const ROUND_TRIPS = 50
 
-/** The steps of an operation: a generator whose yields await what they yield, as the awaits of async functions do. */
-type Steps = Generator<unknown, void, unknown>
-
-/**
- * Runs the steps of an operation as an async function runs, each yield an
- * await: at once when what it yields is no promise, as what SQLite answers
- * is, so that operations run whole and in the order they came, and once it
- * settles when it is one, as what MySQL answers is. It calls `failed` with
- * what the steps threw, and `finished` after them either way.
- */
-function drive(steps: Steps, failed: (error: unknown) => void, finished?: () => void): void {
-  const resume = (value: unknown, threw: boolean): void => {
-    for (;;) {
-      let step: IteratorResult<unknown, void>
-      try {
-        step = threw ? steps.throw(value) : steps.next(value)
-      } catch (error) {
-        failed(error)
-        finished?.()
-        return
-      }
-      if (step.done === true) {
-        finished?.()
-        return
-      }
-      if (step.value instanceof Promise) {
-        step.value.then(
-          (result: unknown) => resume(result, false),
-          (error: unknown) => resume(error, true),
-        )
-        return
-      }
-      value = step.value
-      threw = false
-    }
-  }
-  resume(undefined, false)
-}
-
 /**
  * The server's oxmysql: its connection to the database, as its pool, and
  * the operations its exports start, which run at the server's next tick,
  * as they would once mysql2 heard from the server, and complete for the
- * script of oxmysql at that tick's events.
+ * script of oxmysql as they end.
  */
 export class OxMysql {
   readonly #host: OxMysqlHost
@@ -450,7 +411,6 @@ export class OxMysql {
   #connecting = false
   /** The tokens of the connections the script of oxmysql asked for, which complete once it is connected. */
   readonly #connects: number[] = []
-  #retryAt: number | undefined
   /** What VERSION() gave, as oxmysql shows it before its messages. */
   #version = ''
   /** The operations that the exports started since the last tick, which run at the next, in the order they came. */
@@ -464,10 +424,6 @@ export class OxMysql {
 
   constructor(host: OxMysqlHost) {
     this.#host = host
-  }
-
-  get ready(): boolean {
-    return this.#client !== undefined
   }
 
   /** The prefix of oxmysql's messages, the version of the server in brackets. */
@@ -503,18 +459,17 @@ export class OxMysql {
   }
 
   /**
-   * Connects to the database, as oxmysql does once it started, and again
-   * every 30 seconds until it can, and completes once it is, at the next
-   * tick. A script of oxmysql that started again connects again, as its
-   * pool would, to the database it had.
+   * Connects to the database, as oxmysql does once it started, and
+   * completes once it is, at the next tick. A script of oxmysql that
+   * started again connects again, as its pool would, to the database it had.
    */
-  connect(token?: number): boolean {
+  connect(token: number): boolean {
     if (this.#client !== undefined) {
       this.#host.print(`${this.#prefix} ^2Database server connection established!^0`)
-      if (token !== undefined) this.#complete(token, true, true)
+      this.#complete(token, true, true)
       return false
     }
-    if (token !== undefined) this.#connects.push(token)
+    this.#connects.push(token)
     if (this.#connecting) return true
     this.#connecting = true
     const connectionString =
@@ -523,17 +478,14 @@ export class OxMysql {
       (client) => {
         this.#connecting = false
         // FiveRunner's own database starts with the tables of the .sql files of the resources.
-        const seed = client.seed?.bind(client)
-        if (seed !== undefined) {
-          const seeds = this.#host.seeds()
-          for (const error of seed(seeds)) {
-            this.#host.diagnose(`FiveRunner's database failed to run a statement: ${error}`)
-          }
-          if (seeds.length > 0) {
-            this.#host.diagnose(
-              `FiveRunner's database starts empty, with the tables of the .sql files of the resources, which it ran: ${seeds.map(({ path }) => path).join(', ')}.`,
-            )
-          }
+        const seeds = this.#host.seeds()
+        for (const error of client.seed(seeds)) {
+          this.#host.diagnose(`FiveRunner's database failed to run a statement: ${error}`)
+        }
+        if (seeds.length > 0) {
+          this.#host.diagnose(
+            `FiveRunner's database starts empty, with the tables of the .sql files of the resources, which it ran: ${seeds.map(({ path }) => path).join(', ')}.`,
+          )
         }
         this.#client = client
         this.#version = client.version
@@ -545,17 +497,9 @@ export class OxMysql {
       },
       (error: unknown) => {
         this.#connecting = false
-        const failure = error as Partial<DatabaseError>
-        const message = String(failure.message ?? error).includes('auth_gssapi_client')
-          ? 'Requested authentication using unknown plugin auth_gssapi_client.'
-          : String(failure.message ?? error)
         this.#host.print(
-          `^3Unable to establish a connection to the database (${failure.code})!\n^1Error${failure.errno === undefined ? '' : ` ${failure.errno}`}: ${message}^0`,
+          `^3Unable to establish a connection to the database!\n^1Error: ${messageOf(error)}^0`,
         )
-        this.#host.print(
-          'See https://github.com/overextended/oxmysql/issues/154 for more information.',
-        )
-        this.#retryAt = this.#host.now() + RECONNECT_DELAY
       },
     )
     return true
@@ -578,14 +522,10 @@ export class OxMysql {
    * Runs the operations that the exports started since the last tick, in
    * the order they came, then those that wait for connections once they
    * are free, and fails those that waited too long for a lock, round after
-   * round while callbacks start more. It connects again once it is time to.
+   * round while callbacks start more.
    */
   tick(): void {
     const now = this.#host.now()
-    if (this.#retryAt !== undefined && now >= this.#retryAt) {
-      this.#retryAt = undefined
-      this.connect()
-    }
     for (let round = 0; round < ROUND_TRIPS; round++) {
       for (const run of this.#queued.splice(0)) run()
       if (this.#client !== undefined) this.#runWaiting(this.#client, now)
@@ -599,11 +539,6 @@ export class OxMysql {
       const index = this.#waiting.indexOf(waiting)
       if (index === -1) continue
       const connection = client.connection()
-      if (connection instanceof Promise) {
-        this.#waiting.splice(index, 1)
-        connection.then(waiting.run, waiting.fail)
-        continue
-      }
       if (!connection.blocked(waiting.sql)) {
         this.#waiting.splice(index, 1)
         waiting.run(connection)
@@ -625,28 +560,22 @@ export class OxMysql {
     }
   }
 
-  /** Runs the steps of an operation, as drive() does, with the emulation as their this. */
-  #drive(
-    steps: (this: OxMysql) => Steps,
-    failed: (error: unknown) => void,
-    finished?: () => void,
-  ): void {
-    drive(steps.call(this), failed, finished)
-  }
-
-  /** Runs the steps of `run` on a connection of the pool once there is one, which it gives back after. */
+  /** Runs `run` on a connection of the pool once there is one, which it gives back after, and fails with what it throws. */
   #withConnection(
-    run: (this: OxMysql, connection: DatabaseConnection) => Steps,
+    run: (connection: DatabaseConnection) => void,
     failed: (error: unknown) => void,
     sql?: string,
   ): void {
     this.#acquire(
-      (connection) =>
-        this.#drive(
-          () => run.call(this, connection),
-          failed,
-          () => connection.release(),
-        ),
+      (connection) => {
+        try {
+          run(connection)
+        } catch (error) {
+          failed(error)
+        } finally {
+          connection.release()
+        }
+      },
       failed,
       sql,
     )
@@ -666,10 +595,6 @@ export class OxMysql {
     const client = this.#client
     if (client !== undefined && this.#waiting.length === 0) {
       const connection = client.connection()
-      if (connection instanceof Promise) {
-        connection.then(go, failed)
-        return
-      }
       if (!connection.blocked(sql)) {
         go(connection)
         return
@@ -779,22 +704,24 @@ export class OxMysql {
       )
       return false
     }
+    const failed = (error: unknown) =>
+      this.#logError(token, resource, callback, error, sql, parameters, true)
     this.#queued.push(() =>
       this.#withConnection(
-        function* (connection) {
+        (connection) => {
           const start = this.#host.measure()
           let result: JsValue
           try {
-            result = (yield connection.query(sql, parameters)) as JsValue
+            result = connection.query(sql, parameters) as JsValue
           } catch (error) {
-            this.#logError(token, resource, callback, error, sql, parameters, true)
+            failed(error)
             return
           }
           this.#logQuery(resource, sql, this.#host.measure() - start, parameters)
           this.#validateResultSet(resource, sql, result)
           if (callback.given) this.#complete(token, true, parseResponse(type, result))
         },
-        (error) => this.#logError(token, resource, callback, error, sql, parameters, true),
+        failed,
         sql,
       ),
     )
@@ -829,9 +756,10 @@ export class OxMysql {
       return false
     }
     const sql = query as string
+    const failed = (error: unknown) => this.#logError(token, resource, callback, error, sql, runs)
     this.#queued.push(() =>
       this.#withConnection(
-        function* (connection) {
+        (connection) => {
           const responses: JsValue[] = []
           try {
             for (let index = 0; index < Math.max(runs.length, 1); index++) {
@@ -839,13 +767,13 @@ export class OxMysql {
               if (values !== undefined)
                 for (let i = values.length; i < placeholders; i++) values[i] = null
               const start = this.#host.measure()
-              const result = (yield connection.execute(sql, values)) as JsValue
+              const result = connection.execute(sql, values) as JsValue
               responses.push(unpack ? parseResponse(type, result) : result)
               this.#logQuery(resource, sql, this.#host.measure() - start, values)
               this.#validateResultSet(resource, sql, result)
             }
           } catch (error) {
-            this.#logError(token, resource, callback, error, sql, runs)
+            failed(error)
             return
           }
           if (!callback.given) return
@@ -864,7 +792,7 @@ export class OxMysql {
             } else this.#complete(token, true, response ?? null)
           } else this.#complete(token, true, responses)
         },
-        (error) => this.#logError(token, resource, callback, error, sql, runs),
+        failed,
         sql,
       ),
     )
@@ -909,18 +837,18 @@ export class OxMysql {
       done(false)
     }
     this.#queued.push(() =>
-      this.#withConnection(function* (connection) {
+      this.#withConnection((connection) => {
         try {
-          yield connection.query('START TRANSACTION')
+          connection.query('START TRANSACTION')
           for (const { query, params } of transactions) {
             const start = this.#host.measure()
-            yield connection.query(query, params)
+            connection.query(query, params)
             this.#logQuery(resource, query, this.#host.measure() - start, params)
           }
-          yield connection.query('COMMIT')
+          connection.query('COMMIT')
         } catch (error) {
           try {
-            yield connection.query('ROLLBACK')
+            connection.query('ROLLBACK')
           } catch {
             // oxmysql ignores failures to roll back.
           }
@@ -936,22 +864,20 @@ export class OxMysql {
   /** Starts a transaction of startTransaction on a connection of its own, which it keeps until the transaction ends. */
   begin(token: number, resource: string): boolean {
     const failed = (error: unknown) => {
-      this.#logError(token, resource, { given: false, isPromise: false }, error)
+      this.#logError(token, resource, NO_CALLBACK, error)
       this.#complete(token, false, messageOf(error))
     }
     this.#queued.push(() =>
       this.#acquire((connection) => {
-        this.#drive(
-          function* () {
-            yield connection.query('START TRANSACTION')
-            this.#transactions.set(token, { connection, resource })
-            this.#complete(token, true, token)
-          },
-          (error) => {
-            connection.release()
-            failed(error)
-          },
-        )
+        try {
+          connection.query('START TRANSACTION')
+        } catch (error) {
+          connection.release()
+          failed(error)
+          return
+        }
+        this.#transactions.set(token, { connection, resource })
+        this.#complete(token, true, token)
       }, failed),
     )
     return true
@@ -981,10 +907,14 @@ export class OxMysql {
         fail(new Error('Connection used by transaction timed out after 30 seconds.'))
         return
       }
-      this.#drive(function* () {
-        const result = (yield entry.connection.query(sql, parameters)) as JsValue
-        this.#complete(token, true, result)
-      }, fail)
+      let result: JsValue
+      try {
+        result = entry.connection.query(sql, parameters) as JsValue
+      } catch (error) {
+        fail(error)
+        return
+      }
+      this.#complete(token, true, result)
     })
     return true
   }
@@ -999,31 +929,20 @@ export class OxMysql {
       }
       this.#transactions.delete(transaction)
       const { connection, resource } = entry
-      const finish = (response: boolean) => {
-        connection.release()
-        this.#complete(token, true, response)
+      let failure: unknown = error
+      try {
+        connection.query(commit && error === undefined ? 'COMMIT' : 'ROLLBACK')
+      } catch (thrown) {
+        failure = thrown
+        try {
+          connection.query('ROLLBACK')
+        } catch {
+          // oxmysql ignores failures to roll back.
+        }
       }
-      this.#drive(
-        function* () {
-          try {
-            yield connection.query(commit && error === undefined ? 'COMMIT' : 'ROLLBACK')
-          } catch (failure) {
-            try {
-              yield connection.query('ROLLBACK')
-            } catch {
-              // oxmysql ignores failures to roll back.
-            }
-            this.#logError(token, resource, { given: false, isPromise: false }, failure)
-            finish(false)
-            return
-          }
-          if (error !== undefined) {
-            this.#logError(token, resource, { given: false, isPromise: false }, error)
-            finish(false)
-          } else finish(commit)
-        },
-        (failure) => this.#logError(token, resource, { given: false, isPromise: false }, failure),
-      )
+      connection.release()
+      if (failure !== undefined) this.#logError(token, resource, NO_CALLBACK, failure)
+      this.#complete(token, true, failure === undefined && commit)
     })
     return true
   }
