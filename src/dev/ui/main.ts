@@ -107,10 +107,16 @@ function playerView(client: number): PlayerView {
   const header = document.createElement('header')
   const info = document.createElement('span')
   info.className = 'info'
+  const enlarge = document.createElement('button')
+  enlarge.textContent = 'Enlarge'
+  enlarge.addEventListener('click', () => {
+    const large = element.classList.toggle('large')
+    enlarge.textContent = large ? 'Shrink' : 'Enlarge'
+  })
   const quit = document.createElement('button')
   quit.textContent = 'Disconnect'
   quit.addEventListener('click', () => send({ type: 'disconnect', client }))
-  header.append(info, quit)
+  header.append(info, enlarge, quit)
   const card = document.createElement('div')
   card.className = 'card'
   card.hidden = true

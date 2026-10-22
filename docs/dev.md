@@ -39,7 +39,7 @@ The state bags panel shows the state bags of the server that have keys, such as 
 
 **Connect a player** starts a client and connects it to the server with the name in the box, and a license of the name, `license:` and the SHA-1 of the name, as players of FiveM have the license of their Rockstar account, which frameworks such as QBox and ESX keep their characters by. It joins as a FiveM client does: the server's `playerConnecting` handlers and deferrals run, then the client downloads its resources and starts them. While deferrals present an adaptive card, the player shows it, with a box for the JSON that its `Action.Submit` would give, which **Submit card** submits. **Disconnect** quits the client, as the player leaving the game does.
 
-Each player has a console of its own, with what its client prints, and a screen: the game window of the client, 1920 by 1080 pixels, scaled to fit, which pages are laid out in.
+Each player has a console of its own, with what its client prints, and a screen: the game window of the client, 1920 by 1080 pixels, scaled to fit, which pages are laid out in. **Enlarge** has the screen take the whole width, and **Shrink** gives it back its place.
 
 ## NUI
 

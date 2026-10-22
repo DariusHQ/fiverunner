@@ -295,6 +295,11 @@ main {
   opacity: 0.55;
 }
 
+/* An enlarged player takes the whole width, which shows its frames at a size they read at. */
+.player.large {
+  grid-column: 1 / -1;
+}
+
 .player header {
   display: flex;
   align-items: center;
