@@ -111,6 +111,8 @@ export class MemoryFileSystem implements FileSystem {
   readonly #unlisted = new Map<string, SourceEntry>()
   /** The files that are yet to read the bytes of their sources, by their paths. */
   readonly #unread = new Map<string, SourceEntry>()
+  /** The sources that directories mount, by the paths of the directories. */
+  readonly #mounts = new Map<string, FileSource>()
 
   /** Files with `files`, by their paths, with the directories that these name. */
   constructor(files: Readonly<Record<string, string | Uint8Array>> = {}) {
@@ -130,6 +132,48 @@ export class MemoryFileSystem implements FileSystem {
     }
     this.#directories.delete(directory)
     this.#unlisted.set(directory, { source, path: '' })
+    this.#mounts.set(directory, source)
+  }
+
+  /**
+   * Takes the entry at `path` anew from the source that it is in, as it is
+   * there now, once the directory it is in listed those of the source: the
+   * bytes of a file that changed, a file or a directory that came, or a
+   * file that went. What was written to the file is gone, as the source's
+   * stands.
+   */
+  refresh(path: string): void {
+    const mount = [...this.#mounts.keys()]
+      .filter((at) => at === '' || path.startsWith(`${at}/`))
+      .sort((a, b) => b.length - a.length)[0]
+    const directory = this.#directories.get(parentOf(path))
+    // What no directory listed yet comes from its source as it is there.
+    if (mount === undefined || directory === undefined) return
+    const source = this.#mounts.get(mount)!
+    const inSource = mount === '' ? path : path.slice(mount.length + 1)
+    const slash = inSource.lastIndexOf('/')
+    const name = nameOf(path)
+    let found: FileEntry | undefined
+    try {
+      found = source
+        .list(slash === -1 ? '' : inSource.slice(0, slash))
+        .find((entry) => entry.name === name)
+    } catch {
+      // The directory went from the source.
+    }
+    const entry = directory.get(name)
+    if (found === undefined) {
+      if (entry === false) this.remove(path)
+    } else if (found.directory) {
+      if (entry === undefined) {
+        directory.set(name, true)
+        this.#unlisted.set(path, { source, path: inSource })
+      }
+    } else if (entry !== true) {
+      directory.set(name, false)
+      this.#files.delete(path)
+      this.#unread.set(path, { source, path: inSource })
+    }
   }
 
   list(path: string): readonly FileEntry[] | undefined {

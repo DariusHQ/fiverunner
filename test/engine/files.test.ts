@@ -367,6 +367,28 @@ describe('MemoryFileSystem with sources', () => {
     expect(log).toEqual(['list ', 'list d', 'list d/e', 'read d/e/c.txt', 'read a.txt'])
   })
 
+  it('takes the entries of sources anew as they change there, once it listed them', () => {
+    const backing = new MemoryFileSystem({ 'a.txt': 'a', 'gone.txt': 'g', 'd/b.txt': 'b' })
+    const files = new MemoryFileSystem()
+    files.mount('m', { list: (path) => backing.list(path)!, read: (path) => backing.read(path)! })
+    expect(files.read('m/a.txt')).toEqual(encode('a'))
+    files.write('m/gone.txt', encode('written'))
+    backing.write('a.txt', encode('changed'))
+    backing.write('new.txt', encode('new'))
+    backing.makeDirectory('e')
+    backing.remove('gone.txt')
+    backing.write('d/b.txt', encode('b2'))
+    for (const path of ['m/a.txt', 'm/new.txt', 'm/e', 'm/gone.txt', 'm/d/b.txt', 'x/y']) {
+      files.refresh(path)
+    }
+    expect([
+      files.read('m/a.txt'),
+      files.read('m/new.txt'),
+      files.list('m')?.map(({ name }) => name),
+      files.read('m/d/b.txt'),
+    ]).toEqual([encode('changed'), encode('new'), ['a.txt', 'd', 'new.txt', 'e'], encode('b2')])
+  })
+
   it('mounts sources at roots too, but only where there is nothing', () => {
     const { source } = logged({ 'a.txt': 'a' })
     const files = new MemoryFileSystem({ 'd/x.txt': 'x', 'f.txt': '' })
