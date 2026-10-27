@@ -454,18 +454,25 @@ RegisterCommand('give', function() GiveWeaponToPed(GetPlayerPed(1), GetHashKey('
     ])
   })
 
-  it('run on vehicles for the clients that own them', async () => {
+  it('run on vehicles for the clients that own them, which sync what they did', async () => {
     const test = await session(
       `local vehicle = CreateVehicleServerSetter('adder', 'automobile', 10.0, 0.0, 1.0, 0.0)
-RegisterCommand('plate', function() SetVehicleNumberPlateText(vehicle, 'FIVE') end, false)`,
+RegisterCommand('plate', function() SetVehicleNumberPlateText(vehicle, 'FIVE RUNNER') end, false)
+RegisterCommand('read', function() print(GetVehicleNumberPlateText(vehicle)) end, false)`,
     )
+    /** Reads the plate of the vehicle on the server. */
+    const read = () => {
+      command(test, 'read')
+      return test.server.take().filter((line) => line.includes('[script:'))
+    }
     step(test)
+    const before = read()
     command(test, 'plate')
     step(test)
     step(test)
-    expect(test.client.diagnostics).toEqual([
-      'srv: SetVehicleNumberPlateText is not implemented in FiveRunner yet: it does nothing and returns zero values.',
-    ])
+    // The client gave the vehicle a plate of its own as it created it, as GTA V does.
+    expect([before, read()]).toEqual([['[script:srv] 14CLH315'], ['[script:srv] FIVE RUN']])
+    expect(test.client.diagnostics).toEqual([])
   })
 
   it('run once what waited for them to own entities', async () => {

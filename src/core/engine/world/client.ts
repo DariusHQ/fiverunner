@@ -56,6 +56,9 @@ export class ClientEntity {
   /** For vehicles, the peds in their seats, and those that were last in each seat, by the seats. */
   readonly occupants = new Map<number, ClientEntity>()
   readonly lastOccupants = new Map<number, ClientEntity>()
+  /** For vehicles, the text of their number plates, which worlds give the vehicles they add, and its style. */
+  plate = ''
+  plateIndex = 0
   /** For peds that the client took a sync tree of, the object id of the vehicle that the tree seats them in, -1 for none, and the seat, until the world seats them. */
   syncedVehicle: readonly [objectId: number, seat: number] | undefined = undefined
 
@@ -102,6 +105,8 @@ export class ClientEntity {
     this.health = state.health ?? this.health
     this.maxHealth = state.maxHealth ?? this.maxHealth
     this.armour = state.armour ?? this.armour
+    this.plate = state.plate ?? this.plate
+    this.plateIndex = state.plateIndex ?? this.plateIndex
     if (state.vehicle !== undefined) this.syncedVehicle = [state.vehicle, state.vehicleSeat ?? -1]
   }
 }
@@ -165,6 +170,8 @@ export class ClientWorld {
   readonly #requestedAssets = new Set<string>()
   /** The interior placements of the map that scripts requested, by their names in lower case. */
   readonly ipls = new Set<string>()
+  /** The state of the generator of the plates of vehicles. */
+  #plateSeed = 1
   /** The entity types of the models that the world learned of, as scripts created entities of them. */
   readonly #kinds = new Map<number, number>()
   /** The object ids that the world may network entities with. */
@@ -251,6 +258,20 @@ export class ClientWorld {
     this.#entities.add(entity)
     this.#loaded.add(entity.model)
     this.#kinds.set(entity.model, entityTypeOf(entity.type))
+    if (entityTypeOf(entity.type) === EntityType.vehicle && entity.plate === '') {
+      entity.plate = this.#plate()
+    }
+  }
+
+  /** A plate as GTA V gives new vehicles: two digits, three letters and three digits, drawn from a minstd_rand seeded with 1. */
+  #plate(): string {
+    const draw = (count: number) => {
+      this.#plateSeed = (this.#plateSeed * 48_271) % 2_147_483_647
+      return this.#plateSeed % count
+    }
+    const digit = () => String(draw(10))
+    const letter = () => String.fromCharCode(0x41 + draw(26))
+    return digit() + digit() + letter() + letter() + letter() + digit() + digit() + digit()
   }
 
   /** The entity of a handle, if there is one. */

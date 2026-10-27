@@ -94,6 +94,9 @@ export interface SyncState {
   /** The object id of the vehicle that a ped is in, or -1, and its seat in it plus 2, or -1, as CPedGameStateDataNode holds them. */
   vehicle?: number
   vehicleSeat?: number
+  /** The text of the number plate of a vehicle, and its style, as CVehicleAppearanceDataNode holds them. */
+  plate?: string
+  plateIndex?: number
 }
 
 /** A client of a server, as its game state knows it. */

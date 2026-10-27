@@ -28,7 +28,7 @@ function serverHandleOf(ctx: NativeContext, objectId: number): number {
   return found === undefined ? 0 : gameState.handleOf(found)
 }
 
-/** Natives of the seats of vehicles, which peds are in. */
+/** Natives of the seats of vehicles, which peds are in, and of their plates. */
 export function vehicleNatives(side: Side): NativeDefinition<NativeContext>[] {
   return side === 'server' ? serverNatives() : clientNatives()
 }
@@ -217,11 +217,54 @@ function clientNatives(): NativeDefinition<NativeContext>[] {
         return found !== undefined && !found.occupants.has(seatIndex)
       },
     ),
+    // Plates hold 8 characters.
+    defineNative(
+      {
+        name: 'SET_VEHICLE_NUMBER_PLATE_TEXT',
+        hash: 0x95a88f0b409cda47n,
+        result: 'void',
+        params: ['Vehicle vehicle', 'char* plateText'],
+      },
+      (ctx: NativeContext, vehicle, text) => {
+        const found = vehicleOf(ctx, vehicle)
+        if (found !== undefined) found.plate = (text ?? '').slice(0, 8)
+      },
+    ),
+    defineNative(
+      {
+        name: 'GET_VEHICLE_NUMBER_PLATE_TEXT',
+        hash: 0x7ce1ccb9b293020en,
+        result: 'char*',
+        params: ['Vehicle vehicle'],
+      },
+      (ctx: NativeContext, vehicle) => vehicleOf(ctx, vehicle)?.plate ?? null,
+    ),
+    defineNative(
+      {
+        name: 'SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX',
+        hash: 0x9088eb5a43ffb0a1n,
+        result: 'void',
+        params: ['Vehicle vehicle', 'int plateIndex'],
+      },
+      (ctx: NativeContext, vehicle, index) => {
+        const found = vehicleOf(ctx, vehicle)
+        if (found !== undefined) found.plateIndex = index
+      },
+    ),
+    defineNative(
+      {
+        name: 'GET_VEHICLE_NUMBER_PLATE_TEXT_INDEX',
+        hash: 0xf11bc2dd9a3e7195n,
+        result: 'int',
+        params: ['Vehicle vehicle'],
+      },
+      (ctx: NativeContext, vehicle) => vehicleOf(ctx, vehicle)?.plateIndex ?? 0,
+    ),
   ]
 }
 
 /**
- * The natives of FiveM's server of the seats of vehicles, which read the
+ * The natives of FiveM's server of the seats and the plates of vehicles, which read the
  * trees of peds, and the occupants that the server seats in vehicles as
  * it takes them.
  */
@@ -277,6 +320,15 @@ function serverNatives(): NativeDefinition<NativeContext>[] {
         const into = gameStateOf(ctx).byHandle(vehicle)
         return into !== undefined && into.objectId === objectId
       },
+    ),
+    // The trees of vehicles that their owners did not sync yet have no plates.
+    defineNative(
+      { name: 'GET_VEHICLE_NUMBER_PLATE_TEXT', result: 'char*', params: ['Vehicle vehicle'] },
+      (ctx: NativeContext, vehicle) => vehicleOf(ctx, vehicle)?.state.plate ?? '',
+    ),
+    defineNative(
+      { name: 'GET_VEHICLE_NUMBER_PLATE_TEXT_INDEX', result: 'int', params: ['Vehicle vehicle'] },
+      (ctx: NativeContext, vehicle) => vehicleOf(ctx, vehicle)?.state.plateIndex ?? 0,
     ),
   ]
 }

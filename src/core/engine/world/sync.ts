@@ -11,7 +11,7 @@ import { headingOf, toQuaternion } from './rotation.ts'
  * in 11, the population of missions for the entities that scripts
  * created, the hash of the name of the resource whose script owns it, and
  * the health of peds and vehicles, with the armour of peds and the
- * networked vehicles they are in.
+ * networked vehicles they are in, and the plates of vehicles.
  */
 export function syncStateOf(entity: ClientEntity): SyncState {
   const heading = headingOf(entity.rotation)
@@ -41,7 +41,7 @@ export function syncStateOf(entity: ClientEntity): SyncState {
           vehicleSeat: vehicle === undefined ? -1 : entity.seat + 2,
         }
       : type === EntityType.vehicle
-        ? { health: entity.health }
+        ? { health: entity.health, plate: entity.plate, plateIndex: entity.plateIndex }
         : {}),
   }
 }
