@@ -291,15 +291,15 @@ export class DevSession {
 
   /**
    * Puts the ped of the player of the client `client` at `x`, `y`, at the
-   * height it has, with the vehicle it is in, as SetPedCoordsKeepVehicle
-   * would in a script of the client, which syncs it.
+   * height `z`, or that it has, with the vehicle it is in, as
+   * SetPedCoordsKeepVehicle would in a script of the client, which syncs it.
    */
-  teleport(client: number, x: number, y: number): void {
+  teleport(client: number, x: number, y: number, z?: number): void {
     const found = this.#clients[client - 1]
     const ped = found?.manager.world?.playerPed
     if (ped === undefined || this.#crash !== undefined) return
     const moved = ped.vehicle ?? ped
-    moved.moveTo(Math.fround(x), Math.fround(y), moved.z)
+    moved.moveTo(Math.fround(x), Math.fround(y), z === undefined ? moved.z : Math.fround(z))
     this.#tell()
   }
 

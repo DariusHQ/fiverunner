@@ -133,7 +133,7 @@ addEventListener('message', (event: MessageEvent<ToWorker>) => {
       session?.emit(message.name, message.args, message.target)
       break
     case 'teleport':
-      session?.teleport(message.client, message.x, message.y)
+      session?.teleport(message.client, message.x, message.y, message.z)
       break
     case 'waypoint':
       session?.waypoint(message.client, message.x, message.y)

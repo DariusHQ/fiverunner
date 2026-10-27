@@ -32,8 +32,10 @@ RegisterCommand('open', function()
     TriggerClientEvent('bank:open', -1, 'Opened by the server')
 end, false)
 `,
-  'client.lua': `local blip = AddBlipForCoord(300.0, -300.0, 0.0)
+  'client.lua': `local blip = AddBlipForCoord(300.0, -300.0, 10.0)
 SetBlipColour(blip, 2)
+RegisterKeyMapping('where', 'Tells where the player is', 'keyboard', 'F6')
+RegisterCommand('where', function() print('at', GetEntityCoords(PlayerPedId())) end, false)
 RegisterKeyMapping('+bankmenu', 'Opens the bank', 'keyboard', 'F5')
 RegisterCommand('+bankmenu', function() print('bank menu opened') end, false)
 RegisterCommand('-bankmenu', function() print('bank menu closed') end, false)
@@ -238,6 +240,33 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     // The name of the player, in its colour, moves the centre of its pixels a little.
     expect([Math.abs(movedX - x + 120) < 10, Math.abs(movedY - y - 60) < 10]).toEqual([true, true])
     expect(await page.evaluate(`${pixelsOf(ORANGE)} !== null`)).toBe(true)
+  })
+
+  it('puts the players that it drops on blips where the blips are, at their heights', async () => {
+    /** Where a point of the world is on the page, as the view of the map says. */
+    const onPage = (x: number, y: number) =>
+      page.evaluate<[number, number]>(`(() => {
+      const canvas = document.querySelector('#map canvas')
+      const [cx, cy, scale] = canvas.dataset.view.split(' ').map(Number)
+      const r = canvas.getBoundingClientRect()
+      return [r.left + (${x} - cx) * scale + r.width / 2, r.top + (cy - ${y}) * scale + r.height / 2]
+    })()`)
+    // The first player is where it started, and drops a few pixels off the blip of the bank.
+    const [fromX, fromY] = await onPage(0, 0)
+    const [toX, toY] = await onPage(300, -300)
+    await mouse('mousedown', fromX, fromY)
+    await mouse('mousemove', toX + 5, toY + 4)
+    await mouse('mouseup', toX + 5, toY + 4)
+    await page.evaluate(`(() => {
+      const screen = document.querySelector('.screen')
+      screen.focus()
+      for (const type of ['keydown', 'keyup']) {
+        screen.dispatchEvent(new KeyboardEvent(type, { code: 'F6', bubbles: true, cancelable: true }))
+      }
+    })()`)
+    await page.until(
+      `document.querySelector('.player .console').innerText.includes('at\\tvec3(300.000000, -300.000000, 10.000000)')`,
+    )
   })
 
   it('gives the games of players the keys of their screens, which run the commands bound to them', async () => {

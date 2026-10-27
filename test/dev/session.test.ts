@@ -413,7 +413,7 @@ EndTextCommandSetBlipName(blip)`,
     )
     await session.connect({ name: 'Ann' })
     session.advance(200)
-    session.teleport(1, 50.5, -60.25)
+    session.teleport(1, 50.5, -60.25, 30.5)
     session.waypoint(1, 10, 20)
     session.advance(100)
     expect(states(told()).at(-1)!.map).toEqual({
@@ -424,7 +424,7 @@ EndTextCommandSetBlipName(blip)`,
           kind: 'player',
           x: 50.5,
           y: -60.25,
-          z: 0,
+          z: 30.5,
           heading: 0,
           model: 225514697,
           owner: 1,
@@ -436,6 +436,7 @@ EndTextCommandSetBlipName(blip)`,
           handle: 1,
           x: 100,
           y: 200,
+          z: 30,
           sprite: 9,
           colour: 3,
           alpha: 255,
@@ -451,6 +452,7 @@ EndTextCommandSetBlipName(blip)`,
           handle: 257,
           x: 10,
           y: 20,
+          z: 0,
           sprite: 8,
           colour: 0,
           alpha: 255,

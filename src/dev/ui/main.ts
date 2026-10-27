@@ -53,7 +53,8 @@ const events = new Events(byId('events'), byId<HTMLFormElement>('emit'), {
 })
 const bags = byId<HTMLElement>('bags')
 const map = new WorldMap(byId('map'), {
-  teleport: (client, x, y) => send({ type: 'teleport', client, x, y }),
+  teleport: (client, x, y, z) =>
+    send({ type: 'teleport', client, x, y, ...(z === undefined ? {} : { z }) }),
   waypoint: (client, x, y) => send({ type: 'waypoint', client, x, y }),
 })
 

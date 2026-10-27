@@ -31,8 +31,14 @@ export type ToWorker =
       readonly args: readonly PackedValue[]
       readonly target: EventTarget
     }
-  /** Puts the ped of the player of a client at coordinates of the world, from the map. */
-  | { readonly type: 'teleport'; readonly client: number; readonly x: number; readonly y: number }
+  /** Puts the ped of the player of a client at coordinates of the world, from the map, at a height if one is given. */
+  | {
+      readonly type: 'teleport'
+      readonly client: number
+      readonly x: number
+      readonly y: number
+      readonly z?: number
+    }
   /** Sets the waypoint of the player of a client at coordinates of the world, from the map. */
   | { readonly type: 'waypoint'; readonly client: number; readonly x: number; readonly y: number }
   /** A key of the keyboard of a client went down or up, by the name of FiveM's keyboard mapper. */

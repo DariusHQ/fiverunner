@@ -3,8 +3,8 @@ import type { DevPlayer } from '../session.ts'
 
 /** What the map does in the session. */
 export interface MapActions {
-  /** Puts the ped of the player of a client at coordinates of the world. */
-  teleport(client: number, x: number, y: number): void
+  /** Puts the ped of the player of a client at coordinates of the world, at the height it has unless one is given. */
+  teleport(client: number, x: number, y: number, z?: number): void
   /** Sets the waypoint of the player of a client at coordinates of the world. */
   waypoint(client: number, x: number, y: number): void
 }
@@ -279,8 +279,13 @@ export class WorldMap {
       const drag = this.#drag
       this.#drag = undefined
       if (drag?.kind === 'player') {
-        const [x, y] = this.#toWorld(...at(event))
-        this.#actions.teleport(drag.client, x, y)
+        // A player dropped on a blip goes where it is, as garages and shops are where their blips are.
+        const onto = this.#itemAt(...at(event), 'blip')
+        if (onto?.kind === 'blip') {
+          this.#actions.teleport(drag.client, onto.blip.x, onto.blip.y, onto.blip.z)
+        } else {
+          this.#actions.teleport(drag.client, ...this.#toWorld(...at(event)))
+        }
       }
       this.#draw()
     }
@@ -298,11 +303,12 @@ export class WorldMap {
     })
   }
 
-  /** What the map drew nearest to a pixel of its canvas, within 10 pixels of it. */
-  #itemAt(sx: number, sy: number): Item | undefined {
+  /** What the map drew nearest to a pixel of its canvas, within 10 pixels of it, of a kind if one is given. */
+  #itemAt(sx: number, sy: number, kind?: Item['kind']): Item | undefined {
     let found: Item | undefined
     let best = 10
     for (const item of this.#items) {
+      if (kind !== undefined && item.kind !== kind) continue
       const distance = Math.hypot(item.sx - sx, item.sy - sy)
       if (distance <= best) {
         best = distance
@@ -323,6 +329,8 @@ export class WorldMap {
       canvas.width = Math.round(width * ratio)
       canvas.height = Math.round(height * ratio)
     }
+    // Where the map looks, for tools that drive the dev UI, such as its demo, to find points of the world on it.
+    canvas.dataset.view = `${this.#centreX} ${this.#centreY} ${this.#scale}`
     const context = this.#context
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     context.clearRect(0, 0, width, height)

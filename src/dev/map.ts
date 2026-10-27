@@ -35,6 +35,8 @@ export interface DevBlip {
   readonly handle: number
   readonly x: number
   readonly y: number
+  /** The height of the blip, which players dropped on it go to. */
+  readonly z: number
   readonly sprite: number
   readonly colour: number
   readonly alpha: number
@@ -115,13 +117,14 @@ export function describeMap(
   const blips: DevBlip[] = []
   clients.forEach((manager, index) => {
     for (const blip of manager.world?.blips.all ?? []) {
-      const [x, y] = blip.coords
+      const [x, y, z] = blip.coords
       const { shape } = blip
       blips.push({
         client: index + 1,
         handle: blip.handle,
         x: round(x),
         y: round(y),
+        z: round(z),
         sprite: blip.sprite,
         colour: blip.colour,
         alpha: blip.alpha,
