@@ -121,6 +121,15 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
       },
       () => 1920 / 1080,
     ),
+    // What the weather looks like, and the lights of the city.
+    nothing('SET_RAIN_LEVEL', 0x643e26ea6e024d92n, ['float intensity']),
+    nothing('SET_SNOW_LEVEL', 0x7f06937b0cdcbc1an, ['float level']),
+    nothing('SET_WIND', 0xac3a74e8384a9919n, ['float speed']),
+    nothing('SET_WIND_SPEED', 0xee09ecedbabe47fcn, ['float speed']),
+    nothing('SET_WIND_DIRECTION', 0xeb0f4468467b4528n, ['float direction']),
+    nothing('WATER_OVERRIDE_SET_STRENGTH', 0xc54a08c85ae4d410n, ['float strength']),
+    nothing('SET_ARTIFICIAL_LIGHTS_STATE', 0x1268615ace24d504n, ['BOOL state']),
+    nothing('SET_ARTIFICIAL_LIGHTS_STATE_AFFECTS_VEHICLES', 0xe2b187c0939b3d32n, ['BOOL toggle']),
     // Audio, which FiveRunner plays none of.
     nothing('SET_AUDIO_FLAG', 0xb9efd5c25018725an, ['char* flagName', 'BOOL toggle']),
     defineNative(

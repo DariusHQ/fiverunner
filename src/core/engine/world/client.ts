@@ -9,6 +9,7 @@ import { ScreenFade } from './screen.ts'
 import type { ServerClone } from './server.ts'
 import { sameState, syncStateOf } from './sync.ts'
 import { GameText } from './text.ts'
+import { GameClock, Weather } from './weather.ts'
 
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
 export const PLAYER_ZERO = hashString('player_zero')
@@ -161,6 +162,9 @@ export class ClientWorld {
   readonly text = new GameText()
   /** The keyboard of the game, the controls it presses, and the commands that resources bound to its keys. */
   readonly input = new Input()
+  /** The time of day of the game. */
+  readonly clock = new GameClock()
+  readonly weather = new Weather()
   /** Whether the local player is in a solo tutorial session of the game, as character menus put it. */
   tutorial = false
 
