@@ -1,13 +1,16 @@
 /**
  * Records the demo of FiveRunner, demo/fiverunner.mp4, and the pictures of
- * the README, docs/media/*.png: the tests of the QBox suite in a terminal,
- * then QBox in the dev UI, where a player registers a character, with
- * captions. Chrome records the page and encodes the video itself.
+ * the README, docs/media/*.png, on a deployment of the Stable recipe of
+ * Qbox for txAdmin: its tests in a terminal, then the dev UI, where a
+ * player registers a character, is dragged to a garage on the map, presses
+ * E and takes a car out, with captions. Chrome records the page and
+ * encodes the video itself. The demo puts its tests and its resource,
+ * scripts/demo, in the deployment.
  *
- *   npm run build && sh compat/fetch.sh qbox && node scripts/record-demo.ts
+ *   npm run build && node scripts/record-demo.ts <deployment>
  */
 import { spawn } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join, resolve } from 'node:path'
@@ -15,7 +18,8 @@ import { join, resolve } from 'node:path'
 import { Chrome, findChrome, type Page } from '../test/e2e/chrome.ts'
 
 const root = resolve(import.meta.dirname, '..')
-const project = join(root, 'compat', 'qbox')
+const project = resolve(process.argv[2] ?? '.')
+const scripts = join(root, 'scripts', 'demo')
 const tool = join(root, 'dist', 'fiverunner.js')
 const media = join(root, 'docs', 'media')
 const demo = join(root, 'demo')
@@ -170,7 +174,84 @@ const OVERLAY = `(() => {
   return true
 })()`
 
-/** What a command of the tool prints in the QBox suite, until a line has `until`, when it stops it. */
+/** Where the Motel Parking of qbx_garages is, which players take their cars out of. */
+const GARAGE = [275.58, -344.74] as const
+
+/** The button that enlarges the screen of the player, or shrinks it. */
+const ENLARGE = `[...document.querySelectorAll('.player header button')].find((b) => ['Enlarge', 'Shrink'].includes(b.textContent))`
+
+/** Where the arrow of the first player is on the map: its orange pixels, but those of the name under it. */
+const PLAYER = `(() => {
+  const canvas = document.querySelector('#map canvas')
+  const { data, width } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
+  const found = []
+  for (let i = 0; i < data.length; i += 4) {
+    if (Math.abs(data[i] - 0xf0) < 6 && Math.abs(data[i + 1] - 0xa0) < 6 && Math.abs(data[i + 2] - 0x30) < 6) found.push([(i / 4) % width, Math.floor(i / 4 / width)])
+  }
+  if (found.length === 0) return null
+  const top = Math.min(...found.map(([, y]) => y))
+  const arrow = found.filter(([, y]) => y < top + 20 * devicePixelRatio)
+  const r = canvas.getBoundingClientRect()
+  const at = (index) => arrow.reduce((total, point) => total + point[index], 0) / arrow.length / devicePixelRatio
+  return [r.left + at(0), r.top + at(1)]
+})()`
+
+/** The element of a page that has `text` alone, such as an option of a menu. */
+const leaf = (text: string) =>
+  `[...document.querySelectorAll('*')].find((e) => e.childElementCount === 0 && e.textContent.trim() === '${text}')`
+
+/** The button of a page that says `text`. */
+const button = (text: string) =>
+  `[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '${text}')`
+
+/** Where a point of the world is on the page, as the map says where it looks. */
+function onMap(page: Page, x: number, y: number): Promise<[number, number]> {
+  return page.evaluate<[number, number]>(`(() => {
+    const canvas = document.querySelector('#map canvas')
+    const [cx, cy, scale] = canvas.dataset.view.split(' ').map(Number)
+    const r = canvas.getBoundingClientRect()
+    return [r.left + (${x} - cx) * scale + r.width / 2, r.top + (cy - ${y}) * scale + r.height / 2]
+  })()`)
+}
+
+/** Zooms the map in by `steps` turns of the wheel at `x`, `y`, which stays where it is. */
+async function zoom(page: Page, x: number, y: number, steps: number): Promise<void> {
+  await page.evaluate(`window.demoCursor(${x}, ${y})`)
+  await sleep(800)
+  for (let step = 0; step < steps; step++) {
+    await page.wheel(x, y, -120)
+    await sleep(steps > 6 ? 80 : 350)
+  }
+}
+
+/** The stretches of the recording that the video leaves out, by when they start and end: the waits for what loads. */
+const cuts: [from: number, to: number][] = []
+
+/** Waits for what `wait` waits for, which the video leaves out, but for its last half second. */
+async function cut<T>(wait: () => Promise<T>): Promise<T> {
+  const from = Date.now()
+  const result = await wait()
+  const to = Date.now() - 500
+  if (to > from) cuts.push([from, to])
+  return result
+}
+
+/** Enlarges the screen of the player, or shrinks it, with its button in sight. */
+async function toggleScreen(page: Page): Promise<void> {
+  await page.evaluate(`(${ENLARGE}).scrollIntoView({ block: 'center' })`)
+  await sleep(600)
+  await clickPage(page, ENLARGE)
+}
+
+/** Types `text` a character at a time, as a person would. */
+async function typeSlowly(page: Page, text: string): Promise<void> {
+  for (const char of text) {
+    await page.type(char)
+    await sleep(110)
+  }
+}
+
+/** What a command of the tool prints in the deployment, until a line has `until`, when it stops it. */
 function output(args: readonly string[], until?: string): Promise<string> {
   return new Promise((done, failed) => {
     const child = spawn(process.execPath, [tool, ...args], { cwd: project })
@@ -188,14 +269,27 @@ function output(args: readonly string[], until?: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  if (!existsSync(join(project, 'resources', '[qbx]', 'qbx_garages'))) {
+    throw new Error(
+      `${project} is no deployment of Qbox's Stable recipe of txAdmin: give the directory of one`,
+    )
+  }
   const chromePath = findChrome()
   if (chromePath === undefined) throw new Error('There is no Chrome: set CHROME_PATH')
   mkdirSync(media, { recursive: true })
   mkdirSync(demo, { recursive: true })
+  // The tests of the demo, and a resource of its own beside the recipe, which gives characters a car.
+  mkdirSync(join(project, 'tests'), { recursive: true })
+  cpSync(join(scripts, 'qbox-recipe.test.lua'), join(project, 'tests', 'qbox-recipe.test.lua'))
+  cpSync(join(scripts, 'demo_car'), join(project, 'resources', '[fiverunner-demo]', 'demo_car'), {
+    recursive: true,
+  })
   const tests = (await output(['test'])).trimEnd()
-  if (!tests.includes('passed')) throw new Error(`The QBox suite did not pass:\n${tests}`)
+  if (!tests.includes('passed') || tests.includes('failed')) {
+    throw new Error(`The tests of the recipe did not pass:\n${tests}`)
+  }
 
-  // The dev server of the suite, at the port of FiveM's servers.
+  // The dev server of the recipe, at the port of FiveM's servers.
   const dev = spawn(process.execPath, [tool, 'dev', '--port', '30120'], { cwd: project })
   const devText = await new Promise<string>((done, failed) => {
     let text = ''
@@ -215,11 +309,8 @@ async function main(): Promise<void> {
       `<div class="line">FiveM resources, without GTA V and without FXServer</div>`,
     ),
     '/terminal.html': terminal(
-      [
-        { command: 'npx fiverunner test', output: tests },
-        { command: 'npx fiverunner dev', output: devText.trimEnd().split('\n')[0]! },
-      ],
-      `The real QBox: qbx_core, ox_lib and ox_inventory, tested in ${/Duration: ([\d.]+) s/.exec(tests)![1]} seconds`,
+      [{ command: 'npx fiverunner test', output: tests }],
+      `Qbox's whole txAdmin recipe, a car out of its garage, tested in ${/Duration: ([\d.]+) s/.exec(tests)![1]} seconds`,
     ),
     '/end.html': card(`<div class="line"><code>npx fiverunner init</code></div>
 <div class="line"><code>npx fiverunner test</code> · <code>npx fiverunner dev</code></div>
@@ -271,19 +362,41 @@ async function main(): Promise<void> {
     writeFileSync(join(media, 'tests.png'), await page.screenshot())
 
     await page.goto(devUrl)
-    await page.until(`document.getElementById('status').textContent === 'Running'`)
+    await cut(() =>
+      page.until(`document.getElementById('status').textContent === 'Running'`, undefined, 60000),
+    )
     await page.evaluate(OVERLAY)
-    await caption(page, 'npx fiverunner dev: a QBox server, in your browser')
-    await sleep(3500)
-    await caption(page, 'Connect a player: its client runs your client scripts')
+    const started = await page.evaluate<number>(
+      `document.querySelectorAll('#resources-list .state.started').length`,
+    )
+    await caption(page, `npx fiverunner dev: its ${started} resources, in your browser`)
+    await sleep(2800)
+    await caption(page, 'Start a resource of your own, beside them')
+    await clickPage(page, `document.getElementById('command-line')`)
+    await typeSlowly(page, 'ensure demo_car')
+    await page.press('Enter', 'Enter', 13, String.fromCharCode(13))
+    await page.until(`document.getElementById('console').innerText.includes('demo_car')`)
+    await sleep(1500)
+
+    await caption(page, 'Connect a player: her client runs the client scripts')
+    await page.evaluate(
+      `document.getElementById('player-name').scrollIntoView({ block: 'center' })`,
+    )
+    await sleep(1000)
+    await clickPage(page, `document.getElementById('player-name')`)
+    await page.evaluate(`document.getElementById('player-name').select()`)
+    await typeSlowly(page, 'Ann')
     await clickPage(page, `document.querySelector('#connect button')`)
-    await page.until(`document.querySelector('.player .info')?.textContent.includes('joined')`)
+    await cut(() =>
+      page.until(
+        `document.querySelector('.player .info')?.textContent.includes('joined')`,
+        undefined,
+        30000,
+      ),
+    )
     await page.evaluate(`document.querySelector('.player').scrollIntoView({ block: 'start' })`)
     await sleep(1200)
-    await clickPage(
-      page,
-      `[...document.querySelectorAll('.player header button')].find((b) => b.textContent === 'Enlarge')`,
-    )
+    await toggleScreen(page)
     await page.evaluate(
       `document.querySelector('.player .screen').scrollIntoView({ block: 'center' })`,
     )
@@ -291,14 +404,10 @@ async function main(): Promise<void> {
     const lib = await page.until<string>(
       `[...document.querySelectorAll('.viewport iframe')].map((f) => new URL(f.src).origin).find((o) => o.includes('ox_lib'))`,
     )
-    await page.until(`document.body.innerText.includes('New Character #1')`, lib, 30000)
-    await caption(page, "QBox's own character menu, from the NUI of ox_lib")
-    await sleep(2500)
-    await clickFrame(
-      page,
-      lib,
-      `[...document.querySelectorAll('*')].find((e) => e.childElementCount === 0 && e.textContent === 'New Character #1')`,
-    )
+    await cut(() => page.until(`document.body.innerText.includes('New Character #1')`, lib, 30000))
+    await caption(page, "Qbox's own character menu, from the NUI of ox_lib")
+    await sleep(2000)
+    await clickFrame(page, lib, leaf('New Character #1'))
     await page.until(`document.body.innerText.includes('Character Registration')`, lib)
     await caption(page, 'Register a character, as a player would')
     const input = (label: string) =>
@@ -308,10 +417,7 @@ async function main(): Promise<void> {
       ['Last Name', 'Lee'],
     ] as const) {
       await clickFrame(page, lib, input(label))
-      for (const char of text) {
-        await page.type(char)
-        await sleep(140)
-      }
+      await typeSlowly(page, text)
     }
     await clickFrame(page, lib, input('Sex'))
     await sleep(400)
@@ -322,28 +428,77 @@ async function main(): Promise<void> {
     )
     await sleep(800)
     await shoot(page, frames, 'qbox-registration.png', `document.querySelector('.player .screen')`)
-    await clickFrame(
-      page,
-      lib,
-      `[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Confirm')`,
+    await clickFrame(page, lib, button('Confirm'))
+    await cut(() =>
+      page.until(`document.getElementById('events').innerText.includes('Ann')`, undefined, 30000),
     )
-    await page.until(
-      `document.getElementById('events').innerText.includes('Ann')`,
-      undefined,
-      30000,
-    )
-    await page.evaluate(`window.scrollTo({ top: 0 })`)
-    await sleep(800)
+    await sleep(1500)
+    await page.evaluate(`window.scrollTo({ top: 0, behavior: 'instant' })`)
     await shoot(page, frames, 'dev-ui.png')
-    await caption(page, 'Saved by oxmysql, in a MariaDB-compatible database, in memory')
-    await sleep(4500)
+
+    // The map, with the blips that the resources put on hers, then her screen under it.
+    await toggleScreen(page)
+    await page.evaluate(`document.getElementById('map').scrollIntoView({ block: 'start' })`)
+    await sleep(1200)
+    await caption(page, 'A map of the server, with the blips of every resource')
+    await sleep(2000)
+    const [gx, gy] = await onMap(page, GARAGE[0], GARAGE[1])
+    await zoom(page, gx, gy, 3)
+    await sleep(1500)
+    await shoot(page, frames, 'map.png', `document.getElementById('map')`)
+    await page.evaluate(`window.scrollTo({ top: document.getElementById('map').offsetTop + 320 })`)
+    await sleep(1500)
+    await caption(page, 'Drag her to a garage on the map')
+    const [px, py] = await page.until<[number, number]>(PLAYER)
+    const [tx, ty] = await onMap(page, GARAGE[0], GARAGE[1])
+    await page.evaluate(`window.demoCursor(${px}, ${py})`)
+    await sleep(900)
+    await page.drag(px, py, tx, ty, 45)
+    await page.evaluate(`window.demoCursor(${tx}, ${ty})`)
+    await page.until(`document.body.innerText.includes('Open Garage')`, lib, 10000)
+    await sleep(1200)
+    await caption(page, "qbx_garages and ox_lib's text UI: press E")
+    await clickPage(page, `document.querySelector('.player .screen')`)
+    await sleep(600)
+    await page.press('KeyE', 'e', 69)
+    await page.until(`document.body.innerText.includes('Truffade Adder')`, lib, 10000)
+    await toggleScreen(page)
+    await page.evaluate(
+      `document.querySelector('.player .screen').scrollIntoView({ block: 'center' })`,
+    )
+    await caption(page, 'Her garage, from the database of oxmysql')
+    await sleep(2000)
+    await clickFrame(page, lib, leaf('Truffade Adder'))
+    await page.until(`document.body.innerText.includes('Take Out')`, lib)
+    await sleep(1500)
+    await shoot(page, frames, 'garage.png', `document.querySelector('.player .screen')`)
+    await clickFrame(page, lib, leaf('Take Out'))
+    await sleep(1500)
+
+    await toggleScreen(page)
+    await page.evaluate(`document.getElementById('map').scrollIntoView({ block: 'start' })`)
+    await sleep(1200)
+    await caption(page, 'Spawned by the server, synced by her client')
+    const [cx, cy] = await onMap(page, GARAGE[0], GARAGE[1])
+    await zoom(page, cx, cy, 24)
+    await sleep(3000)
     await page.evaluate('window.demoCaption()')
+    await sleep(1000)
 
     await page.goto(`${local}/end.html`)
-    await sleep(4500)
-    const end = Date.now()
+    await sleep(4000)
     await stop()
 
+    // The video leaves out the waits for what loads, and goes on from where they ended.
+    const left = (time: number) =>
+      cuts.reduce((total, [from, to]) => total + (time >= to ? to - from : 0), 0)
+    const shown = frames.filter(({ time }) => !cuts.some(([from, to]) => time > from && time < to))
+    frames.splice(
+      0,
+      frames.length,
+      ...shown.map(({ data, time }) => ({ data, time: time - left(time) })),
+    )
+    const end = Date.now() - left(Date.now())
     const start = frames[0]!.time
     const count = Math.round(((end - start) * FPS) / 1000)
     await page.goto(`${local}/encode.html`)

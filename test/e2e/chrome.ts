@@ -354,4 +354,50 @@ export class Page {
       )
     }
   }
+
+  /** Drags the mouse from `x`, `y` to `toX`, `toY`, through `steps` moves that each take `pause` milliseconds. */
+  async drag(
+    x: number,
+    y: number,
+    toX: number,
+    toY: number,
+    steps = 30,
+    pause = 16,
+  ): Promise<void> {
+    const send = (type: string, at: readonly [number, number], buttons: number) =>
+      this.#chrome.send(
+        'Input.dispatchMouseEvent',
+        { type, x: at[0], y: at[1], button: 'left', buttons, clickCount: 1 },
+        this.#session,
+      )
+    await send('mouseMoved', [x, y], 0)
+    await send('mousePressed', [x, y], 1)
+    for (let step = 1; step <= steps; step++) {
+      await send('mouseMoved', [x + ((toX - x) * step) / steps, y + ((toY - y) * step) / steps], 1)
+      await new Promise((done) => setTimeout(done, pause))
+    }
+    await send('mouseReleased', [toX, toY], 0)
+  }
+
+  /** Turns the wheel of the mouse at `x`, `y`, by `deltaY` pixels, down for more. */
+  async wheel(x: number, y: number, deltaY: number): Promise<void> {
+    await this.#chrome.send(
+      'Input.dispatchMouseEvent',
+      { type: 'mouseWheel', x, y, deltaX: 0, deltaY },
+      this.#session,
+    )
+  }
+
+  /** Presses a key of the keyboard, by its KeyboardEvent code, key and key code, with the text it types if any, on what has the focus. */
+  async press(code: string, key: string, keyCode: number, text?: string): Promise<void> {
+    for (const type of ['keyDown', 'keyUp']) {
+      const typed = type === 'keyDown' && text !== undefined ? { text } : {}
+      await this.#chrome.send(
+        'Input.dispatchKeyEvent',
+        { type, code, key, windowsVirtualKeyCode: keyCode, ...typed },
+        this.#session,
+      )
+      await new Promise((done) => setTimeout(done, 120))
+    }
+  }
 }
