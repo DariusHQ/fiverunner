@@ -114,6 +114,19 @@ end)`,
     proc.tickAt(0)
     expect(proc.take()).toEqual(['[script:a] ^1SCRIPT ERROR: @a/main.lua:2: boom^7'])
   })
+
+  it("have files run from FiveM's scheduler, which cfxlua-require looks for", async () => {
+    const proc = await createProcess()
+    // As cfxlua-require finds the scheduler, from where it walks the callers of require.
+    const lines = start(
+      proc,
+      'a',
+      `for i = 2, 32 do
+    if debug.getinfo(i, 'S').short_src == 'citizen:/scripting/lua/scheduler.lua' then print(i) break end
+end`,
+    )
+    expect(lines).toEqual(['[script:a] 2'])
+  })
 })
 
 describe('FormatStackTrace', () => {

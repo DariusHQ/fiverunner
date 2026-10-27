@@ -111,6 +111,14 @@ export interface StackFrame {
   readonly line: number
 }
 
+/**
+ * The chunk of FiveM's scheduler, which has its threads, events, function
+ * references, exports, NUI callbacks and state bags, as FiveRunner's
+ * scripts of those are named: scripts such as cfxlua-require look for it
+ * in their stacks.
+ */
+const SCHEDULER = '@citizen:/scripting/lua/scheduler.lua'
+
 /** Collects name and value pairs into a table. */
 const TABLE = `local t = {}
 for i = 1, select('#', ...), 2 do
@@ -432,7 +440,7 @@ export class ScriptRuntime implements NativeCaller {
     release(citizen)
     state.run(nativesSource, '@fiverunner:/natives.lua')
 
-    const [promise] = state.run(deferredSource, '@fiverunner:/deferred.lua')
+    const [promise] = state.run(deferredSource, '@citizen:/scripting/lua/deferred.lua')
     state.setGlobal('promise', promise)
     release(promise)
 
@@ -470,12 +478,12 @@ export class ScriptRuntime implements NativeCaller {
     )
     release(print, trace, checked)
     const [fiverunner] = state.run('return {}', '=fiverunner:shared')
-    state.run(schedulerSource, '@fiverunner:/scheduler.lua', hostTable, fiverunner)
-    state.run(eventsSource, '@fiverunner:/events.lua', hostTable, fiverunner)
-    state.run(refsSource, '@fiverunner:/refs.lua', hostTable, fiverunner)
-    state.run(exportsSource, '@fiverunner:/exports.lua', hostTable)
-    if (host.natives.client) state.run(nuiSource, '@fiverunner:/nui.lua')
-    state.run(statesSource, '@fiverunner:/states.lua', hostTable)
+    state.run(schedulerSource, SCHEDULER, hostTable, fiverunner)
+    state.run(eventsSource, SCHEDULER, hostTable, fiverunner)
+    state.run(refsSource, SCHEDULER, hostTable, fiverunner)
+    state.run(exportsSource, SCHEDULER, hostTable)
+    if (host.natives.client) state.run(nuiSource, SCHEDULER)
+    state.run(statesSource, SCHEDULER, hostTable)
     const [collect, resume, runFile, flush, walkStack, callRef, duplicateRef, deleteRef] =
       state.run(ENTRY_POINTS, '=fiverunner:entry', fiverunner)
     release(hostTable, fiverunner)

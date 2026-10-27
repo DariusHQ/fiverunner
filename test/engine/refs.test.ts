@@ -269,7 +269,7 @@ end)`,
     // The routine runs on the main thread, as in FiveM, not in the thread that called out.
     expect(lines.filter((line) => line.includes('main.lua'))).toEqual([])
     expect(lines.at(-1)).toMatch(
-      /^\[script:b\] false\tfiverunner:\/refs\.lua:\d+: bad argument #1 to 'msgpack_unpack' \(string expected, got nil\)$/,
+      /^\[script:b\] false\tcitizen:\/scripting\/lua\/scheduler\.lua:\d+: bad argument #1 to 'msgpack_unpack' \(string expected, got nil\)$/,
     )
   })
 
@@ -402,7 +402,7 @@ end)`,
     const [first, ...rest] = proc.take()
     // Citizen.Await raises the error from where the proxy awaits it.
     expect(first).toMatch(
-      /^\[script:b\] false\tfiverunner:\/refs\.lua:\d+: \^1SCRIPT ERROR: @a\/main\.lua:3: late\^7$/,
+      /^\[script:b\] false\tcitizen:\/scripting\/lua\/scheduler\.lua:\d+: \^1SCRIPT ERROR: @a\/main\.lua:3: late\^7$/,
     )
     // The stack trace ends the error with a line break, after which print ends the line.
     expect(rest).toEqual(['[script:b] ^3> ref^7 (^5@a/main.lua^7:3)', '[script:b] '])

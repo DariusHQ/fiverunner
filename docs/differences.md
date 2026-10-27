@@ -4,7 +4,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 
 ## Scripts
 
-- Stack traces name FiveRunner's own scripts after it, such as `@fiverunner:/scheduler.lua`, where FiveM names its own, and those frames are not the same as FiveM's.
+- FiveRunner's scripts of the scheduler, events, function references, exports, NUI and state bags are named as FiveM's, `@citizen:/scripting/lua/scheduler.lua`, and its promises `@citizen:/scripting/lua/deferred.lua`, but their lines and frames are not FiveM's. Its other scripts are named after it, such as `@fiverunner:/natives.lua`.
 - NaN prints as `-nan` and `nan`, as the C library of FiveRunner's WebAssembly build writes it, where FiveM's MSVC build writes `-nan(ind)` and `nan`. This goes for `tostring`, `string.format` and `f:write`.
 - Where FiveM throws exceptions with MSVC's texts, such as for convars that `std::stof` reads, FiveRunner approximates the texts, and the sign of the NaN that `std::stof` reads.
 
