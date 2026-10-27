@@ -467,7 +467,8 @@ export class WorldMap {
       context.stroke()
       context.restore()
       const name = this.#players.find(({ client }) => client === entity.owner)?.name
-      if (name !== undefined) this.#label(name, sx + 11, sy + 4, colour)
+      // Under the arrow, off the labels of the blips that players stand on.
+      if (name !== undefined) this.#label(name, sx, sy + 22, colour, 'center')
     } else if (entity.kind === 'vehicle') {
       context.save()
       context.translate(sx, sy)
@@ -484,15 +485,23 @@ export class WorldMap {
     this.#items.push({ key: `entity ${entity.id}`, kind: 'entity', entity, sx, sy })
   }
 
-  #label(text: string, x: number, y: number, colour: string): void {
+  #label(
+    text: string,
+    x: number,
+    y: number,
+    colour: string,
+    align: CanvasTextAlign = 'left',
+  ): void {
     const context = this.#context
     context.font = '12px system-ui, sans-serif'
+    context.textAlign = align
     context.lineWidth = 3
     context.strokeStyle = '#0b0c10'
     context.strokeText(text, x, y)
     context.fillStyle = colour
     context.fillText(text, x, y)
     context.lineWidth = 1
+    context.textAlign = 'left'
   }
 
   #showTooltip(): void {
