@@ -1,7 +1,10 @@
 import type { PackedValue } from '../msgpack.ts'
 import {
+  EntityType,
+  entityTypeOf,
   NetObjType,
   PendingEntity,
+  SEATS,
   SyncEntity,
   type GameStateClient,
   type SyncState,
@@ -235,6 +238,9 @@ export class ServerGameState {
   receiveSync(client: GameStateClient, objectId: number, state: SyncState): void {
     const entity = this.#byId.get(objectId)
     if (entity?.owner !== client) return
+    // A ped that leaves its vehicle was last in it, as FiveM's server takes the trees of peds.
+    const was = entity.state.vehicle ?? 0
+    if (state.vehicle === -1 && was !== 0 && was !== -1) entity.lastVehiclePedWasIn = was
     entity.state = state
     entity.hasSynced = true
   }
@@ -372,13 +378,16 @@ export class ServerGameState {
   }
 
   /**
-   * Runs a tick of the sync thread: it starts deleting the entities that
-   * scripts and clients deleted, sends each client what changed in the
+   * Runs a tick of the sync thread: it seats the peds in the vehicles that
+   * their trees say they are in, as FiveM's server does as it updates its
+   * entities, starts deleting the entities that scripts and clients
+   * deleted, sends each client what changed in the
    * entities near the ped of its player, and the removal of those it knows
    * of that are no longer near it or are being deleted, then removes those
    * that are being deleted, which no client knows of.
    */
   tick(): void {
+    for (const ped of this.#entities) this.#seat(ped)
     for (const id of this.#deletes.splice(0)) {
       const entity = this.#byId.get(id)
       if (entity !== undefined) entity.deleting = true
@@ -497,6 +506,38 @@ export class ServerGameState {
     return (!entity.hasSynced || entity.ownedByClientScript) && bucket
   }
 
+  /**
+   * Seats a ped in the vehicle that its tree says it is in, if it moved
+   * since, as FiveM's server does: it takes it out of the seat it was in,
+   * if it had it still, and into the seat its tree says, if no ped has it.
+   * The trees of server setters seat their peds in the vehicle of object
+   * id 0, which there is none of.
+   */
+  #seat(ped: SyncEntity): void {
+    if (entityTypeOf(ped.type) !== EntityType.ped) return
+    const vehicle = ped.state.vehicle ?? 0
+    const seat = ped.state.vehicleSeat ?? 0
+    if (vehicle === ped.lastVehicle && seat === ped.lastVehicleSeat) return
+    const last = this.#vehicle(ped.lastVehicle)
+    if (last !== undefined && last.occupants[ped.lastVehicleSeat] === ped.objectId) {
+      last.occupants[ped.lastVehicleSeat] = 0
+    }
+    const current = this.#vehicle(vehicle)
+    if (current !== undefined && current.occupants[seat] === 0 && seat < SEATS) {
+      current.occupants[seat] = current.lastOccupants[seat] = ped.objectId
+    }
+    ped.lastVehicle = vehicle
+    ped.lastVehicleSeat = seat
+  }
+
+  /** The vehicle of an object id, if it is one. */
+  #vehicle(objectId: number): SyncEntity | undefined {
+    const found = objectId === -1 ? undefined : this.byObjectId(objectId)
+    return found !== undefined && entityTypeOf(found.type) === EntityType.vehicle
+      ? found
+      : undefined
+  }
+
   #add(type: NetObjType, objectId: number, state: SyncState): SyncEntity {
     const entity = new SyncEntity(type, objectId, state)
     this.#used.add(objectId)
@@ -516,6 +557,11 @@ export class ServerGameState {
     if (entity.finalizing) return
     entity.finalizing = true
     entity.bag?.remove()
+    // A ped that goes leaves the seat it had.
+    const vehicle = entityTypeOf(entity.type) === EntityType.ped ? entity.state.vehicle : undefined
+    const seated = vehicle === undefined ? undefined : this.#vehicle(vehicle)
+    const seat = entity.state.vehicleSeat ?? 0
+    if (seated?.occupants[seat] === entity.objectId) seated.occupants[seat] = 0
     this.#host.onMainThread(() => {
       const handle = this.handleOf(entity)
       this.#host.trigger('entityRemoved', [handle])

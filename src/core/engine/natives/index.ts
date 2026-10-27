@@ -20,6 +20,7 @@ import { screenNatives } from './screen.ts'
 import { scriptingNatives } from './scripting.ts'
 import { stateBagNatives } from './states.ts'
 import { streamingNatives } from './streaming.ts'
+import { vehicleNatives } from './vehicles.ts'
 import { weatherNatives } from './weather.ts'
 
 /** The natives FiveRunner implements for a side, which replace those of the catalog. */
@@ -36,6 +37,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...playerNatives(side),
     ...stateBagNatives(side),
     ...entityNatives(side),
+    ...vehicleNatives(side),
     ...rpcNatives(side),
     ...streamingNatives(side),
     ...screenNatives(side),

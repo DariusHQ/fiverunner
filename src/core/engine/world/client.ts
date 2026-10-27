@@ -48,6 +48,16 @@ export class ClientEntity {
   maxHealth: number
   /** The armour of a ped. */
   armour = 0
+  /** For peds, the vehicle they are in, if any, and their seat in it: -1 for the driver's, then 0 up for those of passengers. */
+  vehicle: ClientEntity | undefined = undefined
+  seat = -1
+  /** For peds, the vehicle they were last in, which is the one they are in, if they are in one. */
+  lastVehicle: ClientEntity | undefined = undefined
+  /** For vehicles, the peds in their seats, and those that were last in each seat, by the seats. */
+  readonly occupants = new Map<number, ClientEntity>()
+  readonly lastOccupants = new Map<number, ClientEntity>()
+  /** For peds that the client took a sync tree of, the object id of the vehicle that the tree seats them in, -1 for none, and the seat, until the world seats them. */
+  syncedVehicle: readonly [objectId: number, seat: number] | undefined = undefined
 
   constructor(type: NetObjType, model: number) {
     this.type = type
@@ -55,11 +65,29 @@ export class ClientEntity {
     this.health = this.maxHealth = entityTypeOf(type) === EntityType.ped ? 200 : 1000
   }
 
-  /** Puts the entity at a position, which natives give in single precision. */
+  /** Puts the entity at a position, which natives give in single precision, and the peds in it, if it is a vehicle. */
   moveTo(x: number, y: number, z: number): void {
     this.x = x
     this.y = y
     this.z = z
+    for (const ped of this.occupants.values()) ped.moveTo(x, y, z)
+  }
+
+  /** Seats a ped in a seat of a vehicle, which the ped that sat there leaves, and puts it where the vehicle is. */
+  enterVehicle(vehicle: ClientEntity, seat: number): void {
+    this.leaveVehicle()
+    vehicle.occupants.get(seat)?.leaveVehicle()
+    this.vehicle = this.lastVehicle = vehicle
+    this.seat = seat
+    vehicle.occupants.set(seat, this)
+    vehicle.lastOccupants.set(seat, this)
+    this.moveTo(vehicle.x, vehicle.y, vehicle.z)
+  }
+
+  /** Takes a ped out of the vehicle that it is in, if it is in one, where the vehicle is. */
+  leaveVehicle(): void {
+    this.vehicle?.occupants.delete(this.seat)
+    this.vehicle = undefined
   }
 
   /** Puts and turns the entity as a sync tree says, and gives it the model and the health of the tree, if a client synced one. */
@@ -74,6 +102,7 @@ export class ClientEntity {
     this.health = state.health ?? this.health
     this.maxHealth = state.maxHealth ?? this.maxHealth
     this.armour = state.armour ?? this.armour
+    if (state.vehicle !== undefined) this.syncedVehicle = [state.vehicle, state.vehicleSeat ?? -1]
   }
 }
 
@@ -302,6 +331,16 @@ export class ClientWorld {
         entity.take(clone.state)
       }
     }
+    // Peds sit where their trees seat them, once the world has the vehicles, which can come later.
+    for (const ped of this.#entities) {
+      if (ped.syncedVehicle === undefined) continue
+      const [objectId, seat] = ped.syncedVehicle
+      const vehicle = objectId === -1 ? undefined : this.byObjectId(objectId)
+      if (vehicle === undefined && objectId !== -1) continue
+      ped.syncedVehicle = undefined
+      if (vehicle === undefined) ped.leaveVehicle()
+      else if (ped.vehicle !== vehicle || ped.seat !== seat - 2) ped.enterVehicle(vehicle, seat - 2)
+    }
   }
 
   /** Whether the world has an object id to network an entity with. */
@@ -417,6 +456,14 @@ export class ClientWorld {
   #forget(entity: ClientEntity): boolean {
     this.#hooks.forgotten(entity)
     this.blips.forget(entity)
+    entity.leaveVehicle()
+    for (const ped of [...entity.occupants.values()]) ped.leaveVehicle()
+    for (const other of this.#entities) {
+      if (other.lastVehicle === entity) other.lastVehicle = undefined
+      for (const [seat, ped] of other.lastOccupants) {
+        if (ped === entity) other.lastOccupants.delete(seat)
+      }
+    }
     this.#entities.delete(entity)
     this.#guids.delete(entity.handle)
     return this.#synced.delete(entity)

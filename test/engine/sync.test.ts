@@ -742,3 +742,54 @@ describe('Players near each other', () => {
     ])
   })
 })
+
+describe('The seats of vehicles that clients network', () => {
+  it('sync to servers, which seat peds as FiveM does, and to the clients near them', async () => {
+    const test = await session(
+      `RegisterCommand('seats', function()
+    local vehicle = NetworkGetEntityFromNetworkId(2)
+    local ped = GetPlayerPed('1')
+    print(GetVehiclePedIsIn(ped, false) == vehicle, GetVehiclePedIsIn(ped, true) == vehicle, GetPedInVehicleSeat(vehicle, 0) == ped, GetLastPedInVehicleSeat(vehicle, 0) == ped, GetSeatPedIsUsing(ped), IsPedInAnyVehicle(ped), IsPedInVehicle(ped, vehicle))
+end, false)
+RegisterCommand('warp', function() TaskWarpPedIntoVehicle(GetPlayerPed('1'), NetworkGetEntityFromNetworkId(2), -1) end, false)`,
+      withAdder(`car = CreateVehicle(adder, 0.0, 0.0, 0.0, 0.0, true, false)
+    SetPedIntoVehicle(PlayerPedId(), car, 0)
+    print(NetworkGetNetworkIdFromEntity(car))
+    RegisterCommand('out', function() TaskLeaveVehicle(PlayerPedId(), car, 0) end, false)`),
+    )
+    const { bob } = await bobOf(test)
+    bob
+      .add('bob', {
+        'fxmanifest.lua': `fx_version 'cerulean'\ngame 'gta5'\nclient_script 'main.lua'`,
+        'main.lua': `RegisterCommand('seats', function()
+    local ann = GetPlayerPed(GetPlayerFromServerId(1))
+    local vehicle = NetworkGetEntityFromNetworkId(2)
+    print(GetVehiclePedIsIn(ann, false) == vehicle, GetPedInVehicleSeat(vehicle, 0) == ann, IsPedInAnyVehicle(ann, false))
+end, false)`,
+      })
+      .start()
+    /** Ticks Ann, the server and Bob, then has the server and Bob tell of the seats. */
+    const seats = () => {
+      for (let i = 0; i < 3; i++) {
+        step(test)
+        bob.tickAt(test.client.time)
+      }
+      test.server.manager.console.commands.invoke('seats', '')
+      bob.manager.console.commands.invoke('seats', '')
+      return [...printed(test.server), ...printed(bob)]
+    }
+    const seated = seats()
+    test.client.manager.console.commands.invoke('out', '')
+    const out = seats()
+    test.server.manager.console.commands.invoke('warp', '')
+    expect([seated, out, seats()]).toEqual([
+      ['[script:srv] true\tfalse\ttrue\ttrue\t0\t1\t1', '[script:bob] true\ttrue\t1'],
+      // The server tells of the vehicle a ped was last in once it left it.
+      [
+        '[script:srv] false\ttrue\tfalse\ttrue\t-3\tfalse\tfalse',
+        '[script:bob] false\tfalse\tfalse',
+      ],
+      ['[script:srv] true\ttrue\tfalse\ttrue\t-1\t1\t1', '[script:bob] true\tfalse\t1'],
+    ])
+  })
+})

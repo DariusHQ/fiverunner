@@ -10,11 +10,13 @@ import { headingOf, toQuaternion } from './rotation.ts'
  * turned by their headings in 8 bits and other entities by quaternions
  * in 11, the population of missions for the entities that scripts
  * created, the hash of the name of the resource whose script owns it, and
- * the health of peds and vehicles, with the armour of peds.
+ * the health of peds and vehicles, with the armour of peds and the
+ * networked vehicles they are in.
  */
 export function syncStateOf(entity: ClientEntity): SyncState {
   const heading = headingOf(entity.rotation)
   const type = entityTypeOf(entity.type)
+  const vehicle = entity.vehicle?.objectId
   return {
     position: syncSector(entity.x, entity.y, entity.z),
     orientation:
@@ -31,7 +33,13 @@ export function syncStateOf(entity: ClientEntity): SyncState {
     popType: entity.type === NetObjType.player ? PopType.unknown : PopType.mission,
     scriptHash: entity.script === undefined ? 0 : hashString(entity.script),
     ...(type === EntityType.ped
-      ? { health: entity.health, maxHealth: entity.maxHealth, armour: entity.armour }
+      ? {
+          health: entity.health,
+          maxHealth: entity.maxHealth,
+          armour: entity.armour,
+          vehicle: vehicle ?? -1,
+          vehicleSeat: vehicle === undefined ? -1 : entity.seat + 2,
+        }
       : type === EntityType.vehicle
         ? { health: entity.health }
         : {}),

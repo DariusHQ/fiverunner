@@ -45,7 +45,7 @@ const POOLS: ReadonlyMap<string, number> = new Map([
 const LOCKDOWN_MODES: ReadonlySet<string> = new Set(['strict', 'no_dummy', 'relaxed', 'inactive'])
 
 /** The game state of the server whose script calls a native. */
-function gameStateOf(ctx: NativeContext): ServerGameState {
+export function gameStateOf(ctx: NativeContext): ServerGameState {
   return ctx.manager.gameState!
 }
 
@@ -55,7 +55,7 @@ function gameStateOf(ctx: NativeContext): ServerGameState {
  * their default value, and a handle of no entity fails the call. It finds
  * entities that are being deleted too.
  */
-function entityOf(ctx: NativeContext, handle: number): SyncEntity | undefined {
+export function entityOf(ctx: NativeContext, handle: number): SyncEntity | undefined {
   if (handle === 0) return undefined
   const entity = gameStateOf(ctx).byHandle(handle)
   if (entity === undefined) throw new NativeError(`Tried to access invalid entity: ${handle}`)
@@ -103,7 +103,7 @@ function create(ctx: NativeContext, type: NetObjType, state: SyncState): number 
 }
 
 /** The entity of a handle on a client, if there is one: GTA V's natives give their default values for no entity. */
-function clientEntityOf(ctx: NativeContext, handle: number): ClientEntity | undefined {
+export function clientEntityOf(ctx: NativeContext, handle: number): ClientEntity | undefined {
   return ctx.manager.world!.byHandle(handle)
 }
 
@@ -212,9 +212,11 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
       ),
     ]
   }
-  /** Puts an entity at a position, as SET_ENTITY_COORDS does without the size of its model, which FiveRunner does not know. */
+  /** Puts an entity at a position, as SET_ENTITY_COORDS does without the size of its model, which FiveRunner does not know: out of the vehicle it is in, if it is a ped. */
   const moveTo = (ctx: NativeContext, entity: number, x: number, y: number, z: number) => {
-    clientEntityOf(ctx, entity)?.moveTo(x, y, z)
+    const found = clientEntityOf(ctx, entity)
+    found?.leaveVehicle()
+    found?.moveTo(x, y, z)
   }
   return [
     defineNative(

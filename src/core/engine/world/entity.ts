@@ -59,6 +59,9 @@ export function entityTypeOf(type: NetObjType): number {
   }
 }
 
+/** How many seats FiveM's server keeps the occupants of for each vehicle, by the seats of the trees of peds. */
+export const SEATS = 32
+
 /** The populations that entities come from, as GTA V's ePopType numbers them. */
 export const PopType = { unknown: 0, mission: 7 } as const
 
@@ -73,7 +76,8 @@ export type Orientation =
  * What the sync tree of an entity holds, as FiveM's server reads it:
  * where it is, how it turns, its model, its population, the hash of the
  * resource whose script created it, which is 0 for none, and the health
- * that clients synced, which the trees of server setters have none of yet.
+ * and the vehicles of peds that clients synced, which the trees of server
+ * setters have none of yet.
  */
 export interface SyncState {
   position: SectorPosition
@@ -87,6 +91,9 @@ export interface SyncState {
   maxHealth?: number
   /** The armour of a ped. */
   armour?: number
+  /** The object id of the vehicle that a ped is in, or -1, and its seat in it plus 2, or -1, as CPedGameStateDataNode holds them. */
+  vehicle?: number
+  vehicleSeat?: number
 }
 
 /** A client of a server, as its game state knows it. */
@@ -158,6 +165,13 @@ export class SyncEntity {
   readonly onOwned: ((owner: GameStateClient) => void)[] = []
   /** The state bag of the entity, once a script or a client asked for one. */
   bag: EntityBag | undefined = undefined
+  /** For peds, the vehicle and the seat that the server last seated them in, and the vehicle they were last in before, -1 for none, as FiveM's server keeps them. */
+  lastVehicle = -1
+  lastVehicleSeat = -1
+  lastVehiclePedWasIn = -1
+  /** For vehicles, the object ids of the peds in their seats, and of those last in them, 0 for none, by the seats of the trees of peds. */
+  readonly occupants: number[] = new Array<number>(SEATS).fill(0)
+  readonly lastOccupants: number[] = new Array<number>(SEATS).fill(0)
 
   constructor(type: NetObjType, objectId: number, state: SyncState) {
     this.type = type
