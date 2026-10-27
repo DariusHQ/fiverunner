@@ -1,5 +1,5 @@
 # The resources of the QBox suite: their category, their release and its SHA-256.
-[ox] https://github.com/overextended/ox_lib/releases/download/v3.40.3/ox_lib.zip 00c3b7e3750f972110975b5c810ad21aa42eb6d2858ab2620d7086aad2e279c6
+[ox] https://github.com/overextended/ox_lib/releases/download/v3.41.0/ox_lib.zip fc7cdbcf2860bcbf692172516de13339bb4e509a4d5ad367c26ea4a1a69e3193
 [ox] https://github.com/overextended/ox_inventory/releases/download/v2.48.0/ox_inventory.zip 701f668161941bb22cedf98f2ad3743cce39485397185b3ffb97fdeedc46ea47
 [qbx] https://github.com/Qbox-project/qbx_core/releases/download/v1.24.0/qbx_core.zip d8024a169d2150b68886fd9f922f74686335ac30b1b8a124e7109a9b421b6676
 [qbx] https://github.com/Qbox-project/qbx_vehicles/releases/download/v1.4.2/qbx_vehicles.zip 24b1c364aeb71b582110fff2d1e6ae59444f5aefd8f24250c55386786290e1bf

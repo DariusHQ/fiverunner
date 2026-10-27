@@ -9,7 +9,7 @@ This page lists only what passes.
 | Resource     | Version |
 | ------------ | ------- |
 | qbx_core     | 1.24.0  |
-| ox_lib       | 3.40.3  |
+| ox_lib       | 3.41.0  |
 | ox_inventory | 2.48.0  |
 | qbx_vehicles | 1.4.2   |
 
