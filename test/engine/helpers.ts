@@ -161,7 +161,11 @@ export interface TestClient {
 
 /** A client that joined a server with or without OneSync as `identity`, with natives of its own if it is given some. */
 export async function clientOf(
-  options: { oneSync?: boolean; clientNatives?: ProcessOptions['natives'] } = {},
+  options: {
+    oneSync?: boolean
+    gameBuild?: number
+    clientNatives?: ProcessOptions['natives']
+  } = {},
   identity: PlayerIdentity = { name: 'Ann' },
 ): Promise<TestClient> {
   const { clientNatives, ...serverOptions } = options

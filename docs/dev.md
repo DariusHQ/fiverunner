@@ -67,7 +67,7 @@ As files of a resource change, the dev UI restarts it, as `restart` does, if it 
 
 ## What it does not do
 
-There is no game: the natives of GTA V that FiveRunner does not implement, such as those of the HUD and of the tasks of peds, do nothing and return zero values, as they do in tests, and FiveRunner tells you of the first time a resource calls each. Clients have the ped of their player and the entities and players near it, and the server the entities that scripts create, which stay where scripts put them, and it has clients run the natives that FiveM's server has them run, as [the differences from FiveM](differences.md#entities) tell. The `PerformHttpRequest` of the server sends real requests, through the dev server, where tests send none.
+There is no game: the natives of GTA V that FiveRunner does not implement, such as most of those of the HUD and of the tasks of peds, do nothing and return zero values, as they do in tests, and FiveRunner tells you of the first time a resource calls each. Those that have nothing to do without a game, such as the density of the population, do nothing without telling. Clients have the ped of their player and the entities and players near it, and the server the entities that scripts create, which stay where scripts put them, and it has clients run the natives that FiveM's server has them run, as [the differences from FiveM](differences.md#entities) tell. The `PerformHttpRequest` of the server sends real requests, through the dev server, where tests send none.
 
 [differences.md](differences.md) lists where FiveRunner differs from FiveM, the dev UI too.
 

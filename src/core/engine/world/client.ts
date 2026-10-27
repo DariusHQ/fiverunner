@@ -129,6 +129,12 @@ export class ClientWorld {
   readonly #loaded = new Set<number>()
   /** The models that scripts requested, which the world loads at its next tick. */
   readonly #requested = new Set<number>()
+  /** The other assets that the world loaded, by their kinds and names in lower case, such as anim:missheist. */
+  readonly #assets = new Set<string>()
+  /** The other assets that scripts requested, which the world loads at its next tick. */
+  readonly #requestedAssets = new Set<string>()
+  /** The interior placements of the map that scripts requested, by their names in lower case. */
+  readonly ipls = new Set<string>()
   /** The entity types of the models that the world learned of, as scripts created entities of them. */
   readonly #kinds = new Map<number, number>()
   /** The object ids that the world may network entities with. */
@@ -324,6 +330,17 @@ export class ClientWorld {
     if (!this.#loaded.has(model)) this.#requested.add(model)
   }
 
+  /** Asks the world to load an asset other than a model, of a kind, which it does at its next tick. */
+  requestAsset(kind: string, name: string): void {
+    const key = `${kind}:${name.toLowerCase()}`
+    if (!this.#assets.has(key)) this.#requestedAssets.add(key)
+  }
+
+  /** Whether the world loaded an asset other than a model, of a kind. */
+  assetLoaded(kind: string, name: string): boolean {
+    return this.#assets.has(`${kind}:${name.toLowerCase()}`)
+  }
+
   /** Whether the world loaded a model. */
   loaded(model: number): boolean {
     return this.#loaded.has(model)
@@ -334,11 +351,13 @@ export class ClientWorld {
     return this.#kinds.get(model) ?? EntityType.none
   }
 
-  /** Runs a tick of the world, which starts a frame of its input: it loads the models that scripts requested. */
+  /** Runs a tick of the world, which starts a frame of its input: it loads the models and the assets that scripts requested. */
   tick(): void {
     this.input.frame()
     for (const model of this.#requested) this.#loaded.add(model)
     this.#requested.clear()
+    for (const asset of this.#requestedAssets) this.#assets.add(asset)
+    this.#requestedAssets.clear()
   }
 
   /**

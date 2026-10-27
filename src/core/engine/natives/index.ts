@@ -6,6 +6,7 @@ import { controlNatives } from './controls.ts'
 import { convarNatives } from './convars.ts'
 import { entityNatives } from './entities.ts'
 import { eventNatives } from './events.ts'
+import { gameNatives } from './game.ts'
 import { httpNatives } from './http.ts'
 import { kvpNatives } from './kvp.ts'
 import { networkNatives } from './network.ts'
@@ -40,6 +41,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...blipNatives(side),
     ...textNatives(side),
     ...controlNatives(side),
+    ...gameNatives(side),
     ...(side === 'server' ? [...httpNatives(), ...oxmysqlNatives()] : nuiNatives()),
   ]
 }
