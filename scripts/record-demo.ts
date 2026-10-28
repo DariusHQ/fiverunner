@@ -4,8 +4,9 @@
  * Qbox for txAdmin: its tests in a terminal, then the dev UI, where a
  * player registers a character, is dragged to a garage on the map, presses
  * E and takes a car out, with captions. Chrome records the page and
- * encodes the video itself. The demo puts its tests and its resource,
- * scripts/demo, in the deployment.
+ * encodes the video itself. The demo puts the tests of the Qbox Stable
+ * suite of compat, and a resource of its own in scripts/demo, in the
+ * deployment.
  *
  *   npm run build && node scripts/record-demo.ts <deployment>
  */
@@ -280,7 +281,10 @@ async function main(): Promise<void> {
   mkdirSync(demo, { recursive: true })
   // The tests of the demo, and a resource of its own beside the recipe, which gives characters a car.
   mkdirSync(join(project, 'tests'), { recursive: true })
-  cpSync(join(scripts, 'qbox-recipe.test.lua'), join(project, 'tests', 'qbox-recipe.test.lua'))
+  cpSync(
+    join(root, 'compat', 'qbox-stable', 'tests', 'recipe.test.lua'),
+    join(project, 'tests', 'qbox-recipe.test.lua'),
+  )
   cpSync(join(scripts, 'demo_car'), join(project, 'resources', '[fiverunner-demo]', 'demo_car'), {
     recursive: true,
   })

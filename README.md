@@ -54,7 +54,7 @@ The dev UI has the console of your server, where you run commands, its resources
 
 QBox and ESX run on FiveRunner: CI runs qbx_core, ox_lib, ox_inventory, qbx_vehicles and es_extended, as they are released, on every change, with players who log in, earn money, carry items, get jobs and are saved as they leave. [docs/compatibility.md](docs/compatibility.md) lists what passes.
 
-So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources: they start without errors but those of npwd, whose phone is JavaScript, which FiveRunner does not run, and a player takes a car out of a garage of qbx_garages, as [the tests of the demo](scripts/demo/qbox-recipe.test.lua) check.
+So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources: they start without errors but those of npwd, whose phone is JavaScript, which FiveRunner does not run, and a player takes a car out of a garage of qbx_garages, as [its tests](compat/qbox-stable/tests/recipe.test.lua) check, which CI runs on every change on all of its resources but npwd and screencapture.
 
 ![The character registration of QBox, from the NUI of ox_lib, on the screen of a player in the dev UI](docs/media/qbox-registration.png)
 

@@ -1,0 +1,43 @@
+# The resources of the Stable recipe of Qbox for txAdmin, but those of npwd and
+# screencapture, which are JavaScript: their category, their release or the
+# archive of their commit, its SHA-256, and the path in the archive and the name
+# of the resource that a line names.
+[cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[managers]/mapmanager
+[cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[managers]/spawnmanager
+[cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[system]/baseevents
+[sql] https://github.com/qbox-project/txAdminRecipe/archive/0a12aa7c3e023b9d22264db4fb200d5183321b56.zip ba4d9a2f11330142323225b97ef73f6f0b69cba33036bb0d0eac92d3ee1288a8 txAdminRecipe-0a12aa7c3e023b9d22264db4fb200d5183321b56/qbox.sql
+[ox] https://github.com/overextended/ox_lib/releases/download/v3.41.0/ox_lib.zip fc7cdbcf2860bcbf692172516de13339bb4e509a4d5ad367c26ea4a1a69e3193
+[ox] https://github.com/overextended/oxmysql/releases/download/v2.14.3/oxmysql.zip f6db8f612a36a8a75fccde300e8c4135696b5bbca5770cd7f26458949e1f7872
+[ox] https://github.com/overextended/ox_target/releases/download/v1.18.1/ox_target.zip c404463199f5563399ff681b5e18641d8c9292d988c9c90b8e7e505b8e0768a7
+[ox] https://github.com/overextended/ox_doorlock/releases/download/v1.23.0/ox_doorlock.zip 4061b5cdf12057fba002186ab76b7aa0c8b56892b7a2a69eb95157f6fac76207
+[ox] https://github.com/overextended/ox_inventory/releases/download/v2.48.1/ox_inventory.zip 33d5386b850e69fef8b7ac2ebf0e7ad78899e19299fe5e208cbc5c08d4cdae19
+[ox] https://github.com/overextended/ox_fuel/archive/84f93ba2a3e24a663514c65cb9b3965c703ffed1.zip c3c514aaadaa9ac715dc74ca69df39c4714823b9e537afc620ba535d14096ae1 ox_fuel-84f93ba2a3e24a663514c65cb9b3965c703ffed1 ox_fuel
+[qbx] https://github.com/qbox-project/qbx_core/releases/download/v1.24.0/qbx_core.zip d8024a169d2150b68886fd9f922f74686335ac30b1b8a124e7109a9b421b6676
+[qbx] https://github.com/qbox-project/qbx_vehicles/releases/download/v1.4.2/qbx_vehicles.zip 24b1c364aeb71b582110fff2d1e6ae59444f5aefd8f24250c55386786290e1bf
+[qbx] https://github.com/qbox-project/qbx_radio/releases/download/v1.0.0/qbx_radio.zip 247b922252426d7b4c8f8d12f8bfe063186b5861ae80bedef63f8387695ad119
+[qbx] https://github.com/qbox-project/qbx_management/releases/download/v1.4.0/qbx_management.zip 366b307bc280efbaa6cc01d33c755ecda7abb6b084487fb701b51acddf21aff7
+[qbx] https://github.com/qbox-project/qbx_diving/releases/download/v1.1.1/qbx_diving.zip 69049f3a63b178746b072d29e89ce9ac669339a0f2fb13f434494b0cd6018f94
+[qbx] https://github.com/qbox-project/qbx_divegear/releases/download/v1.0.1/qbx_divegear.zip 1649eddca8addde4e2214f4afec6378dde623a83b8ff3513d2e65b358a93e1da
+[qbx] https://github.com/qbox-project/qbx_binoculars/releases/download/v1.1.1/qbx_binoculars.zip e03f1fdb1692fa653d9987f5b053685831ddeb0cefdd8f48fac3059298ee3d97
+[qbx] https://github.com/qbox-project/qbx_truckrobbery/releases/download/v1.1.1/qbx_truckrobbery.zip 11fecbc4b1b1289573284779be056cfefaea9da2365132fc79d247644cc1d351
+[qbx] https://github.com/qbox-project/qbx_garages/releases/download/v1.1.4/qbx_garages.zip c4f57ee7b41792d793a8fc4bcaaae8b7177890f1428d58c2c6236cd32780fb52
+[qbx] https://github.com/qbox-project/qbx_smallresources/releases/download/v0.2.0/qbx_smallresources.zip a27650d0afd0a2a8098fca75e0653db875a9b35f4e05c124ba8e2958496ff9b0
+[qbx] https://github.com/qbox-project/qbx_density/releases/download/v1.0.1/qbx_density.zip 27954a6319dedffbb970cd646721e1fb9f24d8a2fc38ea9176e3402cc81cc385
+[qbx] https://github.com/qbox-project/qbx_adminmenu/releases/download/v0.1.0/qbx_adminmenu.zip 3cfbe9b01032353aa82c7dd005d765ac2dea019da1b784caea3214bd89cfaebe
+[qbx] https://github.com/qbox-project/qbx_hud/releases/download/v0.1.0/qbx_hud.zip 11c37219d71b31fb092358c115fc59411d5669e64a0776f30ebac52f41d3a94a
+[qbx] https://github.com/qbox-project/qbx_spawn/releases/download/v0.1.1/qbx_spawn.zip b466d83e7ee4b8b0371e479ab89a53dad762b85ad49b784a726a7b44168f34cb
+[qbx] https://github.com/qbox-project/qbx_customs/releases/download/v0.1.0/qbx_customs.zip f038f5cade99c0c5f41a72b368fbb416425b78e90381ae0732f55460dc924e77
+[standalone] https://github.com/Bob74/bob74_ipl/archive/037dd6c71f6894be771e9343008223d7a3305d79.zip dd588fd5c549dbe65bec56f5de177c98b9660c60a59bb213f906723255df990d bob74_ipl-037dd6c71f6894be771e9343008223d7a3305d79 bob74_ipl
+[standalone] https://github.com/qbox-project/safecracker/archive/9252ee803fbc7efd834e14d1b4334f6c3db084ee.zip 7ae9219f4e3ce519971000e313a857e71b396e36f28f4d530a8da704edb1f6e4 safecracker-9252ee803fbc7efd834e14d1b4334f6c3db084ee safecracker
+[standalone] https://github.com/qbox-project/mhacking/archive/3b7013a1063a5acce7f3a19b66fcd8451d007223.zip dc689a1a1678b5d9970926e41079e25f68c85a997901cade08c3d264a5c60722 mhacking-3b7013a1063a5acce7f3a19b66fcd8451d007223 mhacking
+[standalone] https://github.com/Scullyy/scully_emotemenu/archive/8d22fa57ddd366ee672080dde4d854a59328a2d9.zip 6021062ab91f56ae989312e12bcc8d7018ba928b0d0e0bdcd3ec32aeca9874f7 scully_emotemenu-8d22fa57ddd366ee672080dde4d854a59328a2d9 scully_emotemenu
+[standalone] https://github.com/ultrahacx/ultra-voltlab/archive/f673755f710f6b1d3ef392979b0c71b98825de76.zip 29de27037645bc38f50ecf8a1e46342cd98d3d98d84e9c33cca871f73fa3bf96 ultra-voltlab-f673755f710f6b1d3ef392979b0c71b98825de76 ultra-voltlab
+[standalone] https://github.com/BaziForYou/MugShotBase64/archive/9fac1e8783f447666710a6518d4adef08f9cf300.zip ee46292e184f5967477c485b21273f8c7c668df0557cbe3ec69c073eb81ae22f MugShotBase64-9fac1e8783f447666710a6518d4adef08f9cf300/MugShotBase64
+[standalone] https://github.com/Renewed-Scripts/Renewed-Banking/releases/download/v2.1.4/Renewed-Banking.zip 6bd212b31018e880c1b15f1ee68973401c09f6e4b3b519c4f1134b5874550322
+[standalone] https://github.com/Renewed-Scripts/Renewed-Weathersync/releases/download/v1.1.8/Renewed-Weathersync.zip 76584ceb9fc10a9758ab832fc170d1b70bf70de3c8a43da93c026e947225409e
+[standalone] https://github.com/iLLeniumStudios/illenium-appearance/releases/download/v5.7.0/illenium-appearance.zip 947ba68aada743dbd1edf6e50c848a80864215b2b5ac41f9680c1339b35b3117
+[standalone] https://github.com/D4isDAVID/loadscreen/releases/download/v2.2.1/loadscreen.zip ca2d76d3c1efb1fa7b649382e7dafb3e27fa137ddaf77cd509b8df1d3db85fe3
+[standalone] https://github.com/Manason/mana_audio/releases/download/v1.1.1/mana_audio.zip 0270309de591011505302d62430e20713050a9297aa70d28488783f295489258
+[standalone] https://github.com/xT-Development/xt-prison/releases/download/v1.4.9/xt-prison.zip 2e0ecbf995023c853c2c8d7cbc0453a434861844a1cf2e1c21533218bacff616
+[standalone] https://github.com/QuantumMalice/vehiclehandler/releases/download/v1.4.7/vehiclehandler.zip 893562a206c0d87fcb7dc0c6e8c1f241025d9420e62c556f4d981e1bd2a21288
+[voice] https://github.com/AvarianKnight/pma-voice/archive/6c9d96ed7a02e30912f1a0ce92629bf9afbbca8c.zip 8d94ecb34bf98056050f6d14a20e4a72952b4d1de3854040a3974894cfebd257 pma-voice-6c9d96ed7a02e30912f1a0ce92629bf9afbbca8c pma-voice

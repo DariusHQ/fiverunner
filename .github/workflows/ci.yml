@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [qbox, esx]
+        suite: [qbox, esx, qbox-stable]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
