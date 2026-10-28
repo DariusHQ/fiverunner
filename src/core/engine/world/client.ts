@@ -12,6 +12,7 @@ import type { ServerClone } from './server.ts'
 import { sameState, syncStateOf } from './sync.ts'
 import { GameText } from './text.ts'
 import { GameClock, Weather } from './weather.ts'
+import { UNARMED, type PedWeapon } from './weapons.ts'
 
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
 export const PLAYER_ZERO = hashString('player_zero')
@@ -54,6 +55,9 @@ export class ClientEntity {
   readonly configFlags = new Set<number>()
   /** The appearance of a ped, as scripts set it. */
   appearance = new PedAppearance()
+  /** The weapons of a ped, by their hashes, and the one in its hands. */
+  readonly weapons = new Map<number, PedWeapon>()
+  weapon = UNARMED
   /** For peds, the vehicle they are in, if any, and their seat in it: -1 for the driver's, then 0 up for those of passengers. */
   vehicle: ClientEntity | undefined = undefined
   seat = -1
@@ -113,6 +117,7 @@ export class ClientEntity {
     this.armour = state.armour ?? this.armour
     this.plate = state.plate ?? this.plate
     this.plateIndex = state.plateIndex ?? this.plateIndex
+    this.weapon = state.weapon ?? this.weapon
     if (state.vehicle !== undefined) this.syncedVehicle = [state.vehicle, state.vehicleSeat ?? -1]
   }
 }
@@ -300,6 +305,8 @@ export class ClientWorld {
     ped.armour = 0
     ped.configFlags.clear()
     ped.appearance = new PedAppearance()
+    ped.weapons.clear()
+    ped.weapon = UNARMED
   }
 
   /** The entity of a handle, if there is one. */

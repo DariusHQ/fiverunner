@@ -39,6 +39,7 @@ export function syncStateOf(entity: ClientEntity): SyncState {
           armour: entity.armour,
           vehicle: vehicle ?? -1,
           vehicleSeat: vehicle === undefined ? -1 : entity.seat + 2,
+          weapon: entity.weapon,
         }
       : type === EntityType.vehicle
         ? { health: entity.health, plate: entity.plate, plateIndex: entity.plateIndex }
