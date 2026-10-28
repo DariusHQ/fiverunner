@@ -10,6 +10,7 @@ import { entityNatives } from './entities.ts'
 import { eventNatives } from './events.ts'
 import { gameNatives } from './game.ts'
 import { httpNatives } from './http.ts'
+import { interiorNatives } from './interiors.ts'
 import { kvpNatives } from './kvp.ts'
 import { networkNatives } from './network.ts'
 import { nuiNatives } from './nui.ts'
@@ -54,6 +55,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...pedNatives(side),
     ...weaponNatives(side),
     ...doorNatives(side),
+    ...interiorNatives(side),
     ...(side === 'server' ? [...httpNatives(), ...oxmysqlNatives()] : nuiNatives()),
   ]
 }
