@@ -1,5 +1,6 @@
 import { hashString } from '../../natives/index.ts'
 import { Blips } from './blips.ts'
+import { Cameras } from './cameras.ts'
 import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
 import { Input } from './input.ts'
 import { Pool } from './pool.ts'
@@ -200,6 +201,8 @@ export class ClientWorld {
   readonly text = new GameText()
   /** The keyboard of the game, the controls it presses, and the commands that resources bound to its keys. */
   readonly input = new Input()
+  /** The cameras that scripts create. */
+  readonly cameras = new Cameras()
   /** The time of day of the game. */
   readonly clock = new GameClock()
   readonly weather = new Weather()
@@ -383,12 +386,13 @@ export class ClientWorld {
     if (entity !== undefined) this.#hooks.taken(entity)
   }
 
-  /** Lets go of the entities that the script of a resource owns, and removes its blips, as GTA V does as scripts end. */
+  /** Lets go of the entities that the script of a resource owns, and removes its blips and its cameras, as GTA V does as scripts end. */
   release(script: string): void {
     for (const entity of this.#entities) {
       if (entity.script === script) entity.script = undefined
     }
     this.blips.release(script)
+    this.cameras.release(script)
   }
 
   /** Asks the world to load a model, which it does at its next tick. */
