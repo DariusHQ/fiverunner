@@ -224,12 +224,13 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     const ORANGE = [0xf0, 0xa0, 0x30] as const
     const CYAN = [0x4f, 0xd6, 0xe0] as const
     await page.evaluate(`document.getElementById('map').scrollIntoView()`)
-    // The blips of the players are green, and their peds, at the start of the world, orange and cyan, the second over the first.
+    // The blips of the players are green, and their peds, at the start of the world, orange and cyan, the second over the first, whose name makes way for that of the second, under them.
     const [x, y] = await page.until<[number, number]>(pixelsOf(CYAN))
+    const name = await page.evaluate<[number, number] | null>(pixelsOf(ORANGE))
     expect([
       await page.evaluate(`${pixelsOf(GREEN)} !== null`),
-      await page.evaluate(pixelsOf(ORANGE)),
-    ]).toEqual([true, null])
+      name !== null && name[1] > y + 10,
+    ]).toEqual([true, true])
     await mouse('mousedown', x, y)
     await mouse('mousemove', x - 120, y + 60)
     await mouse('mouseup', x - 120, y + 60)
@@ -237,9 +238,10 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     const [movedX, movedY] = await page.until<[number, number]>(
       `(() => { const point = ${pixelsOf(CYAN)}; return point !== null && Math.abs(point[0] - ${x}) > 60 && point })()`,
     )
-    // The name of the player, in its colour, moves the centre of its pixels a little.
-    expect([Math.abs(movedX - x + 120) < 10, Math.abs(movedY - y - 60) < 10]).toEqual([true, true])
-    expect(await page.evaluate(`${pixelsOf(ORANGE)} !== null`)).toBe(true)
+    // The name of the player, in its colour, goes under it, which moves the centre of its pixels a little.
+    expect([Math.abs(movedX - x + 120) < 10, Math.abs(movedY - y - 60) < 20]).toEqual([true, true])
+    const uncovered = await page.evaluate<[number, number]>(pixelsOf(ORANGE))
+    expect(uncovered[1]).toBeLessThan(name![1] - 3)
   })
 
   it('puts the players that it drops on blips where the blips are, at their heights', async () => {
@@ -276,19 +278,24 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
       select.value = '${style}'
       select.dispatchEvent(new Event('change'))
     })()`)
-    /** Whether the corner of the map, where nothing is, is of a colour. */
-    const corner = ([r, g, b]: readonly [number, number, number]) =>
-      page.evaluate<boolean>(`(() => {
+    /** The colour of the map on average, as red, green and blue, which what it scatters on its ground leaves as it is. */
+    const average = () =>
+      page.evaluate<[number, number, number]>(`(() => {
       const canvas = document.querySelector('#map canvas')
-      const [pr, pg, pb] = canvas.getContext('2d').getImageData(canvas.width - 2, canvas.height - 2, 1, 1).data
-      return Math.abs(pr - ${r}) < 24 && Math.abs(pg - ${g}) < 24 && Math.abs(pb - ${b}) < 24
+      const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
+      const sum = [0, 0, 0]
+      for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c] += data[i + c]
+      return sum.map((total) => total / (data.length / 4))
     })()`)
     await choose('Cartoon')
-    // The grass of the cartoon, then the sea of GTA V.
+    // The grass of the cartoon, then the dark blue of the sea of GTA V.
     expect(await page.evaluate(`localStorage.getItem('fiverunner:map-style')`)).toBe('Cartoon')
-    expect(await corner([0x9e, 0xd2, 0x7a])).toBe(true)
+    const [r, g, b] = await average()
+    expect(g - Math.max(r, b)).toBeGreaterThan(40)
     await choose('GTA')
-    expect(await corner([0x0d, 0x18, 0x23])).toBe(true)
+    const [sr, sg, sb] = await average()
+    expect(sb).toBeGreaterThan(sr)
+    expect(sr + sg + sb).toBeLessThan(200)
     await choose('Classic')
     expect(await page.evaluate(`localStorage.getItem('fiverunner:map-style')`)).toBe('Classic')
   })

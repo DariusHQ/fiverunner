@@ -183,6 +183,27 @@ main {
   white-space: pre;
 }
 
+.map .view[data-style='GTA'] .tooltip {
+  background: rgba(3, 6, 9, 0.9);
+  border: 0;
+  border-left: 3px solid var(--accent);
+  border-radius: 0;
+  color: #fff;
+  font-family: Bahnschrift, 'Arial Narrow', 'Roboto Condensed', Arial, sans-serif;
+  font-stretch: semi-condensed;
+  letter-spacing: 0.02em;
+}
+
+.map .view[data-style='Cartoon'] .tooltip {
+  background: #fff;
+  border: 2px solid #2b2d3a;
+  border-radius: 12px;
+  box-shadow: 0 3px 0 rgba(30, 50, 30, 0.25);
+  color: #2d3142;
+  font-family: 'Nunito', 'Varela Round', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 700;
+}
+
 .console {
   flex: 1;
   overflow: auto;

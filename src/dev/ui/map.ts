@@ -6,6 +6,7 @@ import {
   CLASSIC,
   gtaStyle,
   type MapImage,
+  type MapPlayer,
   type MapStyle,
   type Painter,
   playerColour,
@@ -22,6 +23,9 @@ export interface MapActions {
 
 /** Where the world of GTA V is, which the map shows while nothing is on it. */
 const WORLD = { left: -4000, right: 4500, bottom: -4000, top: 8000 }
+
+/** What a style that draws nothing over the edges of the map covers of them. */
+const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 }
 
 /** How long an entity of an animated style takes to go where it moved, in milliseconds. */
 const GLIDE = 450
@@ -74,7 +78,9 @@ export class WorldMap {
   readonly element: HTMLElement
   readonly #canvas: HTMLCanvasElement
   readonly #context: CanvasRenderingContext2D
+  readonly #view: HTMLElement
   readonly #tooltip: HTMLElement
+  readonly #hint: HTMLElement
   readonly #whose: HTMLSelectElement
   readonly #imageControls: HTMLElement
   readonly #actions: MapActions
@@ -134,12 +140,13 @@ export class WorldMap {
       this.#fit()
     })
     this.#imageControls = this.#imageForm()
-    const hint = document.createElement('span')
-    hint.className = 'hint'
-    hint.textContent = 'Drag a player to move them, double-click to set their waypoint'
-    toolbar.append(title, this.#whose, style, fit, this.#imageControls, hint)
+    this.#hint = document.createElement('span')
+    this.#hint.className = 'hint'
+    this.#hint.textContent = 'Drag a player to move them, double-click to set their waypoint'
+    toolbar.append(title, this.#whose, style, fit, this.#imageControls, this.#hint)
     const view = document.createElement('div')
     view.className = 'view'
+    this.#view = view
     this.#canvas = document.createElement('canvas')
     this.#context = this.#canvas.getContext('2d')!
     this.#tooltip = document.createElement('div')
@@ -196,7 +203,11 @@ export class WorldMap {
     store(STYLE_KEY, this.#style.name)
     this.#glides.clear()
     this.#imageControls.hidden = this.#style.name !== 'GTA'
-    this.#draw()
+    // Styles that show how to use the map, as GTA V does, leave the toolbar without its hint.
+    this.#hint.hidden = this.#style.instructions === true
+    this.#view.dataset.style = this.#style.name
+    if (this.#moved) this.#draw()
+    else this.#fit()
     this.#animate()
   }
 
@@ -275,6 +286,17 @@ export class WorldMap {
       : this.#map.blips.filter(({ client }) => String(client) === whose)
   }
 
+  /** The client whose blips the map shows, if it shows those of one. */
+  get #whoseClient(): number | undefined {
+    const whose = this.#whose.value
+    return whose === '' ? undefined : Number(whose)
+  }
+
+  /** The players of the session, as the styles draw them. */
+  get #mapPlayers(): MapPlayer[] {
+    return this.#players.map(({ client, name }) => ({ client, name, colour: playerColour(client) }))
+  }
+
   /** The player whose waypoint a double click sets: the one whose blips the map shows, or the first that joined. */
   get #player(): number | undefined {
     const whose = this.#whose.value
@@ -295,11 +317,14 @@ export class WorldMap {
     ]
   }
 
-  /** Centres the map on what is on it, or on the world of GTA V while nothing is. */
+  /** Centres the map on what is on it, or on the world of GTA V while nothing is, in what its style leaves of the canvas. */
   #fit(): void {
     const points = [...this.#blips, ...this.#map.entities]
-    const { width, height } = this.#canvas.getBoundingClientRect()
-    if (width === 0 || height === 0) return
+    const rect = this.#canvas.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+    const insets = this.#style.insets?.(rect.width, rect.height) ?? NO_INSETS
+    const width = Math.max(rect.width - insets.left - insets.right, 80)
+    const height = Math.max(rect.height - insets.top - insets.bottom, 80)
     let left = WORLD.left
     let right = WORLD.right
     let bottom = WORLD.bottom
@@ -311,12 +336,13 @@ export class WorldMap {
       top = Math.max(...points.map(({ y }) => y))
     }
     const margin = Math.max(right - left, top - bottom, 200) * 0.15
-    this.#centreX = (left + right) / 2
-    this.#centreY = (bottom + top) / 2
     this.#scale = Math.min(
       width / (right - left + 2 * margin),
       height / (top - bottom + 2 * margin),
     )
+    // The middle of what is on the map goes to the middle of what the style leaves of the canvas.
+    this.#centreX = (left + right) / 2 - (insets.left - insets.right) / 2 / this.#scale
+    this.#centreY = (bottom + top) / 2 + (insets.top - insets.bottom) / 2 / this.#scale
     this.#draw()
   }
 
@@ -414,10 +440,10 @@ export class WorldMap {
     })
   }
 
-  /** What the map drew nearest to a pixel of its canvas, within 10 pixels of it, of a kind if one is given. */
+  /** What the map drew nearest to a pixel of its canvas, within 12 pixels of it, of a kind if one is given. */
   #itemAt(sx: number, sy: number, kind?: Item['kind']): Item | undefined {
     let found: Item | undefined
-    let best = 10
+    let best = 12
     for (const item of this.#items) {
       if (kind !== undefined && item.kind !== kind) continue
       const distance = Math.hypot(item.sx - sx, item.sy - sy)
@@ -456,6 +482,7 @@ export class WorldMap {
       context,
       width,
       height,
+      ratio,
       scale: this.#scale,
       time: now,
       toScreen: (x, y) => this.#toScreen(x, y),
@@ -467,11 +494,25 @@ export class WorldMap {
         if (free || must) claimed.push([x, y, w, h])
         return free || must
       },
+      crowding: (x, y, w, h) =>
+        claimed.reduce(
+          (total, [cx, cy, cw, ch]) =>
+            total +
+            Math.max(0, Math.min(x + w, cx + cw) - Math.max(x, cx)) *
+              Math.max(0, Math.min(y + h, cy + ch) - Math.max(y, cy)),
+          0,
+        ),
     }
     const style = this.#style
-    style.background(painter)
-    this.#items = []
     const blips = this.#blips
+    // Labels keep off what the style draws over the edges of the map.
+    const insets = style.insets?.(width, height) ?? NO_INSETS
+    painter.claim(0, 0, width, insets.top, true)
+    painter.claim(width - insets.right, 0, insets.right, height, true)
+    painter.claim(0, height - insets.bottom, width, insets.bottom, true)
+    painter.claim(0, 0, insets.left, height, true)
+    style.background(painter, blips)
+    this.#items = []
     const entities = this.#map.entities.map((entity) => {
       const moving = this.#glides.has(entity.id)
       const [x, y] = this.#position(entity.id, [entity.x, entity.y], now)
@@ -496,30 +537,53 @@ export class WorldMap {
       const [sx, sy] = this.#toScreen(blip.x, blip.y)
       const key = `blip ${blip.client} ${blip.handle}`
       this.#items.push({ key, kind: 'blip', blip, sx, sy })
-      style.blip(painter, blip, sx, sy, this.#scale >= 0.12 || this.#hover === key)
+      style.blip(painter, blip, sx, sy, this.#hover === key)
     }
+    const players = this.#mapPlayers
+    const tags: [name: string, colour: string, sx: number, sy: number][] = []
     for (const { entity, moving, at } of [...entities].sort((a, b) => a.at[1] - b.at[1])) {
-      const [sx, sy] = at
       const player =
         entity.kind === 'player' && entity.owner !== undefined
-          ? {
+          ? (players.find(({ client }) => client === entity.owner) ?? {
+              client: entity.owner,
+              name: undefined,
               colour: playerColour(entity.owner),
-              name: this.#players.find(({ client }) => client === entity.owner)?.name,
-            }
+            })
           : undefined
-      style.entity(painter, entity, sx, sy, moving, player)
+      const [sx, sy] = style.entity(painter, entity, ...at, moving, player)
       this.#items.push({ key: `entity ${entity.id}`, kind: 'entity', entity, sx, sy })
+      if (player?.name !== undefined) tags.push([player.name, player.colour, ...at])
     }
-    style.overlay?.(painter, blips)
+    // Names over the rest: of players first, who always show, then of the blip that the cursor hovers, then of others as the map zooms in on them and they have room.
+    for (const tag of tags) style.tag(painter, ...tag)
+    const hover = this.#hover
+    const labelled = this.#items.filter(
+      (item) => item.kind === 'blip' && (item.key === hover || this.#scale >= 0.12),
+    )
+    labelled.sort((a, b) => Number(b.key === hover) - Number(a.key === hover))
+    for (const item of labelled) {
+      if (item.kind === 'blip' && item.blip.name !== undefined) {
+        style.label(painter, item.blip.name, item.sx, item.sy, item.key === hover)
+      }
+    }
     const drag = this.#drag
     if (drag?.kind === 'player') {
-      context.strokeStyle = playerColour(drag.client)
-      context.setLineDash([4, 4])
-      context.beginPath()
-      context.arc(drag.x, drag.y, 9, 0, Math.PI * 2)
-      context.stroke()
-      context.setLineDash([])
+      const from = entities.find(
+        ({ entity }) => entity.kind === 'player' && entity.owner === drag.client,
+      )?.at
+      const player = players.find(({ client }) => client === drag.client)
+      if (style.dragging !== undefined && from !== undefined && player !== undefined) {
+        style.dragging(painter, from, [drag.x, drag.y], player)
+      } else {
+        context.strokeStyle = playerColour(drag.client)
+        context.setLineDash([4, 4])
+        context.beginPath()
+        context.arc(drag.x, drag.y, 9, 0, Math.PI * 2)
+        context.stroke()
+        context.setLineDash([])
+      }
     }
+    style.overlay?.(painter, blips, players, this.#whoseClient)
     this.#showTooltip()
   }
 
