@@ -101,17 +101,16 @@ RegisterCommand('seen', function() print('seen', GetEntityCoords(GetPlayerPed(1)
   it('run for players by their net ids, once the models of their hashes loaded', async () => {
     const test = await session(
       `RegisterCommand('model', function(_, args) SetPlayerModel(args[1], GetHashKey('mp_m_freemode_01')) end, false)`,
-      `RegisterCommand('loaded', function() print('loaded', HasModelLoaded(GetHashKey('mp_m_freemode_01'))) end, false)`,
+      `RegisterCommand('loaded', function() print('loaded', HasModelLoaded(GetHashKey('mp_m_freemode_01')), GetEntityModel(PlayerPedId()) == GetHashKey('mp_m_freemode_01')) end, false)`,
     )
     command(test, 'model 1')
     step(test)
     const first = [...ask(test, 'loaded'), ...test.client.diagnostics]
     step(test)
     expect([...first, ...ask(test, 'loaded'), ...test.client.diagnostics]).toEqual([
-      '[script:run0] loaded\tfalse',
+      '[script:run0] loaded\tfalse\tfalse',
       // The model loaded at the next tick, then the client ran the native.
-      '[script:run0] loaded\t1',
-      'srv: SetPlayerModel is not implemented in FiveRunner yet: it does nothing and returns zero values.',
+      '[script:run0] loaded\t1\ttrue',
     ])
   })
 
@@ -287,6 +286,15 @@ function recorders(recorded: unknown[][]): NativeDefinition<NativeContext>[] {
     ),
     defineNative(
       {
+        name: 'RECORD_SET_PLAYER_MODEL',
+        hash: 0x00a1cadd00108836n,
+        result: 'void',
+        params: ['Player player', 'Hash model'],
+      },
+      record('model'),
+    ),
+    defineNative(
+      {
         name: 'RECORD_SET_VEHICLE_DOORS_LOCKED',
         hash: 0xb664292eaecf7fa6n,
         result: 'void',
@@ -411,14 +419,15 @@ RegisterCommand('give', function() GiveWeaponToPed(GetPlayerPed(1), GetHashKey('
   })
 
   it('run at once with hashes of 0, which are of no model', async () => {
+    const recorded: unknown[][] = []
     const test = await session(
       `RegisterCommand('model', function() SetPlayerModel(1, 0) end, false)`,
+      '',
+      { clientNatives: recorders(recorded) },
     )
     command(test, 'model')
     step(test)
-    expect(test.client.diagnostics).toEqual([
-      'srv: SetPlayerModel is not implemented in FiveRunner yet: it does nothing and returns zero values.',
-    ])
+    expect(recorded).toEqual([['model', 'srv', 128, 0]])
   })
 
   it('drop what comes for resources that they did not start yet', async () => {
