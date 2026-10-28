@@ -82,6 +82,8 @@ export interface Painter {
   readonly time: number
   toScreen(x: number, y: number): [number, number]
   toWorld(sx: number, sy: number): [number, number]
+  /** Takes a rectangle of the canvas for a label, unless another label has it, or the label must show: whether the label may show. */
+  claim(x: number, y: number, width: number, height: number, must?: boolean): boolean
 }
 
 /** How a style draws the world of the session, from the ground up. */
@@ -148,9 +150,9 @@ function grid(
   context.setLineDash([])
 }
 
-/** Writes `text` outlined, so that it reads over anything. */
+/** Writes `text` outlined, so that it reads over anything, if no other label is there or it must show. */
 function outlined(
-  context: CanvasRenderingContext2D,
+  p: Painter,
   text: string,
   x: number,
   y: number,
@@ -158,8 +160,13 @@ function outlined(
   outline: string,
   font: string,
   align: CanvasTextAlign = 'left',
+  must = false,
 ): void {
+  const { context } = p
   context.font = font
+  const width = context.measureText(text).width
+  const left = align === 'center' ? x - width / 2 : x
+  if (!p.claim(left - 2, y - 12, width + 4, 16, must)) return
   context.textAlign = align
   context.lineJoin = 'round'
   context.lineWidth = 3
@@ -234,15 +241,7 @@ export const CLASSIC: MapStyle = {
     }
     context.globalAlpha = 1
     if (named && blip.name !== undefined) {
-      outlined(
-        context,
-        blip.name,
-        sx + 8,
-        sy + 4,
-        '#c8ccd4',
-        '#0b0c10',
-        '12px system-ui, sans-serif',
-      )
+      outlined(p, blip.name, sx + 8, sy + 4, '#c8ccd4', '#0b0c10', '12px system-ui, sans-serif')
     }
   },
   entity(p, entity, sx, sy, _moving, player) {
@@ -266,7 +265,7 @@ export const CLASSIC: MapStyle = {
       // Under the arrow, off the labels of the blips that players stand on.
       if (player?.name !== undefined) {
         outlined(
-          context,
+          p,
           player.name,
           sx,
           sy + 22,
@@ -274,6 +273,7 @@ export const CLASSIC: MapStyle = {
           '#0b0c10',
           '12px system-ui, sans-serif',
           'center',
+          true,
         )
       }
     } else if (entity.kind === 'vehicle') {
@@ -355,16 +355,19 @@ function character(
   context.restore()
 }
 
-/** A name on a bubble, above what it names. */
+/** A name on a bubble, above what it names, if no other label is there or it must show. */
 function bubble(
-  context: CanvasRenderingContext2D,
+  p: Painter,
   text: string,
   x: number,
   y: number,
   border: string,
+  must = false,
 ): void {
+  const { context } = p
   context.font = '700 12px system-ui, sans-serif'
   const width = context.measureText(text).width + 14
+  if (!p.claim(x - width / 2, y - 18, width, 18, must)) return
   context.fillStyle = '#ffffff'
   context.strokeStyle = border
   context.lineWidth = 2
@@ -515,7 +518,7 @@ export const CARTOON: MapStyle = {
       context.restore()
     }
     context.globalAlpha = 1
-    if (named && blip.name !== undefined) bubble(context, blip.name, sx, sy + 34, '#ffffff')
+    if (named && blip.name !== undefined) bubble(p, blip.name, sx, sy + 34, '#ffffff')
   },
   entity(p, entity, sx, sy, moving, player) {
     const { context, time } = p
@@ -549,7 +552,7 @@ export const CARTOON: MapStyle = {
         entity.kind === 'ped' ? 0.75 : 1,
       )
       context.restore()
-      if (player?.name !== undefined) bubble(context, player.name, sx, sy - 34, player.colour)
+      if (player?.name !== undefined) bubble(p, player.name, sx, sy - 34, player.colour, true)
     } else if (entity.kind === 'vehicle') {
       const size = Math.min(Math.max(p.scale * 2.2, 0.6), 2.2)
       const bounce = moving ? Math.sin(time / 60) * 0.6 : 0
@@ -718,7 +721,7 @@ export function gtaStyle(image: () => MapImage | undefined): MapStyle {
       context.restore()
       context.globalAlpha = 1
       if (named && blip.name !== undefined) {
-        outlined(context, blip.name.toUpperCase(), sx + 11, sy + 4, '#ffffff', '#000000', font(11))
+        outlined(p, blip.name.toUpperCase(), sx + 11, sy + 4, '#ffffff', '#000000', font(11))
       }
     },
     entity(p, entity, sx, sy, _moving, player) {
@@ -756,7 +759,7 @@ export function gtaStyle(image: () => MapImage | undefined): MapStyle {
         context.lineWidth = 1
         if (player?.name !== undefined) {
           outlined(
-            context,
+            p,
             player.name.toUpperCase(),
             sx,
             sy + 24,
@@ -764,6 +767,7 @@ export function gtaStyle(image: () => MapImage | undefined): MapStyle {
             '#000000',
             font(12),
             'center',
+            true,
           )
         }
       } else if (entity.kind === 'vehicle') {

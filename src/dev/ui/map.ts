@@ -93,8 +93,9 @@ export class WorldMap {
   /** The entities of animated styles that are going where they moved, and where each was last told to be, by their ids. */
   readonly #glides = new Map<number, Glide>()
   readonly #last = new Map<number, readonly [number, number]>()
-  /** Whether a frame of the animation of the style is due. */
+  /** Whether a frame of the animation of the style is due, and whether the map is in sight, which it animates only while it is. */
   #animating = false
+  #visible = true
   /** The key of what the cursor hovers. */
   #hover: string | undefined
   #drag:
@@ -147,6 +148,10 @@ export class WorldMap {
     view.append(this.#canvas, this.#tooltip)
     element.append(toolbar, view)
     new ResizeObserver(() => this.#draw()).observe(view)
+    new IntersectionObserver(([entry]) => {
+      this.#visible = entry?.isIntersecting ?? true
+      this.#animate()
+    }).observe(view)
     this.#listen()
     this.#use(this.#style.name)
   }
@@ -195,12 +200,12 @@ export class WorldMap {
     this.#animate()
   }
 
-  /** Redraws the map at each frame while its style moves of itself, until it no longer does. */
+  /** Redraws the map at each frame while its style moves of itself and it is in sight, until one or the other is no longer so. */
   #animate(): void {
-    if (this.#animating || !this.#style.animated) return
+    if (this.#animating || !this.#style.animated || !this.#visible) return
     this.#animating = true
     const frame = () => {
-      if (!this.#style.animated) {
+      if (!this.#style.animated || !this.#visible) {
         this.#animating = false
         return
       }
@@ -440,6 +445,8 @@ export class WorldMap {
     const context = this.#context
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     const now = performance.now()
+    /** The rectangles of the labels of the frame, which others give way to. */
+    const claimed: [number, number, number, number][] = []
     const painter: Painter = {
       context,
       width,
@@ -448,6 +455,13 @@ export class WorldMap {
       time: now,
       toScreen: (x, y) => this.#toScreen(x, y),
       toWorld: (sx, sy) => this.#toWorld(sx, sy),
+      claim: (x, y, w, h, must = false) => {
+        const free = !claimed.some(
+          ([cx, cy, cw, ch]) => x < cx + cw && cx < x + w && y < cy + ch && cy < y + h,
+        )
+        if (free || must) claimed.push([x, y, w, h])
+        return free || must
+      },
     }
     const style = this.#style
     style.background(painter)
