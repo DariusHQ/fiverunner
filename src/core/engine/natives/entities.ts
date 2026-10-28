@@ -441,6 +441,42 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
         return ped !== undefined && isDead(ped)
       },
     ),
+    defineNative(
+      {
+        name: 'SET_PED_CONFIG_FLAG',
+        hash: 0x1913fe4cbf41c463n,
+        result: 'void',
+        params: ['Ped ped', 'int flagId', 'BOOL value'],
+      },
+      (ctx: NativeContext, ped, flag, value) => {
+        const flags = clientEntityOf(ctx, ped)?.configFlags
+        if (value) flags?.add(flag)
+        else flags?.delete(flag)
+      },
+    ),
+    defineNative(
+      {
+        name: 'GET_PED_CONFIG_FLAG',
+        hash: 0x7ee53118c892b513n,
+        result: 'BOOL',
+        params: ['Ped ped', 'int flagId', 'BOOL p2'],
+      },
+      (ctx: NativeContext, ped, flag) => clientEntityOf(ctx, ped)?.configFlags.has(flag) ?? false,
+    ),
+    // Nothing moves peds, which stand still.
+    ...(
+      [
+        ['IS_PED_WALKING', 0xde4c184b2b9b071an, false],
+        ['IS_PED_RUNNING', 0xc5286ffc176f28a2n, false],
+        ['IS_PED_SPRINTING', 0x57e457cd2c0fc168n, false],
+        ['IS_PED_STILL', 0xac29253eef8f0180n, true],
+      ] as const
+    ).map(([name, hash, still]) =>
+      defineNative(
+        { name, hash, result: 'BOOL', params: ['Ped ped'] },
+        (ctx: NativeContext, ped) => still && clientEntityOf(ctx, ped) !== undefined,
+      ),
+    ),
     // Resurrected peds get all their health back.
     defineNative(
       { name: 'RESURRECT_PED', hash: 0x71bc8e838b9c6035n, result: 'void', params: ['Ped ped'] },

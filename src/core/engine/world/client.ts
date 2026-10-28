@@ -48,6 +48,8 @@ export class ClientEntity {
   maxHealth: number
   /** The armour of a ped. */
   armour = 0
+  /** The config flags of a ped that scripts set, which are all unset otherwise. */
+  readonly configFlags = new Set<number>()
   /** For peds, the vehicle they are in, if any, and their seat in it: -1 for the driver's, then 0 up for those of passengers. */
   vehicle: ClientEntity | undefined = undefined
   seat = -1

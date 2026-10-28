@@ -413,6 +413,19 @@ SetPedArmour(2, 1)`),
     expect(client.diagnostics).toEqual([])
   })
 
+  it('have the config flags that scripts set, and stand still, as nothing moves them', async () => {
+    const { run, client } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+SetPedConfigFlag(ped, 184, true)
+SetPedConfigFlag(ped, 35, true)
+SetPedConfigFlag(ped, 35, false)
+print(GetPedConfigFlag(ped, 184, true), GetPedConfigFlag(ped, 35, true), GetPedConfigFlag(2, 184, true))
+print(IsPedWalking(ped), IsPedRunning(ped), IsPedSprinting(ped), IsPedStill(ped), IsPedStill(2))`),
+    ).toEqual(['1\tfalse\tfalse', 'false\tfalse\tfalse\t1\tfalse'])
+    expect(client.diagnostics).toEqual([])
+  })
+
   it('die below the health of 100 that GTA V injures peds below, until they are resurrected', async () => {
     const { run, client } = await clientOf()
     const dead = `print(IsEntityDead(ped), IsPedInjured(ped), IsPedFatallyInjured(ped), IsPedDeadOrDying(ped, true), IsPlayerDead(PlayerId()))`

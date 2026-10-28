@@ -107,6 +107,7 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
     nothing('SET_BIGMAP_ACTIVE', 0x231c8f89d0539d8fn, ['BOOL toggleBigMap', 'BOOL showFullMap']),
     nothing('DISPLAY_RADAR', 0xa0ebb943c300e693n, ['BOOL toggle']),
     nothing('SET_FOLLOW_PED_CAM_VIEW_MODE', 0x5a4f9edf1673f704n, ['int viewMode']),
+    nothing('DRAW_MARKER', 0x28477ec23d892089n, ['int type']),
     defineNative(
       { name: 'IS_PAUSE_MENU_ACTIVE', hash: 0xb0034a223497ffcbn, result: 'BOOL', params: [] },
       () => false,
@@ -177,6 +178,15 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
       () => true,
     ),
     nothing('RELEASE_NAMED_SCRIPT_AUDIO_BANK', 0x77ed170667f50170n, ['char* audioBank']),
+    defineNative(
+      {
+        name: 'PREPARE_ALARM',
+        hash: 0x9d74ae343db65533n,
+        result: 'BOOL',
+        params: ['char* alarmName'],
+      },
+      () => true,
+    ),
     // The loading screen, which clients shut down as they join.
     nothing('SHUTDOWN_LOADING_SCREEN', 0x078ebe9809ccd637n, []),
     nothing('SHUTDOWN_LOADING_SCREEN_NUI', undefined, []),
@@ -188,6 +198,8 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
       'Hash pickupHash',
       'BOOL toggle',
     ]),
+    // Nothing damages entities.
+    nothing('SET_ENTITY_INVINCIBLE', 0x3882114bde571ad4n, ['Entity entity', 'BOOL toggle']),
     nothing('SET_BLOCKING_OF_NON_TEMPORARY_EVENTS', 0x9f8aa94d6d97dbf4n, [
       'Ped ped',
       'BOOL toggle',

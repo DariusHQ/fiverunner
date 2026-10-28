@@ -53,9 +53,11 @@ SetDiscordAppId('123')
 DisplayRadar(false)
 SetAudioFlag('PoliceScannerDisabled', true)
 ShutdownLoadingScreenNui()
+DrawMarker(1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 255, 0, 0, 255, false, false, 2, false, nil, nil, false)
+SetEntityInvincible(PlayerPedId(), true)
 print(IsPauseMenuActive(), GetAspectRatio(false), StartAudioScene('x'), RequestScriptAudioBank('x', false, -1), IsPedBeingStunned(PlayerPedId(), 0))
-print(CreateAudioSubmix('a'), CreateAudioSubmix('b'), GetGameBuildNumber())`),
-    ).toEqual(['false\t1.7777777910233\t1\t1\tfalse', '0\t1\t2944'])
+print(CreateAudioSubmix('a'), CreateAudioSubmix('b'), GetGameBuildNumber(), PrepareAlarm('x'), GetDisplayNameFromVehicleModel(GetHashKey('adder')))`),
+    ).toEqual(['false\t1.7777777910233\t1\t1\tfalse', '0\t1\t2944\t1\tCARNOTFOUND'])
     expect(test.client.diagnostics).toEqual([])
   })
 })
