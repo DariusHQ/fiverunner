@@ -1,5 +1,16 @@
 import type { DevBlip, DevEntity, DevMap } from '../map.ts'
 import type { DevPlayer } from '../session.ts'
+import {
+  blipColour,
+  CARTOON,
+  CLASSIC,
+  gtaStyle,
+  type MapImage,
+  type MapStyle,
+  type Painter,
+  playerColour,
+  WAYPOINT,
+} from './map-styles.ts'
 
 /** What the map does in the session. */
 export interface MapActions {
@@ -9,68 +20,31 @@ export interface MapActions {
   waypoint(client: number, x: number, y: number): void
 }
 
-/** The colours that the map gives the colour ids of blips: FiveRunner's own, near those that GTA V names. */
-const BLIP_COLOURS: readonly string[] = [
-  '#f0f0f0',
-  '#e04646',
-  '#6fcf6f',
-  '#5a9ef0',
-  '#f0f0f0',
-  '#f0d24a',
-  '#e57373',
-  '#b07ee0',
-  '#f080c0',
-  '#f0b070',
-  '#c8a070',
-  '#90e090',
-  '#80c8f0',
-  '#c8a0f0',
-  '#7050b0',
-  '#50d0d0',
-  '#f0e090',
-  '#f09030',
-  '#6aa8f0',
-  '#c05090',
-  '#c0a030',
-  '#d07020',
-  '#b0b0b0',
-  '#f0b0d0',
-  '#c0e050',
-  '#3a8a3a',
-  '#4060f0',
-  '#a040f0',
-  '#806050',
-  '#304090',
-  '#208080',
-  '#b09070',
-]
-
-/** The colours of the players of the session, by their numbers. */
-const PLAYER_COLOURS: readonly string[] = [
-  '#f0a030',
-  '#4fd6e0',
-  '#d070f0',
-  '#5fd068',
-  '#ff5c5c',
-  '#5c8dff',
-]
-
-/** The sprite of the waypoint of players. */
-const WAYPOINT = 8
-
 /** Where the world of GTA V is, which the map shows while nothing is on it. */
 const WORLD = { left: -4000, right: 4500, bottom: -4000, top: 8000 }
 
-/** How far apart the lines of the grid may be, in metres. */
-const STEPS = [10, 25, 50, 100, 250, 500, 1000, 2000]
+/** How long an entity of an animated style takes to go where it moved, in milliseconds. */
+const GLIDE = 450
 
-/** The colour of a blip of a colour id: the map's own for those it names, and a hue of their own for others. */
-function blipColour(colour: number): string {
-  return BLIP_COLOURS[colour] ?? `hsl(${(colour * 137.5) % 360} 70% 62%)`
+/** Where the map keeps, in the storage of the browser, the style that the user chose and the edges of their image. */
+const STYLE_KEY = 'fiverunner:map-style'
+const IMAGE_KEY = 'fiverunner:map-image'
+
+/** Reads what the map keeps in the storage of the browser, which may have none. */
+function stored(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
 }
 
-function playerColour(client: number): string {
-  return PLAYER_COLOURS[(client - 1) % PLAYER_COLOURS.length]!
+function store(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // The map works without its storage, as it does in private windows.
+  }
 }
 
 /** What the map drew at a point of its canvas, which the cursor hovers and drags. */
@@ -79,11 +53,22 @@ type Item = { readonly key: string; readonly sx: number; readonly sy: number } &
   | { readonly kind: 'entity'; readonly entity: DevEntity }
 )
 
+/** An entity going from where it was to where it moved, as animated styles show it. */
+interface Glide {
+  readonly fromX: number
+  readonly fromY: number
+  readonly toX: number
+  readonly toY: number
+  readonly start: number
+}
+
 /**
  * A map of the world of the session: a grid of metres, the entities of the
  * server where their owners synced them, the peds of players, which the
  * cursor drags to put them elsewhere, and the blips of the maps of the
- * players, which a double click adds the waypoint of a player to.
+ * players, which a double click adds the waypoint of a player to. Its
+ * styles draw it: classic, a cartoon, or as the pause menu of GTA V, over
+ * an image of the world that the user gives it.
  */
 export class WorldMap {
   readonly element: HTMLElement
@@ -91,7 +76,11 @@ export class WorldMap {
   readonly #context: CanvasRenderingContext2D
   readonly #tooltip: HTMLElement
   readonly #whose: HTMLSelectElement
+  readonly #imageControls: HTMLElement
   readonly #actions: MapActions
+  readonly #styles: readonly MapStyle[]
+  #style: MapStyle
+  #image: MapImage | undefined
   #map: DevMap = { entities: [], blips: [] }
   #players: readonly DevPlayer[] = []
   /** The point of the world at the centre of the canvas, and how many pixels a metre takes. */
@@ -101,6 +90,11 @@ export class WorldMap {
   /** Whether the user zoomed or moved the map, which then keeps where they put it, where it fits what is on it until then. */
   #moved = false
   #items: Item[] = []
+  /** The entities of animated styles that are going where they moved, and where each was last told to be, by their ids. */
+  readonly #glides = new Map<number, Glide>()
+  readonly #last = new Map<number, readonly [number, number]>()
+  /** Whether a frame of the animation of the style is due. */
+  #animating = false
   /** The key of what the cursor hovers. */
   #hover: string | undefined
   #drag:
@@ -117,6 +111,8 @@ export class WorldMap {
   constructor(element: HTMLElement, actions: MapActions) {
     this.element = element
     this.#actions = actions
+    this.#styles = [CLASSIC, CARTOON, gtaStyle(() => this.#image)]
+    this.#style = this.#styles.find(({ name }) => name === stored(STYLE_KEY)) ?? CLASSIC
     const toolbar = document.createElement('div')
     toolbar.className = 'toolbar'
     const title = document.createElement('h2')
@@ -124,6 +120,11 @@ export class WorldMap {
     this.#whose = document.createElement('select')
     this.#whose.setAttribute('aria-label', 'Whose blips the map shows')
     this.#whose.addEventListener('change', () => this.#draw())
+    const style = document.createElement('select')
+    style.setAttribute('aria-label', 'How the map looks')
+    style.append(...this.#styles.map(({ name }) => new Option(name, name)))
+    style.value = this.#style.name
+    style.addEventListener('change', () => this.#use(style.value))
     const fit = document.createElement('button')
     fit.type = 'button'
     fit.textContent = 'Fit'
@@ -131,10 +132,11 @@ export class WorldMap {
       this.#moved = false
       this.#fit()
     })
+    this.#imageControls = this.#imageForm()
     const hint = document.createElement('span')
     hint.className = 'hint'
     hint.textContent = 'Drag a player to move them, double-click to set their waypoint'
-    toolbar.append(title, this.#whose, fit, hint)
+    toolbar.append(title, this.#whose, style, fit, this.#imageControls, hint)
     const view = document.createElement('div')
     view.className = 'view'
     this.#canvas = document.createElement('canvas')
@@ -146,10 +148,24 @@ export class WorldMap {
     element.append(toolbar, view)
     new ResizeObserver(() => this.#draw()).observe(view)
     this.#listen()
+    this.#use(this.#style.name)
   }
 
   /** Shows the world of the session as it is now, with its players. */
   show(map: DevMap, players: readonly DevPlayer[]): void {
+    const now = performance.now()
+    for (const entity of map.entities) {
+      const last = this.#last.get(entity.id)
+      if (
+        this.#style.animated &&
+        last !== undefined &&
+        (last[0] !== entity.x || last[1] !== entity.y)
+      ) {
+        const [fromX, fromY] = this.#position(entity.id, last, now)
+        this.#glides.set(entity.id, { fromX, fromY, toX: entity.x, toY: entity.y, start: now })
+      }
+      this.#last.set(entity.id, [entity.x, entity.y])
+    }
     this.#map = map
     if (
       players.map(({ client, name }) => `${client} ${name}`).join() !==
@@ -169,6 +185,83 @@ export class WorldMap {
     else this.#draw()
   }
 
+  /** Draws the map in a style of a name, which the map keeps for the next time. */
+  #use(name: string): void {
+    this.#style = this.#styles.find((style) => style.name === name) ?? CLASSIC
+    store(STYLE_KEY, this.#style.name)
+    this.#glides.clear()
+    this.#imageControls.hidden = this.#style.name !== 'GTA'
+    this.#draw()
+    this.#animate()
+  }
+
+  /** Redraws the map at each frame while its style moves of itself, until it no longer does. */
+  #animate(): void {
+    if (this.#animating || !this.#style.animated) return
+    this.#animating = true
+    const frame = () => {
+      if (!this.#style.animated) {
+        this.#animating = false
+        return
+      }
+      this.#draw()
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
+  }
+
+  /** The form that puts an image of the world under the map, with the coordinates of the world at its edges. */
+  #imageForm(): HTMLElement {
+    const form = document.createElement('details')
+    form.className = 'map-image'
+    const summary = document.createElement('summary')
+    summary.textContent = 'Map image'
+    const file = document.createElement('input')
+    file.type = 'file'
+    file.accept = 'image/*'
+    file.setAttribute('aria-label', 'An image of the world to show under the map')
+    const edges = (JSON.parse(stored(IMAGE_KEY) ?? 'null') as number[] | null) ?? [
+      WORLD.left,
+      WORLD.top,
+      WORLD.right,
+      WORLD.bottom,
+    ]
+    const inputs = ['Left', 'Top', 'Right', 'Bottom'].map((label, index) => {
+      const input = document.createElement('input')
+      input.type = 'number'
+      input.value = String(edges[index])
+      input.setAttribute(
+        'aria-label',
+        `The ${label.toLowerCase()} edge of the image, in metres of the world`,
+      )
+      input.title = `${label} edge, in metres`
+      return input
+    })
+    let picture: HTMLImageElement | undefined
+    const apply = () => {
+      const [left, top, right, bottom] = inputs.map((input) => Number(input.value))
+      store(IMAGE_KEY, JSON.stringify([left, top, right, bottom]))
+      this.#image =
+        picture === undefined
+          ? undefined
+          : { image: picture, left: left!, top: top!, right: right!, bottom: bottom! }
+      this.#draw()
+    }
+    file.addEventListener('change', () => {
+      const chosen = file.files?.[0]
+      if (chosen === undefined) return
+      const image = new Image()
+      image.addEventListener('load', () => {
+        picture = image
+        apply()
+      })
+      image.src = URL.createObjectURL(chosen)
+    })
+    for (const input of inputs) input.addEventListener('change', apply)
+    form.append(summary, file, ...inputs)
+    return form
+  }
+
   /** The blips of the players that the map shows. */
   get #blips(): readonly DevBlip[] {
     const whose = this.#whose.value
@@ -182,6 +275,19 @@ export class WorldMap {
     const whose = this.#whose.value
     if (whose !== '') return Number(whose)
     return this.#players.find(({ state }) => state === 'joined')?.client
+  }
+
+  /** Where an entity is drawn at `now`: on its way to where it moved, or where it is. */
+  #position(id: number, at: readonly [number, number], now: number): [number, number] {
+    const glide = this.#glides.get(id)
+    if (glide === undefined) return [at[0], at[1]]
+    const t = Math.min((now - glide.start) / GLIDE, 1)
+    if (t === 1) this.#glides.delete(id)
+    const ease = 1 - (1 - t) ** 3
+    return [
+      glide.fromX + (glide.toX - glide.fromX) * ease,
+      glide.fromY + (glide.toY - glide.fromY) * ease,
+    ]
   }
 
   /** Centres the map on what is on it, or on the world of GTA V while nothing is. */
@@ -333,16 +439,59 @@ export class WorldMap {
     canvas.dataset.view = `${this.#centreX} ${this.#centreY} ${this.#scale}`
     const context = this.#context
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
-    context.clearRect(0, 0, width, height)
-    this.#drawGrid(width, height)
+    const now = performance.now()
+    const painter: Painter = {
+      context,
+      width,
+      height,
+      scale: this.#scale,
+      time: now,
+      toScreen: (x, y) => this.#toScreen(x, y),
+      toWorld: (sx, sy) => this.#toWorld(sx, sy),
+    }
+    const style = this.#style
+    style.background(painter)
     this.#items = []
     const blips = this.#blips
-    // Areas under the rest, then the routes to blips, then blips, then entities over them.
-    for (const blip of blips)
-      if (blip.shape === 'radius' || blip.shape === 'area') this.#drawArea(blip)
-    for (const blip of blips) if (blip.route) this.#drawRoute(blip)
-    for (const blip of blips) this.#drawBlip(blip)
-    for (const entity of this.#map.entities) this.#drawEntity(entity)
+    const entities = this.#map.entities.map((entity) => {
+      const moving = this.#glides.has(entity.id)
+      const [x, y] = this.#position(entity.id, [entity.x, entity.y], now)
+      return { entity, moving, at: this.#toScreen(x, y) }
+    })
+    // Areas under the rest, then the routes to blips, then blips, then entities over them, the nearest of the north the furthest back.
+    for (const blip of blips) {
+      if (blip.shape === 'radius' || blip.shape === 'area') {
+        style.area(painter, blip, ...this.#toScreen(blip.x, blip.y))
+      }
+    }
+    for (const blip of blips) {
+      if (!blip.route) continue
+      const ped = entities.find(
+        ({ entity }) => entity.kind === 'player' && entity.owner === blip.client,
+      )
+      if (ped !== undefined) {
+        style.route(painter, ped.at, this.#toScreen(blip.x, blip.y), blipColour(blip.colour))
+      }
+    }
+    for (const blip of blips) {
+      const [sx, sy] = this.#toScreen(blip.x, blip.y)
+      const key = `blip ${blip.client} ${blip.handle}`
+      this.#items.push({ key, kind: 'blip', blip, sx, sy })
+      style.blip(painter, blip, sx, sy, this.#scale >= 0.12 || this.#hover === key)
+    }
+    for (const { entity, moving, at } of [...entities].sort((a, b) => a.at[1] - b.at[1])) {
+      const [sx, sy] = at
+      const player =
+        entity.kind === 'player' && entity.owner !== undefined
+          ? {
+              colour: playerColour(entity.owner),
+              name: this.#players.find(({ client }) => client === entity.owner)?.name,
+            }
+          : undefined
+      style.entity(painter, entity, sx, sy, moving, player)
+      this.#items.push({ key: `entity ${entity.id}`, kind: 'entity', entity, sx, sy })
+    }
+    style.overlay?.(painter, blips)
     const drag = this.#drag
     if (drag?.kind === 'player') {
       context.strokeStyle = playerColour(drag.client)
@@ -353,155 +502,6 @@ export class WorldMap {
       context.setLineDash([])
     }
     this.#showTooltip()
-  }
-
-  #drawGrid(width: number, height: number): void {
-    const context = this.#context
-    const step = STEPS.find((each) => each * this.#scale >= 70) ?? STEPS.at(-1)!
-    const [left, top] = this.#toWorld(0, 0)
-    const [right, bottom] = this.#toWorld(width, height)
-    context.lineWidth = 1
-    context.font = '11px ui-monospace, Consolas, monospace'
-    context.fillStyle = '#5a606c'
-    for (let x = Math.ceil(left / step) * step; x <= right; x += step) {
-      const [sx] = this.#toScreen(x, 0)
-      context.strokeStyle = x === 0 ? '#3a404c' : '#1f232b'
-      context.beginPath()
-      context.moveTo(Math.round(sx) + 0.5, 0)
-      context.lineTo(Math.round(sx) + 0.5, height)
-      context.stroke()
-      context.fillText(String(x), sx + 3, 12)
-    }
-    for (let y = Math.ceil(bottom / step) * step; y <= top; y += step) {
-      const [, sy] = this.#toScreen(0, y)
-      context.strokeStyle = y === 0 ? '#3a404c' : '#1f232b'
-      context.beginPath()
-      context.moveTo(0, Math.round(sy) + 0.5)
-      context.lineTo(width, Math.round(sy) + 0.5)
-      context.stroke()
-      context.fillText(String(y), 3, sy - 3)
-    }
-  }
-
-  #drawArea(blip: DevBlip): void {
-    const context = this.#context
-    const [sx, sy] = this.#toScreen(blip.x, blip.y)
-    context.globalAlpha = (blip.alpha / 255) * 0.35
-    context.fillStyle = blipColour(blip.colour)
-    context.beginPath()
-    if (blip.shape === 'radius')
-      context.arc(sx, sy, (blip.radius ?? 0) * this.#scale, 0, Math.PI * 2)
-    else {
-      const w = (blip.width ?? 0) * this.#scale
-      const h = (blip.height ?? 0) * this.#scale
-      context.rect(sx - w / 2, sy - h / 2, w, h)
-    }
-    context.fill()
-    context.globalAlpha = 1
-  }
-
-  #drawRoute(blip: DevBlip): void {
-    const ped = this.#map.entities.find(
-      ({ kind, owner }) => kind === 'player' && owner === blip.client,
-    )
-    if (ped === undefined) return
-    const context = this.#context
-    context.strokeStyle = blipColour(blip.colour)
-    context.lineWidth = 2
-    context.setLineDash([6, 5])
-    context.beginPath()
-    context.moveTo(...this.#toScreen(ped.x, ped.y))
-    context.lineTo(...this.#toScreen(blip.x, blip.y))
-    context.stroke()
-    context.setLineDash([])
-    context.lineWidth = 1
-  }
-
-  #drawBlip(blip: DevBlip): void {
-    const context = this.#context
-    const [sx, sy] = this.#toScreen(blip.x, blip.y)
-    context.globalAlpha = Math.max(blip.alpha / 255, 0.25)
-    if (blip.sprite === WAYPOINT) {
-      context.fillStyle = '#d070f0'
-      context.beginPath()
-      context.moveTo(sx, sy - 9)
-      context.lineTo(sx + 7, sy)
-      context.lineTo(sx, sy + 9)
-      context.lineTo(sx - 7, sy)
-      context.closePath()
-      context.fill()
-    } else if (blip.shape !== 'radius' && blip.shape !== 'area') {
-      context.fillStyle = blipColour(blip.colour)
-      context.strokeStyle = '#0b0c10'
-      context.beginPath()
-      context.arc(sx, sy, 5, 0, Math.PI * 2)
-      context.fill()
-      context.stroke()
-    }
-    context.globalAlpha = 1
-    const key = `blip ${blip.client} ${blip.handle}`
-    this.#items.push({ key, kind: 'blip', blip, sx, sy })
-    if (blip.name !== undefined && (this.#scale >= 0.12 || this.#hover === key)) {
-      this.#label(blip.name, sx + 8, sy + 4, '#c8ccd4')
-    }
-  }
-
-  #drawEntity(entity: DevEntity): void {
-    const context = this.#context
-    const [sx, sy] = this.#toScreen(entity.x, entity.y)
-    const turn = (-entity.heading * Math.PI) / 180
-    if (entity.kind === 'player') {
-      const colour = entity.owner === undefined ? '#d7dae0' : playerColour(entity.owner)
-      context.save()
-      context.translate(sx, sy)
-      context.rotate(turn)
-      context.fillStyle = colour
-      context.strokeStyle = '#0b0c10'
-      context.beginPath()
-      context.moveTo(0, -10)
-      context.lineTo(7, 7)
-      context.lineTo(0, 3)
-      context.lineTo(-7, 7)
-      context.closePath()
-      context.fill()
-      context.stroke()
-      context.restore()
-      const name = this.#players.find(({ client }) => client === entity.owner)?.name
-      // Under the arrow, off the labels of the blips that players stand on.
-      if (name !== undefined) this.#label(name, sx, sy + 22, colour, 'center')
-    } else if (entity.kind === 'vehicle') {
-      context.save()
-      context.translate(sx, sy)
-      context.rotate(turn)
-      context.fillStyle = '#8a909c'
-      context.fillRect(-4, -7, 8, 14)
-      context.restore()
-    } else {
-      context.fillStyle = entity.kind === 'ped' ? '#a8adb8' : '#5a606c'
-      context.beginPath()
-      context.arc(sx, sy, entity.kind === 'ped' ? 3.5 : 2.5, 0, Math.PI * 2)
-      context.fill()
-    }
-    this.#items.push({ key: `entity ${entity.id}`, kind: 'entity', entity, sx, sy })
-  }
-
-  #label(
-    text: string,
-    x: number,
-    y: number,
-    colour: string,
-    align: CanvasTextAlign = 'left',
-  ): void {
-    const context = this.#context
-    context.font = '12px system-ui, sans-serif'
-    context.textAlign = align
-    context.lineWidth = 3
-    context.strokeStyle = '#0b0c10'
-    context.strokeText(text, x, y)
-    context.fillStyle = colour
-    context.fillText(text, x, y)
-    context.lineWidth = 1
-    context.textAlign = 'left'
   }
 
   #showTooltip(): void {

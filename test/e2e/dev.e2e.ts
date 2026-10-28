@@ -269,6 +269,30 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     )
   })
 
+  it('draws the map as a cartoon or as GTA V does, which it keeps for the next time', async () => {
+    const choose = (style: string) =>
+      page.evaluate(`(() => {
+      const select = [...document.querySelectorAll('#map select')].find((s) => [...s.options].some((o) => o.value === 'GTA'))
+      select.value = '${style}'
+      select.dispatchEvent(new Event('change'))
+    })()`)
+    /** Whether the corner of the map, where nothing is, is of a colour. */
+    const corner = ([r, g, b]: readonly [number, number, number]) =>
+      page.evaluate<boolean>(`(() => {
+      const canvas = document.querySelector('#map canvas')
+      const [pr, pg, pb] = canvas.getContext('2d').getImageData(canvas.width - 2, canvas.height - 2, 1, 1).data
+      return Math.abs(pr - ${r}) < 24 && Math.abs(pg - ${g}) < 24 && Math.abs(pb - ${b}) < 24
+    })()`)
+    await choose('Cartoon')
+    // The grass of the cartoon, then the sea of GTA V.
+    expect(await page.evaluate(`localStorage.getItem('fiverunner:map-style')`)).toBe('Cartoon')
+    expect(await corner([0x9e, 0xd2, 0x7a])).toBe(true)
+    await choose('GTA')
+    expect(await corner([0x0d, 0x18, 0x23])).toBe(true)
+    await choose('Classic')
+    expect(await page.evaluate(`localStorage.getItem('fiverunner:map-style')`)).toBe('Classic')
+  })
+
   it('gives the games of players the keys of their screens, which run the commands bound to them', async () => {
     await page.evaluate(`(() => {
       const screen = document.querySelector('.screen')

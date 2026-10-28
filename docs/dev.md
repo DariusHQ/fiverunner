@@ -42,6 +42,12 @@ The map shows the world of the server on a grid of metres, with the north up: th
 - Dragging the ped of a player puts it where it is dropped, at the height it had, with the vehicle it is in, as a script of the client would with `SetPedCoordsKeepVehicle`, which its client syncs to the server. Dropped on a blip, it goes where the blip is, at its height, as the blips of garages, shops and jobs are where players use them.
 - A double click sets the waypoint of a player there, as the map of the game does: that of the player whose blips the map shows, or of the first that joined.
 
+The map has three styles, which the dev UI keeps for the next time:
+
+- **Classic**: dots, arrows and a grid, on the dark of the dev UI.
+- **Cartoon**: little characters that breathe and walk to where they move, cars with wheels and headlights, round badges with icons for the blips, and a flag on the waypoint, on grass.
+- **GTA**: the style of the pause menu of GTA V: glyphs on the dark of the sea, players as arrows with cones of sight, magenta routes and a legend of the blips. **Map image** puts an image of the world of your own under it, from your computer, with the coordinates of the world at its edges, which the dev UI keeps for the next time, but not the image. FiveRunner has no image of the map of GTA V, whose pictures are Rockstar's, nor of its blips: the icons of the styles are FiveRunner's own, for the sprites of garages, shops, clothes, barbers, guns, banks, hospitals, police, fuel, houses, mechanics and airports, and the first letter of their names for others.
+
 ## Players
 
 **Connect a player** starts a client and connects it to the server with the name in the box, and a license of the name, `license:` and the SHA-1 of the name, as players of FiveM have the license of their Rockstar account, which frameworks such as QBox and ESX keep their characters by. It joins as a FiveM client does: the server's `playerConnecting` handlers and deferrals run, then the client downloads its resources and starts them. While deferrals present an adaptive card, the player shows it, with a box for the JSON that its `Action.Submit` would give, which **Submit card** submits. **Disconnect** quits the client, as the player leaving the game does.

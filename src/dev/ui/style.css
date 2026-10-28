@@ -128,6 +128,33 @@ main {
   font-size: 12px;
 }
 
+.map .map-image {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.map .map-image[open] {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.map .map-image summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.map .map-image input[type='number'] {
+  width: 72px;
+}
+
+.map .map-image input[type='file'] {
+  max-width: 190px;
+  font-size: 11px;
+}
+
 .map .view {
   position: relative;
   flex: 1;
