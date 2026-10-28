@@ -48,7 +48,9 @@ npx fiverunner dev
 
 The dev UI has the console of your server, where you run commands, its resources, which you start, stop and restart, the events that the server and the players send each other, which you trigger too, its state bags, and a map of its entities and of the blips of the players, classic, as a cartoon or in the style of GTA V, where you drag players to move them. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI restarts the resources that they belong to, and the players stay. [docs/dev.md](docs/dev.md) tells all that it does.
 
-![The map of the dev UI: the blips that the resources of Qbox put on the map of a player, over Los Santos and Blaine County, and the player](docs/media/map.png)
+![The map of the dev UI in the style of the pause menu of GTA V: the blips that the resources of Qbox put on the map of a player, with a legend](docs/media/map-gta.png)
+
+![The map of the dev UI as a cartoon: the blips of Qbox as round badges, on grass](docs/media/map-cartoon.png)
 
 ## Frameworks
 

@@ -2,8 +2,9 @@
  * Records the demo of FiveRunner, demo/fiverunner.mp4, and the pictures of
  * the README, docs/media/*.png, on a deployment of the Stable recipe of
  * Qbox for txAdmin: its tests in a terminal, then the dev UI, where a
- * player registers a character, is dragged to a garage on the map, presses
- * E and takes a car out, with captions. Chrome records the page and
+ * player registers a character, the map shows the city in the style of GTA
+ * V and as a cartoon, in which she is dragged to a garage, presses E and
+ * takes a car out, with captions. Chrome records the page and
  * encodes the video itself. The demo puts the tests of the Qbox Stable
  * suite of compat, and a resource of its own in scripts/demo, in the
  * deployment.
@@ -181,21 +182,28 @@ const GARAGE = [275.58, -344.74] as const
 /** The button that enlarges the screen of the player, or shrinks it. */
 const ENLARGE = `[...document.querySelectorAll('.player header button')].find((b) => ['Enlarge', 'Shrink'].includes(b.textContent))`
 
-/** Where the arrow of the first player is on the map: its orange pixels, but those of the name under it. */
-const PLAYER = `(() => {
-  const canvas = document.querySelector('#map canvas')
-  const { data, width } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
-  const found = []
-  for (let i = 0; i < data.length; i += 4) {
-    if (Math.abs(data[i] - 0xf0) < 6 && Math.abs(data[i + 1] - 0xa0) < 6 && Math.abs(data[i + 2] - 0x30) < 6) found.push([(i / 4) % width, Math.floor(i / 4 / width)])
-  }
-  if (found.length === 0) return null
-  const top = Math.min(...found.map(([, y]) => y))
-  const arrow = found.filter(([, y]) => y < top + 20 * devicePixelRatio)
-  const r = canvas.getBoundingClientRect()
-  const at = (index) => arrow.reduce((total, point) => total + point[index], 0) / arrow.length / devicePixelRatio
-  return [r.left + at(0), r.top + at(1)]
-})()`
+/** Where the ped of the first player is on the page, as the map says where its players are. */
+async function playerOnMap(page: Page): Promise<[number, number]> {
+  const [x, y] = await page.until<[number, number]>(
+    `(() => { const found = JSON.parse(document.querySelector('#map canvas').dataset.players ?? '[]').find(([client]) => client === 1); return found && [found[1], found[2]] })()`,
+  )
+  return onMap(page, x, y)
+}
+
+/** Has the map drawn in a style, as a user would choose it. */
+async function useStyle(page: Page, style: string): Promise<void> {
+  const select = `[...document.querySelectorAll('#map select')].find((s) => [...s.options].some((o) => o.value === 'GTA'))`
+  const [x, y] = await page.evaluate<[number, number]>(
+    `(() => { const r = (${select}).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2] })()`,
+  )
+  await page.evaluate(`window.demoCursor(${x}, ${y})`)
+  await sleep(800)
+  await page.evaluate('window.demoClick()')
+  await page.evaluate(
+    `(() => { const s = ${select}; s.value = '${style}'; s.dispatchEvent(new Event('change')) })()`,
+  )
+  await sleep(300)
+}
 
 /** The element of a page that has `text` alone, such as an option of a menu. */
 const leaf = (text: string) =>
@@ -448,12 +456,19 @@ async function main(): Promise<void> {
     await sleep(2000)
     const [gx, gy] = await onMap(page, GARAGE[0], GARAGE[1])
     await zoom(page, gx, gy, 3)
-    await sleep(1500)
-    await shoot(page, frames, 'map.png', `document.getElementById('map')`)
+    await sleep(1000)
+    await caption(page, 'In the style of the pause menu of GTA V')
+    await useStyle(page, 'GTA')
+    await sleep(2200)
+    await shoot(page, frames, 'map-gta.png', `document.getElementById('map')`)
+    await caption(page, 'Or as a cartoon')
+    await useStyle(page, 'Cartoon')
+    await sleep(2200)
+    await shoot(page, frames, 'map-cartoon.png', `document.getElementById('map')`)
     await page.evaluate(`window.scrollTo({ top: document.getElementById('map').offsetTop + 320 })`)
     await sleep(1500)
     await caption(page, 'Drag her to a garage on the map')
-    const [px, py] = await page.until<[number, number]>(PLAYER)
+    const [px, py] = await playerOnMap(page)
     const [tx, ty] = await onMap(page, GARAGE[0], GARAGE[1])
     await page.evaluate(`window.demoCursor(${px}, ${py})`)
     await sleep(900)
