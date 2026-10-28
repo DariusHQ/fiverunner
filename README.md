@@ -6,7 +6,7 @@ Run FiveM resources in your browser and in CI. No GTA V, no FXServer, no restart
 
 ![The Stable recipe of Qbox in the dev UI: the console of its server, the events that its player sent, its resources and state bags, and the map of its world](docs/media/dev-ui.png)
 
-[Watch the demo](https://github.com/DariusHQ/fiverunner/releases/download/v0.6.0/fiverunner.mp4) (84 seconds): the whole Stable recipe of Qbox for txAdmin, tested, then in the dev UI, where a player registers a character, is dragged to a garage on the map, presses E and takes her car out.
+[Watch the demo](https://github.com/DariusHQ/fiverunner/releases/download/v0.8.0/fiverunner.mp4) (92 seconds): the whole Stable recipe of Qbox for txAdmin, tested, then in the dev UI, where a player registers a character, the map shows the city in the style of GTA V and as a cartoon, and she is dragged to a garage, presses E and takes her car out.
 
 ## Testing resources
 
