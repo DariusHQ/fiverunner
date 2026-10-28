@@ -13,6 +13,7 @@ import { kvpNatives } from './kvp.ts'
 import { networkNatives } from './network.ts'
 import { nuiNatives } from './nui.ts'
 import { oxmysqlNatives } from './oxmysql.ts'
+import { pedNatives } from './peds.ts'
 import { playerNatives } from './players.ts'
 import { refNatives } from './refs.ts'
 import { resourceNatives } from './resources.ts'
@@ -48,6 +49,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...gameNatives(side),
     ...weatherNatives(side),
     ...cameraNatives(side),
+    ...pedNatives(side),
     ...(side === 'server' ? [...httpNatives(), ...oxmysqlNatives()] : nuiNatives()),
   ]
 }

@@ -1,4 +1,5 @@
 import { hashString } from '../../natives/index.ts'
+import { PedAppearance } from './appearance.ts'
 import { Blips } from './blips.ts'
 import { Cameras } from './cameras.ts'
 import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
@@ -51,6 +52,8 @@ export class ClientEntity {
   armour = 0
   /** The config flags of a ped that scripts set, which are all unset otherwise. */
   readonly configFlags = new Set<number>()
+  /** The appearance of a ped, as scripts set it. */
+  appearance = new PedAppearance()
   /** For peds, the vehicle they are in, if any, and their seat in it: -1 for the driver's, then 0 up for those of passengers. */
   vehicle: ClientEntity | undefined = undefined
   seat = -1
@@ -277,6 +280,26 @@ export class ClientWorld {
     const digit = () => String(draw(10))
     const letter = () => String.fromCharCode(0x41 + draw(26))
     return digit() + digit() + letter() + letter() + letter() + digit() + digit() + digit()
+  }
+
+  /**
+   * Gives the local player a new ped of a model, as SetPlayerModel does: its
+   * ped gets a handle of its own, which the old one no longer names, and
+   * starts where it was as a new ped of a player, but networked as it was.
+   */
+  changePlayerModel(model: number): void {
+    const ped = this.playerPed
+    this.blips.forget(ped)
+    ped.leaveVehicle()
+    ped.lastVehicle = undefined
+    this.#guids.delete(ped.handle)
+    ped.handle = this.#guids.add(ped)
+    ped.model = model
+    this.#kinds.set(model, EntityType.ped)
+    ped.health = ped.maxHealth = 200
+    ped.armour = 0
+    ped.configFlags.clear()
+    ped.appearance = new PedAppearance()
   }
 
   /** The entity of a handle, if there is one. */
