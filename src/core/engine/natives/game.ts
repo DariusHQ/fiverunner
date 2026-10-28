@@ -108,6 +108,15 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
     nothing('DISPLAY_RADAR', 0xa0ebb943c300e693n, ['BOOL toggle']),
     nothing('SET_FOLLOW_PED_CAM_VIEW_MODE', 0x5a4f9edf1673f704n, ['int viewMode']),
     nothing('DRAW_MARKER', 0x28477ec23d892089n, ['int type']),
+    nothing('DRAW_RECT', 0x3a618a217e5154f0n, [
+      'float x',
+      'float y',
+      'float width',
+      'float height',
+    ]),
+    nothing('SET_SCRIPT_GFX_DRAW_ORDER', 0x61bb1d9b3a95d802n, ['int drawOrder']),
+    nothing('SET_TEXT_RENDER_ID', 0x5f15302936e07111n, ['int renderId']),
+    nothing('SET_USE_HI_DOF', 0xa13b0222f3d94a94n, []),
     defineNative(
       { name: 'IS_PAUSE_MENU_ACTIVE', hash: 0xb0034a223497ffcbn, result: 'BOOL', params: [] },
       () => false,
@@ -178,6 +187,7 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
       () => true,
     ),
     nothing('RELEASE_NAMED_SCRIPT_AUDIO_BANK', 0x77ed170667f50170n, ['char* audioBank']),
+    nothing('STOP_ALL_ALARMS', 0x2f794a877add4c92n, ['BOOL stop']),
     defineNative(
       {
         name: 'PREPARE_ALARM',
