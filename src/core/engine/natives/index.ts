@@ -5,6 +5,7 @@ import { cameraNatives } from './cameras.ts'
 import { consoleNatives } from './console.ts'
 import { controlNatives } from './controls.ts'
 import { convarNatives } from './convars.ts'
+import { doorNatives } from './doors.ts'
 import { entityNatives } from './entities.ts'
 import { eventNatives } from './events.ts'
 import { gameNatives } from './game.ts'
@@ -52,6 +53,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...cameraNatives(side),
     ...pedNatives(side),
     ...weaponNatives(side),
+    ...doorNatives(side),
     ...(side === 'server' ? [...httpNatives(), ...oxmysqlNatives()] : nuiNatives()),
   ]
 }

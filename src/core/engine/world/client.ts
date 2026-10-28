@@ -2,6 +2,7 @@ import { hashString } from '../../natives/index.ts'
 import { PedAppearance } from './appearance.ts'
 import { Blips } from './blips.ts'
 import { Cameras } from './cameras.ts'
+import type { Door } from './doors.ts'
 import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
 import { Input } from './input.ts'
 import { Pool } from './pool.ts'
@@ -209,6 +210,8 @@ export class ClientWorld {
   readonly text = new GameText()
   /** The keyboard of the game, the controls it presses, and the commands that resources bound to its keys. */
   readonly input = new Input()
+  /** The doors of the door system, by their hashes. */
+  readonly doors = new Map<number, Door>()
   /** The cameras that scripts create. */
   readonly cameras = new Cameras()
   /** The time of day of the game. */
