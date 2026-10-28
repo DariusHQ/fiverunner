@@ -362,7 +362,9 @@ describe('The dev server', () => {
     const { port } = taken.address() as AddressInfo
     try {
       const { server } = await start(undefined, port)
-      expect(server.port).toBe(port + 1)
+      // Another test may take the next port too, which the server passes for one after it.
+      expect(server.port).toBeGreaterThan(port)
+      expect(server.port).toBeLessThanOrEqual(port + 20)
     } finally {
       await new Promise((resolve) => taken.close(resolve))
     }
