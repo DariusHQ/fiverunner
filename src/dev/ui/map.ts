@@ -440,8 +440,13 @@ export class WorldMap {
       canvas.width = Math.round(width * ratio)
       canvas.height = Math.round(height * ratio)
     }
-    // Where the map looks, for tools that drive the dev UI, such as its demo, to find points of the world on it.
+    // Where the map looks, and where players are, for tools that drive the dev UI, such as its demo, to find them on it.
     canvas.dataset.view = `${this.#centreX} ${this.#centreY} ${this.#scale}`
+    canvas.dataset.players = JSON.stringify(
+      this.#map.entities.flatMap(({ kind, owner, x, y }) =>
+        kind === 'player' && owner !== undefined ? [[owner, x, y]] : [],
+      ),
+    )
     const context = this.#context
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     const now = performance.now()
