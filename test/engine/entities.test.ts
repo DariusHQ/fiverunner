@@ -413,6 +413,34 @@ SetPedArmour(2, 1)`),
     expect(client.diagnostics).toEqual([])
   })
 
+  it('die below the health of 100 that GTA V injures peds below, until they are resurrected', async () => {
+    const { run, client } = await clientOf()
+    const dead = `print(IsEntityDead(ped), IsPedInjured(ped), IsPedFatallyInjured(ped), IsPedDeadOrDying(ped, true), IsPlayerDead(PlayerId()))`
+    expect(
+      run(`local ped = PlayerPedId()
+${dead}
+SetEntityHealth(ped, 100)
+${dead}
+SetEntityHealth(ped, 99)
+${dead}
+NetworkResurrectLocalPlayer(10.0, 20.0, 30.0, 90.0, true, false)
+${dead}
+print(GetEntityHealth(ped), GetEntityCoords(ped), GetEntityHeading(ped))
+SetEntityHealth(ped, 0)
+ResurrectPed(ped)
+print(GetEntityHealth(ped), IsEntityDead(2), IsPedFatallyInjured(2), IsPlayerDead(5))`),
+    ).toEqual([
+      'false\tfalse\tfalse\tfalse\tfalse',
+      'false\tfalse\tfalse\tfalse\tfalse',
+      '1\t1\t1\t1\t1',
+      'false\tfalse\tfalse\tfalse\tfalse',
+      '200\tvec3(10.000000, 20.000000, 30.000000)\t90.0',
+      // The handles of no ped are of injured peds, as GTA V says.
+      '200\tfalse\t1\tfalse',
+    ])
+    expect(client.diagnostics).toEqual([])
+  })
+
   it('give natives their defaults for handles of no entity, as GTA V does', async () => {
     const { run, client } = await clientOf()
     expect(

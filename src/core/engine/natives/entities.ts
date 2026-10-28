@@ -28,7 +28,7 @@ import type { EntityLockdown, ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
 import { bindEntityBag } from '../world/bags.ts'
 import { checkArgument } from './events.ts'
-import { localPlayerIndex, withOneSync } from './players.ts'
+import { localPlayerIndex, playerPed, withOneSync } from './players.ts'
 import { entityHandle } from './rpc.ts'
 
 const encoder = new TextEncoder()
@@ -113,6 +113,22 @@ function vector([x, y, z]: readonly [number, number, number]): Vector3Like {
 }
 
 const ZERO: Vector3Like = { x: 0, y: 0, z: 0 }
+
+/** The health that peds die below, as GTA V's die below their fatally injured thresholds, 100 by default. */
+const FATALLY_INJURED = 100
+
+/** Whether an entity is dead: a ped below its fatally injured threshold, and others with no health left. */
+function isDead(entity: ClientEntity): boolean {
+  return entityTypeOf(entity.type) === EntityType.ped
+    ? entity.health < FATALLY_INJURED
+    : entity.health <= 0
+}
+
+/** Whether the ped of a handle on a client is injured, as GTA V says of the handles of no ped too. */
+function injured(ctx: NativeContext, handle: number): boolean {
+  const found = clientEntityOf(ctx, handle)
+  return found === undefined || entityTypeOf(found.type) !== EntityType.ped || isDead(found)
+}
 
 /** How many searches of the pools of clients FiveM's FIND_FIRST natives keep at once. */
 const FIND_HANDLES = 64
@@ -377,6 +393,78 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
       'Ped ped',
       ['GET_PED_ARMOUR', 0x9483af821605b1d8n],
       ['SET_PED_ARMOUR', 0xcea04d83135264ccn],
+    ),
+    defineNative(
+      {
+        name: 'IS_ENTITY_DEAD',
+        hash: 0x5f9532f3b5cc2551n,
+        result: 'BOOL',
+        params: ['Entity entity', 'BOOL p1'],
+      },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        return found !== undefined && isDead(found)
+      },
+    ),
+    // GTA V's injured and fatally injured thresholds are both 100 by default.
+    defineNative(
+      { name: 'IS_PED_INJURED', hash: 0x84a2dd9ac37c35c1n, result: 'BOOL', params: ['Ped ped'] },
+      injured,
+    ),
+    defineNative(
+      {
+        name: 'IS_PED_FATALLY_INJURED',
+        hash: 0xd839450756ed5a80n,
+        result: 'BOOL',
+        params: ['Ped ped'],
+      },
+      injured,
+    ),
+    defineNative(
+      {
+        name: 'IS_PED_DEAD_OR_DYING',
+        hash: 0x3317dedb88c95038n,
+        result: 'BOOL',
+        params: ['Ped ped', 'BOOL checkMeleeDeathFlags'],
+      },
+      injured,
+    ),
+    defineNative(
+      {
+        name: 'IS_PLAYER_DEAD',
+        hash: 0x424d4687fa1e5652n,
+        result: 'BOOL',
+        params: ['Player player'],
+      },
+      (ctx: NativeContext, player) => {
+        const ped = clientEntityOf(ctx, playerPed(ctx, player))
+        return ped !== undefined && isDead(ped)
+      },
+    ),
+    // Resurrected peds get all their health back.
+    defineNative(
+      { name: 'RESURRECT_PED', hash: 0x71bc8e838b9c6035n, result: 'void', params: ['Ped ped'] },
+      (ctx: NativeContext, ped) => {
+        const found = clientEntityOf(ctx, ped)
+        if (found !== undefined && entityTypeOf(found.type) === EntityType.ped) {
+          found.health = found.maxHealth
+        }
+      },
+    ),
+    defineNative(
+      {
+        name: 'NETWORK_RESURRECT_LOCAL_PLAYER',
+        hash: 0xea23c49eaa83acfbn,
+        result: 'void',
+        params: ['float x', 'float y', 'float z', 'float heading'],
+      },
+      (ctx: NativeContext, x, y, z, heading) => {
+        const ped = ctx.manager.world!.playerPed
+        ped.leaveVehicle()
+        ped.moveTo(x, y, z)
+        ped.rotation = fromHeading(heading)
+        ped.health = ped.maxHealth
+      },
     ),
     defineNative(
       {

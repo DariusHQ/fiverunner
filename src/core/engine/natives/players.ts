@@ -69,7 +69,7 @@ function networkPlayer(ctx: NativeContext, index: number): ClientPlayer | undefi
 }
 
 /** The handle of the ped of the player that an index names on a client, -1 for the local player, or 0. */
-function playerPed(ctx: NativeContext, index: number): number {
+export function playerPed(ctx: NativeContext, index: number): number {
   if (index === -1) return ctx.manager.world!.playerPed.handle
   return clientPlayer(ctx, index)?.ped?.handle ?? 0
 }
