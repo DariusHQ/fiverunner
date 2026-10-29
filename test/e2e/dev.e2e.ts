@@ -19,7 +19,7 @@ server_script '@oxmysql/lib/MySQL.lua'
 server_script 'server.lua'
 client_script 'client.lua'
 ui_page 'html/index.html'
-files { 'html/index.html', 'html/app.js' }
+files { 'html/index.html', 'html/app.js', 'html/logo.svg' }
 `,
   'bank.sql': `CREATE TABLE accounts (id INT AUTO_INCREMENT PRIMARY KEY);
 INSERT INTO accounts VALUES (), ();
@@ -56,11 +56,20 @@ end)
 <p id="name"></p>
 <p id="answer"></p>
 <button id="close" style="position: absolute; left: 100px; top: 100px; width: 300px; height: 100px">Close</button>
+<img id="logo" src="nui://bank/html/logo.svg">
+<script src="nui://game/ui/jquery.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
 `,
-  'html/app.js': `document.getElementById('name').textContent = GetParentResourceName() + ' ' + (localStorage.getItem('seen') ?? 'new')
+  'html/logo.svg': `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20" fill="teal"/></svg>
+`,
+  'html/app.js': `const badge = document.createElement('div')
+badge.id = 'badge'
+badge.style.backgroundImage = 'url(nui://bank/html/logo.svg)'
+document.body.append(badge)
+fetch('nui://bank/html/logo.svg').then((response) => response.text()).then((text) => { badge.dataset.fetched = String(text.startsWith('<svg')) })
+document.getElementById('name').textContent = GetParentResourceName() + ' ' + (localStorage.getItem('seen') ?? 'new')
 localStorage.setItem('seen', 'seen')
 window.addEventListener('message', (event) => {
   if (event.data.type === 'open') document.getElementById('text').textContent = event.data.text
@@ -165,6 +174,26 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     expect([origins.map((origin) => /\.c(\d)\./.exec(origin)?.[1]), names]).toEqual([
       ['1', '2'],
       ['bank new', 'bank new'],
+    ])
+  })
+
+  it('gives pages the files of resources at nui://, which browsers have no scheme for, and jQuery as FiveM does', async () => {
+    const [first] = await frameOrigins()
+    expect(
+      await page.until(
+        `(() => {
+          const logo = document.getElementById('logo')
+          const badge = document.getElementById('badge')
+          return logo.complete && badge.dataset.fetched !== undefined && [logo.naturalWidth, logo.getAttribute('src'), badge.style.backgroundImage, badge.dataset.fetched, jQuery.fn.jquery]
+        })()`,
+        first,
+      ),
+    ).toEqual([
+      40,
+      'https://cfx-nui-bank/html/logo.svg',
+      'url("https://cfx-nui-bank/html/logo.svg")',
+      'true',
+      '2.1.1',
     ])
   })
 

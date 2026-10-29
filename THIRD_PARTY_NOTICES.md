@@ -8,7 +8,8 @@ Every script runtime also loads one Lua library, [lua-promises](#lua-promises). 
 catalog of FiveM natives is generated from the
 [CitizenFX typings](#citizenfx-typings), and the types of the files NUI serves from the
 [mime](#mime) package. The database of FiveRunner's oxmysql is
-[SQLite](#sqlite-and-sqlite-wasm).
+[SQLite](#sqlite-and-sqlite-wasm). The dev UI gives the pages of frames [jQuery](#jquery) at
+nui://game/ui/jquery.js, as FiveM's NUI does.
 
 ## Lua and LuaGLM
 
@@ -342,6 +343,37 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+## jQuery
+
+[src/dev/public/game/ui/jquery.js](src/dev/public/game/ui/jquery.js) is
+`dist/jquery.min.js` of the npm package [jquery](https://www.npmjs.com/package/jquery) at
+version 2.1.1, the version that FiveM's NUI serves, without the comment that names its
+source map. MIT License.
+
+```text
+Copyright 2014 jQuery Foundation and other contributors
+http://jquery.com/
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ## SQLite and SQLite Wasm

@@ -7,7 +7,7 @@
  * UI shows the frames, fails.
  */
 import type { Answer, Ask } from './answers.ts'
-import { FRAME_SCRIPT, withScript } from './frame.ts'
+import { FRAME_SCRIPT, withNuiUrls, withScript } from './frame.ts'
 import type { BridgeMessage } from './protocol.ts'
 import { route } from './routes.ts'
 
@@ -73,7 +73,8 @@ function responseOf(request: Request, answer: Answer): Response | Promise<Respon
   const html = headers.some(
     ([name, value]) => name.toLowerCase() === 'content-type' && value.startsWith('text/html'),
   )
-  const bytes = request.mode === 'navigate' && html ? withScript(body, FRAME_SCRIPT) : body
+  const bytes =
+    request.mode === 'navigate' && html ? withScript(withNuiUrls(body), FRAME_SCRIPT) : body
   try {
     const empty = status === 204 || status === 205 || status === 304
     return new Response(empty ? null : new Uint8Array(bytes), {

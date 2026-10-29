@@ -1,3 +1,4 @@
 package-lock.json
 native/vendor/
+src/dev/public/game/
 src/core/natives/catalog/

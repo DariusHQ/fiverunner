@@ -3,7 +3,7 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_GAME_BUILD } from '../../src/core/engine/index.ts'
-import { FRAME_SCRIPT, withScript } from '../../src/dev/frame.ts'
+import { FRAME_SCRIPT, nuiUrls, withNuiUrls, withScript } from '../../src/dev/frame.ts'
 
 /** A window that runs FRAME_SCRIPT as the page of a frame named `name`, with what its frames were posted. */
 function frameWindow(name: string, nesting: 'resource' | 'nested' | 'top') {
@@ -139,6 +139,50 @@ describe('Scripts in HTML', () => {
     expect([...utf16, other].map((html) => withScript(html, 'x()'))).toEqual([
       ...utf16,
       new Uint8Array([...encoder.encode('<script>x()</script>'), 0xff, 0x3c]),
+    ])
+  })
+})
+
+describe('The nui:// URLs of pages', () => {
+  it('go to the files of resources at https://cfx-nui-, and those of FiveM at nui://game/ to the dev UI', () => {
+    const text = `<script src="nui://game/ui/jquery.js"></script><img src="nui://ox_inventory/web/images/money.png">`
+    expect(nuiUrls(text)).toBe(
+      '<script src="/__fiverunner/game/ui/jquery.js"></script><img src="https://cfx-nui-ox_inventory/web/images/money.png">',
+    )
+  })
+
+  it('go there in the documents of pages in UTF-8, which keep their byte order marks, but not in others', () => {
+    const utf8 = encoder.encode(`${BOM}<img alt="ă" src="nui://bank/logo.png">`)
+    const latin1 = Uint8Array.from(
+      [...'<p>\xe9</p><img src="nui://bank/logo.png">'].map((c) => c.charCodeAt(0)),
+    )
+    const plain = encoder.encode('<p>no URLs</p>')
+    expect([decoder.decode(withNuiUrls(utf8)), withNuiUrls(latin1), withNuiUrls(plain)]).toEqual([
+      `${BOM}<img alt="ă" src="https://cfx-nui-bank/logo.png">`,
+      latin1,
+      plain,
+    ])
+  })
+
+  it('go there as pages fetch them, as the script of frames has them', () => {
+    const fetched: unknown[] = []
+    const window: Record<string, unknown> = {
+      name: 'bank',
+      navigator: { languages: [] },
+      addEventListener: () => {},
+      fetch: (input: unknown) => fetched.push(input),
+    }
+    window.window = window
+    window.top = window
+    window.parent = window
+    runInNewContext(FRAME_SCRIPT, window)
+    const fetch = window.fetch as (input: string) => void
+    for (const url of ['nui://game/ui/jquery.js', 'nui://bank/data.json', 'https://bank/close'])
+      fetch(url)
+    expect(fetched).toEqual([
+      nuiUrls('nui://game/ui/jquery.js'),
+      nuiUrls('nui://bank/data.json'),
+      'https://bank/close',
     ])
   })
 })

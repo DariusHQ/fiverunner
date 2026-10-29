@@ -94,6 +94,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 ## The dev UI
 
 - Pages run in the browser that shows the dev UI, rather than in FiveM's Chromium, at `http://<host>.c<player>.<tab>.fiverunner.localhost:<port>`, where FiveM has them at `https://cfx-nui-<resource>` or `nui://<resource>`, which `location` tells pages.
+- Browsers have no `nui://` scheme, so pages get the files of resources at `https://cfx-nui-<resource>` in its place, where FiveM's NUI serves them too: those of their documents, of the sources, links and styles of their elements and those that they fetch, but not those of style sheets. Of the files of FiveM's own NUI, at `nui://game/ui/`, the dev UI has jQuery 2.1.1 alone, as FiveM has it.
 - The names of the headers of the requests of pages come capitalized word by word, as in `Content-Type`, as browsers do not tell service workers their case. Requests carry the `Origin` of their frames whatever their methods and schemes.
 - Responses with statuses outside 200 to 599, which browsers do not take, fail their requests.
 - Absolute `nui://` URLs in pages do not load, and frames in pages at `https://cfx-nui-` URLs load from the web, which has no such hosts: pages load the files of their own resources by relative URLs.
