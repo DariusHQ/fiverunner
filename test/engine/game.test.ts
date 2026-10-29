@@ -60,9 +60,20 @@ SetScriptGfxDrawOrder(4)
 SetTextRenderId(1)
 SetUseHiDof()
 StopAllAlarms(true)
+HudWeaponWheelIgnoreSelection()
+DisablePlayerVehicleRewards(PlayerId())
+TaskStandStill(PlayerPedId(), -1)
+NetworkSetFriendlyFireOption(true)
+SetCanAttackFriendly(PlayerPedId(), true, false)
+SetFuelConsumptionRateMultiplier(10.0)
 print(IsPauseMenuActive(), GetAspectRatio(false), StartAudioScene('x'), RequestScriptAudioBank('x', false, -1), IsPedBeingStunned(PlayerPedId(), 0))
-print(CreateAudioSubmix('a'), CreateAudioSubmix('b'), GetGameBuildNumber(), PrepareAlarm('x'), GetDisplayNameFromVehicleModel(GetHashKey('adder')))`),
-    ).toEqual(['false\t1.7777777910233\t1\t1\tfalse', '0\t1\t2944\t1\tCARNOTFOUND'])
+print(CreateAudioSubmix('a'), CreateAudioSubmix('b'), GetGameBuildNumber(), PrepareAlarm('x'), GetDisplayNameFromVehicleModel(GetHashKey('adder')))
+print(GetPedParachuteState(PlayerPedId()), IsEntityInWater(PlayerPedId()), GetPlayerSprintStaminaRemaining(PlayerId()), IsPlayerSwitchInProgress(), IsPlayerTeleportActive())`),
+    ).toEqual([
+      'false\t1.7777777910233\t1\t1\tfalse',
+      '0\t1\t2944\t1\tCARNOTFOUND',
+      '-1\tfalse\t0.0\tfalse\tfalse',
+    ])
     expect(test.client.diagnostics).toEqual([])
   })
 })

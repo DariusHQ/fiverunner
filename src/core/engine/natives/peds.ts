@@ -1,21 +1,71 @@
-import { defineNative, type NativeDefinition, type Side } from '../../natives/index.ts'
+import { defineNative, hashString, type NativeDefinition, type Side } from '../../natives/index.ts'
 import type { NativeContext } from '../context.ts'
-import type { PedAppearance } from '../world/appearance.ts'
+import { HAIR_COLOURS, MAKEUP_COLOURS, type PedAppearance } from '../world/appearance.ts'
+import type { ClientEntity, PedAnim } from '../world/client.ts'
 import { EntityType, entityTypeOf } from '../world/entity.ts'
 import { clientEntityOf } from './entities.ts'
 import { localPlayerIndex } from './players.ts'
 
+/** The ped of a handle on a client, if it names one. */
+function pedOf(ctx: NativeContext, handle: number): ClientEntity | undefined {
+  const found = clientEntityOf(ctx, handle)
+  return found !== undefined && entityTypeOf(found.type) === EntityType.ped ? found : undefined
+}
+
 /** The appearance of the ped of a handle on a client, if it names a ped. */
 function appearanceOf(ctx: NativeContext, handle: number): PedAppearance | undefined {
-  const found = clientEntityOf(ctx, handle)
-  return found !== undefined && entityTypeOf(found.type) === EntityType.ped
-    ? found.appearance
-    : undefined
+  return pedOf(ctx, handle)?.appearance
+}
+
+/** The female freemode model, and the male one, which the characters of GTA Online, Qbox and ESX are. */
+const FREEMODE_FEMALE = hashString('mp_f_freemode_01')
+const FREEMODE = new Set([hashString('mp_m_freemode_01'), FREEMODE_FEMALE])
+
+/**
+ * How many drawables the freemode models have of each of their components
+ * and props, near what recent builds of GTA V have, and how many textures
+ * each has, as FiveRunner has no metadata of models to count them by. Other
+ * models have one drawable of each component, of one texture, and no props.
+ */
+const FREEMODE_DRAWABLES: readonly number[] = [
+  46, 200, 80, 200, 150, 100, 110, 150, 200, 50, 150, 400,
+]
+const FREEMODE_PROPS: readonly number[] = [180, 40, 40, 0, 0, 0, 40, 15]
+const FREEMODE_TEXTURES = 10
+const COMPONENTS = 12
+
+/** How many drawables a ped has of a component or of a prop. */
+function drawablesOf(ped: ClientEntity | undefined, slot: number, prop: boolean): number {
+  if (ped === undefined) return 0
+  if (FREEMODE.has(ped.model)) return (prop ? FREEMODE_PROPS : FREEMODE_DRAWABLES)[slot] ?? 0
+  return !prop && slot >= 0 && slot < COMPONENTS ? 1 : 0
+}
+
+/** How many values GTA V has of each head overlay, from blemishes to the extra blemishes of bodies. */
+const HEAD_OVERLAY_VALUES: readonly number[] = [24, 29, 34, 15, 75, 7, 12, 11, 10, 18, 17, 12, 2]
+
+/** The flags of TASK_PLAY_ANIM that keep an anim on, as it loops or holds its last frame, and that play it on the secondary task. */
+const ANIM_LOOPING = 1
+const ANIM_HOLD_LAST_FRAME = 2
+const ANIM_SECONDARY = 32
+/** How long the clips that play once, for no set duration, play, as FiveRunner has no clips to know their lengths by. */
+const CLIP_LENGTH = 1000
+
+/** Whether an anim is of a clip of an anim dict and plays at a time. */
+function plays(anim: PedAnim | undefined, dict: string, name: string, now: number): boolean {
+  return (
+    anim !== undefined &&
+    anim.until > now &&
+    anim.dict === dict.toLowerCase() &&
+    anim.name === name.toLowerCase()
+  )
 }
 
 /** Natives of the appearance of the peds of clients and of the models of their players. */
 export function pedNatives(side: Side): NativeDefinition<NativeContext>[] {
   if (side === 'server') return []
+  /** The anim dicts that each client played clips of unloaded, which it is told of once. */
+  const unloaded = new WeakMap<object, Set<string>>()
   return [
     defineNative(
       {
@@ -39,6 +89,77 @@ export function pedNatives(side: Side): NativeDefinition<NativeContext>[] {
         (ctx: NativeContext, ped, component) =>
           appearanceOf(ctx, ped)?.components.get(component)?.[part] ?? 0,
       ),
+    ),
+    ...(
+      [
+        ['GET_NUMBER_OF_PED_DRAWABLE_VARIATIONS', 0x27561561732a7842n, 'int componentId'],
+        ['GET_NUMBER_OF_PED_PROP_DRAWABLE_VARIATIONS', 0x5faf9754e789fb47n, 'int propId'],
+      ] as const
+    ).map(([name, hash, slotParam]) =>
+      defineNative(
+        { name, hash, result: 'int', params: ['Ped ped', slotParam] },
+        (ctx: NativeContext, ped, slot) =>
+          drawablesOf(pedOf(ctx, ped), slot, slotParam === 'int propId'),
+      ),
+    ),
+    ...(
+      [
+        ['GET_NUMBER_OF_PED_TEXTURE_VARIATIONS', 0x8f7156a3142a6badn, 'int componentId'],
+        ['GET_NUMBER_OF_PED_PROP_TEXTURE_VARIATIONS', 0xa6e7f1ceb523e171n, 'int propId'],
+      ] as const
+    ).map(([name, hash, slotParam]) =>
+      defineNative(
+        { name, hash, result: 'int', params: ['Ped ped', slotParam, 'int drawableId'] },
+        (ctx: NativeContext, ped, slot, drawable) => {
+          const found = pedOf(ctx, ped)
+          if (drawable < 0 || drawable >= drawablesOf(found, slot, slotParam === 'int propId')) {
+            return 0
+          }
+          return FREEMODE.has(found!.model) ? FREEMODE_TEXTURES : 1
+        },
+      ),
+    ),
+    defineNative(
+      {
+        name: 'GET_PED_HEAD_OVERLAY_NUM',
+        hash: 0xcf1ce768bb43480en,
+        result: 'int',
+        params: ['int overlayID'],
+      },
+      (_ctx: NativeContext, overlay) => HEAD_OVERLAY_VALUES[overlay] ?? 0,
+    ),
+    // The colours of hair and of makeup are FiveRunner's own, as many as GTA V's.
+    defineNative(
+      { name: '_GET_NUM_HAIR_COLORS', hash: 0xe5c0cf872c2ad150n, result: 'int', params: [] },
+      () => HAIR_COLOURS.length,
+    ),
+    defineNative(
+      { name: '_GET_NUM_MAKEUP_COLORS', hash: 0xd1f7ca1535d22818n, result: 'int', params: [] },
+      () => MAKEUP_COLOURS.length,
+    ),
+    ...(
+      [
+        ['_GET_PED_HAIR_RGB_COLOR', 0x4852fc386e2e1bb5n, 'int hairColorIndex', HAIR_COLOURS],
+        ['_GET_PED_MAKEUP_RGB_COLOR', 0x013e5cfc38cd5387n, 'int makeupColorIndex', MAKEUP_COLOURS],
+      ] as const
+    ).map(([name, hash, index, colours]) =>
+      defineNative(
+        { name, hash, result: 'void', params: [index, 'int* outR', 'int* outG', 'int* outB'] },
+        (_ctx: NativeContext, at, red, green, blue) => {
+          const colour = colours[at] ?? 0
+          red.set(colour >> 16)
+          green.set((colour >> 8) & 0xff)
+          blue.set(colour & 0xff)
+        },
+      ),
+    ),
+    // FiveRunner has no metadata of models to tell the female ones by, but the female freemode model.
+    defineNative(
+      { name: 'IS_PED_MALE', hash: 0x6d9f5faa7488ba46n, result: 'BOOL', params: ['Ped ped'] },
+      (ctx: NativeContext, ped) => {
+        const found = pedOf(ctx, ped)
+        return found !== undefined && found.model !== FREEMODE_FEMALE
+      },
     ),
     defineNative(
       {
@@ -278,6 +399,112 @@ export function pedNatives(side: Side): NativeDefinition<NativeContext>[] {
     defineNative(
       { name: 'IS_PED_FALLING', hash: 0xfb92a102f1c4dfa3n, result: 'BOOL', params: ['Ped ped'] },
       () => false,
+    ),
+    // Peds play the anims of the anim dicts that are loaded, which only scripts see.
+    defineNative(
+      {
+        name: 'TASK_PLAY_ANIM',
+        hash: 0xea47fe3719165b94n,
+        result: 'void',
+        params: [
+          'Ped ped',
+          'char* animDictionary',
+          'char* animationName',
+          'float blendInSpeed',
+          'float blendOutSpeed',
+          'int duration',
+          'int flag',
+          'float playbackRate',
+          'BOOL lockX',
+          'BOOL lockY',
+          'BOOL lockZ',
+        ],
+      },
+      (ctx: NativeContext, ped, dict, name, _blendIn, _blendOut, duration, flag) => {
+        const found = pedOf(ctx, ped)
+        if (found === undefined) return
+        if (!ctx.manager.world!.assetLoaded('anim', dict ?? '')) {
+          const told = unloaded.get(ctx.manager) ?? new Set<string>()
+          unloaded.set(ctx.manager, told)
+          const key = (dict ?? '').toLowerCase()
+          if (!told.has(key)) {
+            told.add(key)
+            ctx.diagnose(
+              `TaskPlayAnim was given the anim dict ${dict ?? ''}, which is not loaded, so the ped played nothing, as in GTA V: request it with RequestAnimDict, then wait until HasAnimDictLoaded says it loaded.`,
+            )
+          }
+          return
+        }
+        const held = (flag & (ANIM_LOOPING | ANIM_HOLD_LAST_FRAME)) !== 0
+        const anim = {
+          dict: (dict ?? '').toLowerCase(),
+          name: (name ?? '').toLowerCase(),
+          until: ctx.manager.time() + (duration > 0 ? duration : held ? Infinity : CLIP_LENGTH),
+        }
+        if ((flag & ANIM_SECONDARY) !== 0) found.secondaryAnim = anim
+        else found.anim = anim
+      },
+    ),
+    defineNative(
+      {
+        name: 'IS_ENTITY_PLAYING_ANIM',
+        hash: 0x1f0b79228e461ec9n,
+        result: 'BOOL',
+        params: ['Entity entity', 'char* animDict', 'char* animName', 'int taskFlag'],
+      },
+      (ctx: NativeContext, entity, dict, name) => {
+        const found = pedOf(ctx, entity)
+        const now = ctx.manager.time()
+        return (
+          found !== undefined &&
+          (plays(found.anim, dict ?? '', name ?? '', now) ||
+            plays(found.secondaryAnim, dict ?? '', name ?? '', now))
+        )
+      },
+    ),
+    defineNative(
+      {
+        name: 'STOP_ANIM_TASK',
+        hash: 0x97ff36a1d40ea00an,
+        result: 'void',
+        params: ['Ped ped', 'char* animDictionary', 'char* animationName', 'float animExitSpeed'],
+      },
+      (ctx: NativeContext, ped, dict, name) => {
+        const found = pedOf(ctx, ped)
+        if (found === undefined) return
+        const now = ctx.manager.time()
+        if (plays(found.anim, dict ?? '', name ?? '', now)) found.anim = undefined
+        if (plays(found.secondaryAnim, dict ?? '', name ?? '', now)) found.secondaryAnim = undefined
+      },
+    ),
+    // Clearing the tasks of peds stops their anims, and clearing them at once takes them out of their vehicles too.
+    ...(
+      [
+        ['CLEAR_PED_TASKS', 0xe1ef3c1216aff2cdn, false],
+        ['CLEAR_PED_TASKS_IMMEDIATELY', 0xaaa34f8a7cb32098n, true],
+      ] as const
+    ).map(([name, hash, immediately]) =>
+      defineNative(
+        { name, hash, result: 'void', params: ['Ped ped'] },
+        (ctx: NativeContext, ped) => {
+          const found = pedOf(ctx, ped)
+          if (found === undefined) return
+          found.anim = found.secondaryAnim = undefined
+          if (immediately) found.leaveVehicle()
+        },
+      ),
+    ),
+    defineNative(
+      {
+        name: 'CLEAR_PED_SECONDARY_TASK',
+        hash: 0x176cecf6f920d707n,
+        result: 'void',
+        params: ['Ped ped'],
+      },
+      (ctx: NativeContext, ped) => {
+        const found = pedOf(ctx, ped)
+        if (found !== undefined) found.secondaryAnim = undefined
+      },
     ),
     defineNative(
       {

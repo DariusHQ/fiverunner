@@ -4,6 +4,8 @@ import { hashString } from '../../natives/index.ts'
 const GAME_LABELS: ReadonlyMap<number, string> = new Map([
   [hashString('STRING'), '~a~'],
   [hashString('TWOSTRINGS'), '~a~~a~'],
+  // The zone of all San Andreas, which GET_NAME_OF_ZONE gives everywhere.
+  [hashString('SANAND'), 'San Andreas'],
 ])
 
 /**

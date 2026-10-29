@@ -44,6 +44,9 @@ const POOLS: ReadonlyMap<string, number> = new Map([
 /** The entity lockdown modes that SetRoutingBucketEntityLockdownMode takes. */
 const LOCKDOWN_MODES: ReadonlySet<string> = new Set(['strict', 'no_dummy', 'relaxed', 'inactive'])
 
+/** The config flag of peds that handcuffs set, IsHandCuffed. */
+const HANDCUFFED = 120
+
 /** The game state of the server whose script calls a native. */
 export function gameStateOf(ctx: NativeContext): ServerGameState {
   return ctx.manager.gameState!
@@ -463,13 +466,42 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
       },
       (ctx: NativeContext, ped, flag) => clientEntityOf(ctx, ped)?.configFlags.has(flag) ?? false,
     ),
-    // Nothing moves peds, which stand still.
+    // Handcuffs are the config flag IsHandCuffed, 120, which GET_PED_CONFIG_FLAG reads too.
+    defineNative(
+      {
+        name: 'SET_ENABLE_HANDCUFFS',
+        hash: 0xdf1af8b5d56542fan,
+        result: 'void',
+        params: ['Ped ped', 'BOOL toggle'],
+      },
+      (ctx: NativeContext, ped, toggle) => {
+        const flags = clientEntityOf(ctx, ped)?.configFlags
+        if (toggle) flags?.add(HANDCUFFED)
+        else flags?.delete(HANDCUFFED)
+      },
+    ),
+    defineNative(
+      { name: 'IS_PED_CUFFED', hash: 0x74e559b3bc910685n, result: 'BOOL', params: ['Ped ped'] },
+      (ctx: NativeContext, ped) => clientEntityOf(ctx, ped)?.configFlags.has(HANDCUFFED) ?? false,
+    ),
+    // Nothing moves entities, which have no speed.
+    defineNative(
+      {
+        name: 'GET_ENTITY_SPEED',
+        hash: 0xd5037ba82e12416fn,
+        result: 'float',
+        params: ['Entity entity'],
+      },
+      () => 0,
+    ),
+    // Nothing moves peds, which stand still, nor knocks them down.
     ...(
       [
         ['IS_PED_WALKING', 0xde4c184b2b9b071an, false],
         ['IS_PED_RUNNING', 0xc5286ffc176f28a2n, false],
         ['IS_PED_SPRINTING', 0x57e457cd2c0fc168n, false],
         ['IS_PED_STILL', 0xac29253eef8f0180n, true],
+        ['IS_PED_RAGDOLL', 0x47e4e977581c5b55n, false],
       ] as const
     ).map(([name, hash, still]) =>
       defineNative(

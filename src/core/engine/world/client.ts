@@ -18,6 +18,13 @@ import { UNARMED, type PedWeapon } from './weapons.ts'
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
 export const PLAYER_ZERO = hashString('player_zero')
 
+/** An anim that a ped plays, as TASK_PLAY_ANIM plays it: a clip of an anim dict, until a time of the game timer of its client. */
+export interface PedAnim {
+  readonly dict: string
+  readonly name: string
+  readonly until: number
+}
+
 /** How few object ids FiveM's clients in OneSync's big mode keep before they ask their servers for more. */
 const FEW_OBJECT_IDS = 4
 
@@ -62,6 +69,9 @@ export class ClientEntity {
   /** For peds, the vehicle they are in, if any, and their seat in it: -1 for the driver's, then 0 up for those of passengers. */
   vehicle: ClientEntity | undefined = undefined
   seat = -1
+  /** For peds, the anim that their task plays, and the one that their secondary task plays over it, if any. */
+  anim: PedAnim | undefined = undefined
+  secondaryAnim: PedAnim | undefined = undefined
   /** For peds, the vehicle they were last in, which is the one they are in, if they are in one. */
   lastVehicle: ClientEntity | undefined = undefined
   /** For vehicles, the peds in their seats, and those that were last in each seat, by the seats. */

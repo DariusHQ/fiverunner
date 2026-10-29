@@ -21,7 +21,7 @@ export function interiorNatives(side: Side): NativeDefinition<NativeContext>[] {
   const of = (ctx: NativeContext) => {
     let state = states.get(ctx.manager)
     if (state === undefined) {
-      state = { entitySets: new Map(), targets: new Map(), linked: new Set(), nextId: 1 }
+      state = { entitySets: new Map(), targets: new Map(), linked: new Set(), nextId: 2 }
       states.set(ctx.manager, state)
     }
     return state
@@ -142,6 +142,16 @@ export function interiorNatives(side: Side): NativeDefinition<NativeContext>[] {
       },
       () => true,
     ),
+    // The default target of scripts has the render id 1, and those that scripts register the ids after it.
+    defineNative(
+      {
+        name: 'GET_DEFAULT_SCRIPT_RENDERTARGET_RENDER_ID',
+        hash: 0x52f0982d7fd156b6n,
+        result: 'int',
+        params: [],
+      },
+      () => 1,
+    ),
     defineNative(
       {
         name: 'REGISTER_NAMED_RENDERTARGET',
@@ -201,6 +211,37 @@ export function interiorNatives(side: Side): NativeDefinition<NativeContext>[] {
         params: ['Hash modelHash'],
       },
       (ctx: NativeContext, model) => of(ctx).linked.has(model),
+    ),
+    // FiveRunner has no zones nor paths of the map: everywhere is in the zone of all San Andreas, on no street.
+    defineNative(
+      {
+        name: 'GET_NAME_OF_ZONE',
+        hash: 0xcd90657d4c30e1can,
+        result: 'char*',
+        params: ['float x', 'float y', 'float z'],
+      },
+      () => 'SANAND',
+    ),
+    defineNative(
+      {
+        name: 'GET_STREET_NAME_AT_COORD',
+        hash: 0x2eb41072b4c1e4c0n,
+        result: 'void',
+        params: ['float x', 'float y', 'float z', 'Hash* streetName', 'Hash* crossingRoad'],
+      },
+      (_ctx: NativeContext, _x, _y, _z, street, crossing) => {
+        street.set(0)
+        crossing.set(0)
+      },
+    ),
+    defineNative(
+      {
+        name: 'GET_STREET_NAME_FROM_HASH_KEY',
+        hash: 0xd0ef8a959b8a4cb9n,
+        result: 'char*',
+        params: ['Hash hash'],
+      },
+      () => '',
     ),
     // The objects of the map of GTA V are none of the entities that FiveRunner has, so it finds those of scripts alone.
     defineNative(

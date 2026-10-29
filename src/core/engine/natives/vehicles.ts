@@ -176,6 +176,15 @@ function clientNatives(): NativeDefinition<NativeContext>[] {
       },
       (ctx: NativeContext, ped) => isIn(ctx, ped),
     ),
+    // Vehicles are automobiles, whatever their models, so no ped is in a helicopter or a plane.
+    ...(
+      [
+        ['IS_PED_IN_ANY_HELI', 0x298b91ae825e5705n],
+        ['IS_PED_IN_ANY_PLANE', 0x5fff4cfc74d8fb80n],
+      ] as const
+    ).map(([name, hash]) =>
+      defineNative({ name, hash, result: 'BOOL', params: ['Ped ped'] }, () => false),
+    ),
     defineNative(
       {
         name: 'IS_PED_SITTING_IN_VEHICLE',

@@ -25,6 +25,7 @@ import { scriptingNatives } from './scripting.ts'
 import { stateBagNatives } from './states.ts'
 import { streamingNatives } from './streaming.ts'
 import { vehicleNatives } from './vehicles.ts'
+import { voiceNatives } from './voice.ts'
 import { weaponNatives } from './weapons.ts'
 import { weatherNatives } from './weather.ts'
 
@@ -56,6 +57,7 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...weaponNatives(side),
     ...doorNatives(side),
     ...interiorNatives(side),
+    ...voiceNatives(side),
     ...(side === 'server' ? [...httpNatives(), ...oxmysqlNatives()] : nuiNatives()),
   ]
 }

@@ -25,12 +25,21 @@ print(IsInteriorEntitySetActive(interior, 'SET_STYLE_01'), IsInteriorEntitySetAc
     const { run, client } = await clientOf()
     expect(
       run(`local model = GetHashKey('prop_tv_flat_01')
-print(IsNamedRendertargetRegistered('tvscreen'), GetNamedRendertargetRenderId('tvscreen'))
+print(IsNamedRendertargetRegistered('tvscreen'), GetNamedRendertargetRenderId('tvscreen'), GetDefaultScriptRendertargetRenderId())
 print(RegisterNamedRendertarget('tvscreen', false), RegisterNamedRendertarget('tvscreen', false), RegisterNamedRendertarget('other', false))
 LinkNamedRendertarget(model)
 print(IsNamedRendertargetRegistered('tvscreen'), GetNamedRendertargetRenderId('tvscreen'), GetNamedRendertargetRenderId('other'), IsNamedRendertargetLinked(model))
 print(ReleaseNamedRendertarget('tvscreen'), IsNamedRendertargetRegistered('tvscreen'))`),
-    ).toEqual(['false\t0', '1\tfalse\t1', '1\t1\t2\t1', '1\tfalse'])
+    ).toEqual(['false\t0\t1', '1\tfalse\t1', '1\t2\t3\t1', '1\tfalse'])
+    expect(client.diagnostics).toEqual([])
+  })
+
+  it('are in no zone of the map but that of all San Andreas, and on no street', async () => {
+    const { run, client } = await clientOf()
+    expect(
+      run(`local street, crossing = GetStreetNameAtCoord(215.0, -810.0, 30.7)
+print(GetNameOfZone(215.0, -810.0, 30.7), GetLabelText(GetNameOfZone(0.0, 0.0, 0.0)), street, crossing, GetStreetNameFromHashKey(street) == '')`),
+    ).toEqual(['SANAND\tSan Andreas\t0\t0\ttrue'])
     expect(client.diagnostics).toEqual([])
   })
 

@@ -7,6 +7,18 @@ import {
 import { DEFAULT_GAME_BUILD, parseGameBuild } from '../constraints.ts'
 import type { NativeContext } from '../context.ts'
 
+/** A native that does nothing, which CFX natives give no hash for. */
+export function nothing(
+  name: string,
+  hash: bigint | undefined,
+  params: readonly ParamSpec[],
+): NativeDefinition<NativeContext> {
+  return defineNative(
+    { name, ...(hash === undefined ? {} : { hash }), result: 'void', params },
+    () => {},
+  )
+}
+
 /**
  * Natives of what the games of clients do that FiveRunner has no game for:
  * the population of the world, the rich presence of Discord, the HUD and
@@ -17,12 +29,6 @@ import type { NativeContext } from '../context.ts'
  */
 export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
   if (side === 'server') return []
-  /** A native that does nothing. */
-  const nothing = (name: string, hash: bigint | undefined, params: readonly ParamSpec[]) =>
-    defineNative(
-      { name, ...(hash === undefined ? {} : { hash }), result: 'void', params },
-      () => {},
-    )
   /** The ids of the submixes of audio that clients created, which name nothing. */
   const submixes = new WeakMap<object, number>()
   return [
@@ -100,6 +106,7 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
     // The HUD and the cameras of the frames that the game draws, which it draws none of.
     nothing('HIDE_HUD_COMPONENT_THIS_FRAME', 0x6806c51ad12b83b8n, ['int id']),
     nothing('DISPLAY_AMMO_THIS_FRAME', 0xa5e78ba2b1331c55n, ['BOOL display']),
+    nothing('_HUD_WEAPON_WHEEL_IGNORE_SELECTION', 0x0afc4af510774b47n, []),
     nothing('DISABLE_IDLE_CAMERA', undefined, ['BOOL state']),
     nothing('DISABLE_VEHICLE_PASSENGER_IDLE_CAMERA', undefined, ['BOOL state']),
     nothing('SET_TIMECYCLE_MODIFIER', 0x2c933abf17a1df41n, ['char* modifierName']),
@@ -208,8 +215,55 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
       'Hash pickupHash',
       'BOOL toggle',
     ]),
+    nothing('DISABLE_PLAYER_VEHICLE_REWARDS', 0xc142be3bb9ce125fn, ['Player player']),
+    nothing('TASK_STAND_STILL', 0x919be13eed931959n, ['Ped ped', 'int time']),
+    // No ped has a parachute, nor is in water, which there is none of.
+    defineNative(
+      {
+        name: 'GET_PED_PARACHUTE_STATE',
+        hash: 0x79cfd9827cc979b6n,
+        result: 'int',
+        params: ['Ped ped'],
+      },
+      () => -1,
+    ),
+    defineNative(
+      {
+        name: 'IS_ENTITY_IN_WATER',
+        hash: 0xcfb0a0d8edd145a3n,
+        result: 'BOOL',
+        params: ['Entity entity'],
+      },
+      () => false,
+    ),
+    // Players sprint nowhere, so they use none of their stamina, which GTA V counts up from 0.
+    defineNative(
+      {
+        name: 'GET_PLAYER_SPRINT_STAMINA_REMAINING',
+        hash: 0x3f9f16f8e65a7ed7n,
+        result: 'float',
+        params: ['Player player'],
+      },
+      () => 0,
+    ),
+    // Nothing switches players with the camera of the sky, nor teleports them over frames.
+    defineNative(
+      {
+        name: 'IS_PLAYER_SWITCH_IN_PROGRESS',
+        hash: 0xd9d2cfff49fab35fn,
+        result: 'BOOL',
+        params: [],
+      },
+      () => false,
+    ),
+    defineNative(
+      { name: 'IS_PLAYER_TELEPORT_ACTIVE', hash: 0x02b15662d7f8886fn, result: 'BOOL', params: [] },
+      () => false,
+    ),
     // Nothing damages entities.
     nothing('SET_ENTITY_INVINCIBLE', 0x3882114bde571ad4n, ['Entity entity', 'BOOL toggle']),
+    nothing('NETWORK_SET_FRIENDLY_FIRE_OPTION', 0xf808475fa571d823n, ['BOOL toggle']),
+    nothing('SET_CAN_ATTACK_FRIENDLY', 0xb3b1cb349ff9c75dn, ['Ped ped', 'BOOL toggle', 'BOOL p2']),
     nothing('SET_BLOCKING_OF_NON_TEMPORARY_EVENTS', 0x9f8aa94d6d97dbf4n, [
       'Ped ped',
       'BOOL toggle',
@@ -229,7 +283,7 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
       },
       () => false,
     ),
-    nothing('SET_FUEL_CONSUMPTION_RATE_MULTIPLIER', undefined, ['int multiplier']),
+    nothing('SET_FUEL_CONSUMPTION_RATE_MULTIPLIER', undefined, ['float multiplier']),
     nothing('SET_FUEL_CONSUMPTION_STATE', undefined, ['BOOL state']),
     // Clients run the game build that their servers enforce, as FiveM's restart into it, or the default one.
     defineNative(
