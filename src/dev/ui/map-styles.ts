@@ -1,4 +1,5 @@
-import type { DevBlip, DevEntity } from '../map.ts'
+import { HAIR_COLOURS } from '../../core/engine/world/appearance.ts'
+import type { DevBlip, DevEntity, DevLook } from '../map.ts'
 import { drawIcon, iconOf } from './map-icons.ts'
 
 /** The colours that the map gives the colour ids of blips: FiveRunner's own, near those that GTA V names. */
@@ -159,6 +160,8 @@ export interface MapPlayer {
   readonly client: number
   readonly name: string | undefined
   readonly colour: string
+  /** How the ped of the player looks, if the map has it. */
+  readonly look?: DevLook
 }
 
 /** What a style draws the map on: its canvas, where the map looks, and the time of the frame, in milliseconds. */
@@ -177,6 +180,8 @@ export interface Painter {
   claim(x: number, y: number, width: number, height: number, must?: boolean): boolean
   /** How much of a rectangle of the canvas the labels and marks that took room have, in square pixels. */
   crowding(x: number, y: number, width: number, height: number): number
+  /** Whether the map draws the world alone, as behind the screens of players, without the labels of its grid. */
+  readonly bare?: boolean
 }
 
 /** How far into the canvas a style draws over the map from each of its edges, in pixels. */
@@ -261,7 +266,7 @@ function grid(
     context.moveTo(Math.round(sx) + 0.5, 0)
     context.lineTo(Math.round(sx) + 0.5, height)
     context.stroke()
-    context.fillText(String(x), sx + 3, top + 12)
+    if (p.bare !== true) context.fillText(String(x), sx + 3, top + 12)
   }
   for (let y = Math.ceil(bottom / step) * step; y <= worldTop; y += step) {
     const [, sy] = p.toScreen(0, y)
@@ -270,7 +275,7 @@ function grid(
     context.moveTo(0, Math.round(sy) + 0.5)
     context.lineTo(width, Math.round(sy) + 0.5)
     context.stroke()
-    if (sy > top + 20) context.fillText(String(y), 3, sy - 3)
+    if (sy > top + 20 && p.bare !== true) context.fillText(String(y), 3, sy - 3)
   }
   context.setLineDash([])
 }
@@ -566,6 +571,72 @@ const CAR_COLOURS = ['#ef5b5b', '#3f8efc', '#ffc145', '#34c38f', '#a66cff', '#ff
 const SHIRTS = ['#8d99ae', '#e9c46a', '#2a9d8f', '#e76f51', '#9b5de5', '#577590']
 const SKINS = ['#f8d5b5', '#eab78e', '#c98d62', '#9c6644', '#6f4630']
 const HAIR = ['#3b2a20', '#6b4423', '#d8a93f', '#a0522d', '#23232b', '#c8553d']
+
+/**
+ * The colours of the clothes of the characters of the cartoon, which each
+ * drawable and texture of a component gets one of, as FiveRunner has none
+ * of the clothes of GTA V to see the colours of, and the tones of the skins
+ * of the parents of their heads, which their indices take in turn.
+ */
+const CLOTHES = [
+  '#3d4a6b',
+  '#e9c46a',
+  '#2a9d8f',
+  '#e76f51',
+  '#9b5de5',
+  '#577590',
+  '#f4f1de',
+  '#ef476f',
+  '#118ab2',
+  '#06d6a0',
+  '#ffd166',
+  '#264653',
+  '#8d99ae',
+  '#f78c6b',
+  '#2b2d42',
+  '#b5838d',
+]
+const SKIN_TONES = [
+  '#f8d5b5',
+  '#f1c6a0',
+  '#eab78e',
+  '#d9a077',
+  '#c98d62',
+  '#b07650',
+  '#9c6644',
+  '#845437',
+  '#6f4630',
+]
+
+/** What the cartoon dresses a character in: the colours of its skin, hair, top, legs and shoes, and whether its hair is long. */
+interface Dress {
+  readonly skin: string
+  readonly hair: string
+  readonly top: string
+  readonly legs: string
+  readonly shoes: string
+  readonly long: boolean
+}
+
+/** How the cartoon dresses the character of a ped that looks as `look` says, if it says. */
+function dressOf(look: DevLook | undefined): Dress | undefined {
+  if (look === undefined) return undefined
+  const clothes = ([drawable, texture]: readonly [number, number], offset: number) =>
+    CLOTHES[Math.abs(drawable * 5 + texture * 3 + offset) % CLOTHES.length]!
+  const tone = (index: number) => channels(SKIN_TONES[Math.abs(index) % SKIN_TONES.length]!)
+  const [first, second, mix] = look.skin
+  const [a, b] = [tone(first), tone(second)]
+  const skin = a.map((value, i) => Math.round(value + (b[i]! - value) * mix))
+  const hair = HAIR_COLOURS[look.hair] ?? HAIR_COLOURS[0]!
+  return {
+    skin: `rgb(${skin.join(' ')})`,
+    hair: `#${hair.toString(16).padStart(6, '0')}`,
+    top: clothes(look.top, 1),
+    legs: clothes(look.legs, 0),
+    shoes: clothes(look.shoes, 14),
+    long: look.hairStyle % 2 === 1,
+  }
+}
 
 /** Draws a filled shape and its ink round it, with no lines inside where its parts overlap. */
 function inked(context: CanvasRenderingContext2D, path: Path2D, fill: string, width = 1.6): void {
@@ -896,7 +967,8 @@ function facingOf(turn: number): Facing {
 /**
  * A little character of the cartoon, standing at the origin, its feet there
  * and its head above, which faces as it turns on the canvas, walks as it
- * moves, breathes, and blinks, as `seed` has it do at its own times.
+ * moves, breathes, and blinks, as `seed` has it do at its own times. It
+ * wears what `dress` says, or a skin and hair of its seed, and `shirt`.
  */
 function character(
   context: CanvasRenderingContext2D,
@@ -906,11 +978,12 @@ function character(
   shirt: string,
   seed: number,
   lifted = false,
+  dress?: Dress,
 ): void {
   const facing = facingOf(turn)
-  const skin = SKINS[seed % SKINS.length]!
-  const hair = HAIR[Math.floor(seed / 5) % HAIR.length]!
-  const long = Math.floor(seed / 3) % 2 === 0
+  const skin = dress?.skin ?? SKINS[seed % SKINS.length]!
+  const hair = dress?.hair ?? HAIR[Math.floor(seed / 5) % HAIR.length]!
+  const long = dress?.long ?? Math.floor(seed / 3) % 2 === 0
   const phase = time / 105 + seed
   const swing = moving ? Math.sin(phase) : 0
   const bob = moving ? -Math.abs(Math.sin(phase)) * 2 : Math.sin(time / 420 + seed) * 0.5
@@ -919,8 +992,9 @@ function character(
   context.translate(0, bob)
   const side = facing === 'left' || facing === 'right'
   const flip = facing === 'left' ? -1 : 1
-  // Legs, which step in turn, or dangle while the cursor lifts the character.
+  // Legs, which step in turn, or dangle while the cursor lifts the character, in their shoes.
   const legs = new Path2D()
+  const shoes = new Path2D()
   for (const [x, lift] of [
     [-3, Math.max(0, swing)],
     [3, Math.max(0, -swing)],
@@ -928,8 +1002,10 @@ function character(
     const dx = side ? swing * (x < 0 ? 3 : -3) * flip : 0
     const dy = lifted ? 1.5 : -lift * 2.6
     legs.roundRect((side ? x * 0.35 : x) - 2.1 + dx, -8.5 + dy, 4.2, 8.5, 2)
+    shoes.roundRect((side ? x * 0.35 + flip : x) - 2.6 + dx, -2.8 + dy, 5.2, 3.2, 1.5)
   }
-  inked(context, legs, '#3d4a6b', 1.4)
+  inked(context, legs, dress?.legs ?? '#3d4a6b', 1.4)
+  inked(context, shoes, dress?.shoes ?? '#2b2d42', 1.2)
   // Arms, which swing against the legs.
   const arms = new Path2D()
   for (const [x, sway] of [
@@ -1081,8 +1157,8 @@ function car(
   }
 }
 
-/** The map as a cartoon: little people and cars, round tokens for blips, on a meadow with trees under drifting clouds. */
-export const CARTOON: MapStyle = (() => {
+/** The map as a cartoon: little people and cars, round tokens for blips, on a meadow with trees under drifting clouds, with a ground of its own. */
+export function cartoonStyle(): MapStyle {
   const ground = layer()
   return {
     name: 'Cartoon',
@@ -1263,7 +1339,17 @@ export const CARTOON: MapStyle = (() => {
         context.save()
         context.translate(sx, sy)
         context.scale(size, size)
-        character(context, time, moving, turnOf(entity), colour, (player?.client ?? entity.id) * 7)
+        const dress = dressOf(entity.look)
+        character(
+          context,
+          time,
+          moving,
+          turnOf(entity),
+          dress?.top ?? colour,
+          (player?.client ?? entity.id) * 7,
+          false,
+          dress,
+        )
         context.restore()
         return [sx, sy - 14 * size]
       }
@@ -1326,7 +1412,17 @@ export const CARTOON: MapStyle = (() => {
       context.save()
       context.translate(to[0], to[1] + 16 + Math.sin(time / 160) * 1.5)
       context.rotate(Math.sin(time / 240) * 0.08)
-      character(context, time, false, Math.PI, player.colour, player.client * 7, true)
+      const dress = dressOf(player.look)
+      character(
+        context,
+        time,
+        false,
+        Math.PI,
+        dress?.top ?? player.colour,
+        player.client * 7,
+        true,
+        dress,
+      )
       context.restore()
     },
     overlay(p) {
@@ -1390,7 +1486,7 @@ export const CARTOON: MapStyle = (() => {
       context.textAlign = 'left'
     },
   }
-})()
+}
 
 /** An image of the world that the user gave the map, and the coordinates of the world at its edges. */
 export interface MapImage {

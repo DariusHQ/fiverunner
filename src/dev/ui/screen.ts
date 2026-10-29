@@ -1,5 +1,6 @@
 import type { NuiFrame } from '../../core/engine/index.ts'
 import { devFrameUrl } from '../hosts.ts'
+import { WorldMap } from './map.ts'
 
 /** The size of the game window that the screens of players stand for, in pixels, which pages are laid out in. */
 export const GAME_WIDTH = 1920
@@ -61,10 +62,14 @@ export interface ScreenHost {
  * order they came, the focused one on top, each hidden until its page
  * loads. Frames take the mouse while NUI shows the cursor, and the keyboard
  * while it has the focus; while the screen itself has the focus, its keys
- * go to the game.
+ * go to the game. Under the frames, the game is the world round the ped
+ * of the player, in the style of the map, which fades as the game does.
  */
 export class Screen {
   readonly element: HTMLElement
+  /** The world round the ped of the player, which the map of the dev UI feeds. */
+  readonly world: WorldMap
+  readonly #fade: HTMLElement
   readonly #viewport: HTMLElement
   readonly #client: number
   readonly #tab: string
@@ -89,6 +94,17 @@ export class Screen {
     this.element = document.createElement('div')
     this.element.className = 'screen'
     this.element.tabIndex = 0
+    const world = document.createElement('div')
+    world.className = 'world'
+    this.world = new WorldMap(
+      world,
+      { teleport: () => {}, waypoint: () => {} },
+      // At half the pixels of the game window, which draws the world twice as large.
+      { client, width: GAME_WIDTH / 2, height: GAME_HEIGHT / 2 },
+    )
+    this.#fade = document.createElement('div')
+    this.#fade.className = 'fade'
+    this.element.append(world, this.#fade)
     this.#viewport = document.createElement('div')
     this.#viewport.className = 'viewport'
     this.#viewport.style.width = `${GAME_WIDTH}px`
@@ -120,6 +136,11 @@ export class Screen {
       if (frame.contentWindow === source) return resource
     }
     return undefined
+  }
+
+  /** Shows the screen of the game as faded as `level` says, from 0, which shows the game, to 1, black, as frames stay over it. */
+  fade(level: number): void {
+    this.#fade.style.opacity = String(level)
   }
 
   /** Takes where the cursor is over a frame, which the frame told. */

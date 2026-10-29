@@ -50,6 +50,8 @@ export interface DevPlayer {
   readonly card?: string
   /** Why the server refused the player. */
   readonly rejection?: string
+  /** How faded the screen of the game of the player is, from 0, which shows the game, to 1, black, while it is. */
+  readonly fade?: number
 }
 
 /** A state bag of the server, with its keys and their values, as describe writes them. */
@@ -337,15 +339,19 @@ export class DevSession {
     const bags = [...this.#engine.server.states.bags].filter((bag) => bag.keys().length > 0)
     const state: DevState = {
       resources: [...this.#engine.server.resources].map(({ name, state }) => ({ name, state })),
-      players: this.#clients.map(({ player }, index) => ({
-        client: index + 1,
-        name: player.name,
-        id: player.netId,
-        state: player.state,
-        ...(player.message === undefined ? {} : { message: player.message }),
-        ...(player.card === undefined ? {} : { card: player.card }),
-        ...(player.rejection === undefined ? {} : { rejection: player.rejection }),
-      })),
+      players: this.#clients.map(({ player, manager }, index) => {
+        const fade = Math.round((manager.world?.screen.level(manager.time()) ?? 0) * 100) / 100
+        return {
+          client: index + 1,
+          name: player.name,
+          id: player.netId,
+          state: player.state,
+          ...(player.message === undefined ? {} : { message: player.message }),
+          ...(player.card === undefined ? {} : { card: player.card }),
+          ...(player.rejection === undefined ? {} : { rejection: player.rejection }),
+          ...(fade > 0 ? { fade } : {}),
+        }
+      }),
       bags: bags.map((bag) => ({
         name: bag.name,
         keys: bag.keys().map((key) => ({ key, value: this.#describe(bag.get(key)!) })),

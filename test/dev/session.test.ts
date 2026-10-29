@@ -409,7 +409,12 @@ SetBlipColour(blip, 3)
 SetBlipRoute(blip, true)
 BeginTextCommandSetBlipName('STRING')
 AddTextComponentSubstringPlayerName('Bank')
-EndTextCommandSetBlipName(blip)`,
+EndTextCommandSetBlipName(blip)
+local ped = PlayerPedId()
+SetPedComponentVariation(ped, 11, 5, 2, 0)
+SetPedComponentVariation(ped, 2, 3, 0, 0)
+SetPedHairColor(ped, 7, 3)
+SetPedHeadBlendData(ped, 1, 2, 0, 4, 5, 0, 0.5, 0.25, 0.0, false)`,
     )
     await session.connect({ name: 'Ann' })
     session.advance(200)
@@ -428,6 +433,15 @@ EndTextCommandSetBlipName(blip)`,
           heading: 0,
           model: 225514697,
           owner: 1,
+          // How the ped looks, as its client's scripts dressed it.
+          look: {
+            hair: 7,
+            hairStyle: 3,
+            skin: [4, 5, 0.25],
+            top: [5, 2],
+            legs: [0, 0],
+            shoes: [0, 0],
+          },
         },
       ],
       blips: [
@@ -461,6 +475,28 @@ EndTextCommandSetBlipName(blip)`,
         },
       ],
     })
+  })
+
+  it('tell how faded the screens of the games of players are, while they are', async () => {
+    const { session, told } = await sessionOf(
+      '',
+      `RegisterNetEvent('fade', function(duration) DoScreenFadeOut(duration) end)
+RegisterNetEvent('show', function() DoScreenFadeIn(0) end)`,
+    )
+    await session.connect({ name: 'Ann' })
+    session.advance(200)
+    const fade = () => states(told()).at(-1)!.players[0]!.fade
+    const faded = [fade()]
+    session.emit('fade', [1000], { to: 1 })
+    session.advance(500)
+    faded.push(fade())
+    session.advance(600)
+    faded.push(fade())
+    session.emit('show', [], { to: 1 })
+    session.advance(100)
+    faded.push(fade())
+    // Halfway through a fade of a second, black once it ends, and none once the game shows again.
+    expect(faded).toEqual([undefined, expect.closeTo(0.5, 1), 1, undefined])
   })
 
   it('tell of the deferrals of connections, whose cards players submit', async () => {

@@ -56,6 +56,10 @@ const map = new WorldMap(byId('map'), {
   teleport: (client, x, y, z) =>
     send({ type: 'teleport', client, x, y, ...(z === undefined ? {} : { z }) }),
   waypoint: (client, x, y) => send({ type: 'waypoint', client, x, y }),
+  // The worlds behind the screens of players are in the style of the map.
+  styled: (name) => {
+    for (const view of players.values()) view.screen.world.use(name)
+  },
 })
 
 /** What the dev UI shows of a player. */
@@ -193,6 +197,8 @@ function showState(state: DevState): void {
     const reason = player.rejection ?? player.message?.trim()
     view.info.textContent = `${player.name} (id ${player.id}) ${player.state}${reason ? `: ${reason}` : ''}`
     view.element.classList.toggle('gone', gone)
+    view.screen.world.show(state.map, state.players)
+    view.screen.fade(player.fade ?? 0)
     showCard(player.client, view, player)
   }
 }

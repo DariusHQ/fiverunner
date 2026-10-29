@@ -31,6 +31,9 @@ RegisterNetEvent('bank:ping', function(value) print('ping', source, value) end)
 RegisterCommand('open', function()
     TriggerClientEvent('bank:open', -1, 'Opened by the server')
 end, false)
+RegisterCommand('fade', function(_, args)
+    TriggerClientEvent('bank:fade', -1, args[1] == 'out')
+end, false)
 `,
   'client.lua': `local blip = AddBlipForCoord(300.0, -300.0, 10.0)
 SetBlipColour(blip, 2)
@@ -42,6 +45,9 @@ RegisterCommand('-bankmenu', function() print('bank menu closed') end, false)
 RegisterNetEvent('bank:open', function(text)
     SendNUIMessage({ type = 'open', text = text })
     SetNuiFocus(true, true)
+end)
+RegisterNetEvent('bank:fade', function(out)
+    if out then DoScreenFadeOut(0) else DoScreenFadeIn(0) end
 end)
 RegisterNUICallback('close', function(data, cb)
     print('closed with', data.reason)
@@ -327,6 +333,29 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     expect(sr + sg + sb).toBeLessThan(200)
     await choose('Classic')
     expect(await page.evaluate(`localStorage.getItem('fiverunner:map-style')`)).toBe('Classic')
+  })
+
+  it('shows the world round the peds of players behind their screens, faded as their games are', async () => {
+    const command = (line: string) =>
+      page.evaluate(`(() => {
+        const input = document.getElementById('command-line')
+        input.value = '${line}'
+        input.form.requestSubmit()
+      })()`)
+    const fade = `getComputedStyle(document.querySelector('.player .screen .fade')).opacity`
+    await command('fade out')
+    await page.until(`${fade} === '1'`)
+    await command('fade in')
+    await page.until(`${fade} === '0'`)
+    expect(
+      await page.evaluate(`(() => {
+        const canvas = document.querySelector('.player .screen .world canvas')
+        const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
+        let drawn = 0
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) drawn++
+        return [canvas.width > 0, drawn > 0]
+      })()`),
+    ).toEqual([true, true])
   })
 
   it('gives the games of players the keys of their screens, which run the commands bound to them', async () => {

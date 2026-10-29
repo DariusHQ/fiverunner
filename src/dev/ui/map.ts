@@ -2,7 +2,7 @@ import type { DevBlip, DevEntity, DevMap } from '../map.ts'
 import type { DevPlayer } from '../session.ts'
 import {
   blipColour,
-  CARTOON,
+  cartoonStyle,
   CLASSIC,
   gtaStyle,
   type MapImage,
@@ -19,7 +19,19 @@ export interface MapActions {
   teleport(client: number, x: number, y: number, z?: number): void
   /** Sets the waypoint of the player of a client at coordinates of the world. */
   waypoint(client: number, x: number, y: number): void
+  /** Tells that the user chose a style of a name for the map. */
+  styled?(name: string): void
 }
+
+/** What a map that follows the ped of a player looks at: the client, and the game window, whose pixels it draws in. */
+export interface Follow {
+  readonly client: number
+  readonly width: number
+  readonly height: number
+}
+
+/** How many pixels of the game window a metre takes on maps that follow peds, near the street. */
+const STREET_SCALE = 7
 
 /** Where the world of GTA V is, which the map shows while nothing is on it. */
 const WORLD = { left: -4000, right: 4500, bottom: -4000, top: 8000 }
@@ -72,7 +84,9 @@ interface Glide {
  * cursor drags to put them elsewhere, and the blips of the maps of the
  * players, which a double click adds the waypoint of a player to. Its
  * styles draw it: classic, a cartoon, or as the pause menu of GTA V, over
- * an image of the world that the user gives it.
+ * an image of the world that the user gives it. A map that follows the ped
+ * of a player shows the world round it, near the street, as the world
+ * behind the screen of the player, which nothing on it changes.
  */
 export class WorldMap {
   readonly element: HTMLElement
@@ -85,6 +99,7 @@ export class WorldMap {
   readonly #imageControls: HTMLElement
   readonly #actions: MapActions
   readonly #styles: readonly MapStyle[]
+  readonly #follow: Follow | undefined
   #style: MapStyle
   #image: MapImage | undefined
   #map: DevMap = { entities: [], blips: [] }
@@ -115,10 +130,11 @@ export class WorldMap {
     | { readonly kind: 'player'; readonly client: number; x: number; y: number }
     | undefined
 
-  constructor(element: HTMLElement, actions: MapActions) {
+  constructor(element: HTMLElement, actions: MapActions, follow?: Follow) {
     this.element = element
     this.#actions = actions
-    this.#styles = [CLASSIC, CARTOON, gtaStyle(() => this.#image)]
+    this.#follow = follow
+    this.#styles = [CLASSIC, cartoonStyle(), gtaStyle(() => this.#image)]
     this.#style = this.#styles.find(({ name }) => name === stored(STYLE_KEY)) ?? CLASSIC
     const toolbar = document.createElement('div')
     toolbar.className = 'toolbar'
@@ -131,7 +147,10 @@ export class WorldMap {
     style.setAttribute('aria-label', 'How the map looks')
     style.append(...this.#styles.map(({ name }) => new Option(name, name)))
     style.value = this.#style.name
-    style.addEventListener('change', () => this.#use(style.value))
+    style.addEventListener('change', () => {
+      this.use(style.value)
+      this.#actions.styled?.(style.value)
+    })
     const fit = document.createElement('button')
     fit.type = 'button'
     fit.textContent = 'Fit'
@@ -153,14 +172,14 @@ export class WorldMap {
     this.#tooltip.className = 'tooltip'
     this.#tooltip.hidden = true
     view.append(this.#canvas, this.#tooltip)
-    element.append(toolbar, view)
+    element.append(...(follow === undefined ? [toolbar, view] : [view]))
     new ResizeObserver(() => this.#draw()).observe(view)
     new IntersectionObserver(([entry]) => {
       this.#visible = entry?.isIntersecting ?? true
       this.#animate()
     }).observe(view)
-    this.#listen()
-    this.#use(this.#style.name)
+    if (follow === undefined) this.#listen()
+    this.use(this.#style.name)
   }
 
   /** Shows the world of the session as it is now, with its players. */
@@ -197,10 +216,10 @@ export class WorldMap {
     else this.#draw()
   }
 
-  /** Draws the map in a style of a name, which the map keeps for the next time. */
-  #use(name: string): void {
+  /** Draws the map in a style of a name, which the map keeps for the next time, unless it follows a ped. */
+  use(name: string): void {
     this.#style = this.#styles.find((style) => style.name === name) ?? CLASSIC
-    store(STYLE_KEY, this.#style.name)
+    if (this.#follow === undefined) store(STYLE_KEY, this.#style.name)
     this.#glides.clear()
     this.#imageControls.hidden = this.#style.name !== 'GTA'
     // Styles that show how to use the map, as GTA V does, leave the toolbar without its hint.
@@ -294,7 +313,12 @@ export class WorldMap {
 
   /** The players of the session, as the styles draw them. */
   get #mapPlayers(): MapPlayer[] {
-    return this.#players.map(({ client, name }) => ({ client, name, colour: playerColour(client) }))
+    return this.#players.map(({ client, name }) => {
+      const look = this.#map.entities.find(
+        ({ kind, owner }) => kind === 'player' && owner === client,
+      )?.look
+      return { client, name, colour: playerColour(client), ...(look === undefined ? {} : { look }) }
+    })
   }
 
   /** The player whose waypoint a double click sets: the one whose blips the map shows, or the first that joined. */
@@ -317,8 +341,13 @@ export class WorldMap {
     ]
   }
 
-  /** Centres the map on what is on it, or on the world of GTA V while nothing is, in what its style leaves of the canvas. */
+  /**
+   * Centres the map on what is on it, or on the world of GTA V while nothing
+   * is, in what its style leaves of the canvas. Maps that follow peds draw
+   * where their peds are.
+   */
   #fit(): void {
+    if (this.#follow !== undefined) return this.#draw()
     const points = [...this.#blips, ...this.#map.entities]
     const rect = this.#canvas.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return
@@ -346,9 +375,14 @@ export class WorldMap {
     this.#draw()
   }
 
+  /** The size of the canvas, in the pixels that the map draws in: those of the game window, for maps that follow peds. */
+  #size(): { width: number; height: number } {
+    return this.#follow ?? this.#canvas.getBoundingClientRect()
+  }
+
   /** Where a point of the world is on the canvas, in its pixels. */
   #toScreen(x: number, y: number): [number, number] {
-    const { width, height } = this.#canvas.getBoundingClientRect()
+    const { width, height } = this.#size()
     return [
       (x - this.#centreX) * this.#scale + width / 2,
       (this.#centreY - y) * this.#scale + height / 2,
@@ -357,7 +391,7 @@ export class WorldMap {
 
   /** Where a pixel of the canvas is in the world. */
   #toWorld(sx: number, sy: number): [number, number] {
-    const { width, height } = this.#canvas.getBoundingClientRect()
+    const { width, height } = this.#size()
     return [
       (sx - width / 2) / this.#scale + this.#centreX,
       this.#centreY - (sy - height / 2) / this.#scale,
@@ -457,14 +491,27 @@ export class WorldMap {
 
   #draw(): void {
     const canvas = this.#canvas
-    const { width, height } = canvas.getBoundingClientRect()
-    const ratio = devicePixelRatio
+    const rect = canvas.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+    const { width, height } = this.#size()
+    // Maps that follow peds draw in the pixels of the game window, which their canvases scale to the screen.
+    const ratio = devicePixelRatio * (rect.width / width)
     if (
-      canvas.width !== Math.round(width * ratio) ||
-      canvas.height !== Math.round(height * ratio)
+      canvas.width !== Math.round(rect.width * devicePixelRatio) ||
+      canvas.height !== Math.round(rect.height * devicePixelRatio)
     ) {
-      canvas.width = Math.round(width * ratio)
-      canvas.height = Math.round(height * ratio)
+      canvas.width = Math.round(rect.width * devicePixelRatio)
+      canvas.height = Math.round(rect.height * devicePixelRatio)
+    }
+    const now = performance.now()
+    const follow = this.#follow
+    if (follow !== undefined) {
+      const ped = this.#map.entities.find(
+        ({ kind, owner }) => kind === 'player' && owner === follow.client,
+      )
+      if (ped !== undefined)
+        [this.#centreX, this.#centreY] = this.#position(ped.id, [ped.x, ped.y], now)
+      this.#scale = STREET_SCALE
     }
     // Where the map looks, and where players are, for tools that drive the dev UI, such as its demo, to find them on it.
     canvas.dataset.view = `${this.#centreX} ${this.#centreY} ${this.#scale}`
@@ -475,7 +522,6 @@ export class WorldMap {
     )
     const context = this.#context
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
-    const now = performance.now()
     /** The rectangles of the labels of the frame, which others give way to. */
     const claimed: [number, number, number, number][] = []
     const painter: Painter = {
@@ -483,6 +529,7 @@ export class WorldMap {
       width,
       height,
       ratio,
+      bare: follow !== undefined,
       scale: this.#scale,
       time: now,
       toScreen: (x, y) => this.#toScreen(x, y),
@@ -505,8 +552,8 @@ export class WorldMap {
     }
     const style = this.#style
     const blips = this.#blips
-    // Labels keep off what the style draws over the edges of the map.
-    const insets = style.insets?.(width, height) ?? NO_INSETS
+    // Labels keep off what the style draws over the edges of the map, which those that follow peds draw nothing over.
+    const insets = follow === undefined ? (style.insets?.(width, height) ?? NO_INSETS) : NO_INSETS
     painter.claim(0, 0, width, insets.top, true)
     painter.claim(width - insets.right, 0, insets.right, height, true)
     painter.claim(0, height - insets.bottom, width, insets.bottom, true)
@@ -583,7 +630,7 @@ export class WorldMap {
         context.setLineDash([])
       }
     }
-    style.overlay?.(painter, blips, players, this.#whoseClient)
+    if (follow === undefined) style.overlay?.(painter, blips, players, this.#whoseClient)
     this.#showTooltip()
   }
 
