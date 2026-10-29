@@ -66,13 +66,19 @@ TaskStandStill(PlayerPedId(), -1)
 NetworkSetFriendlyFireOption(true)
 SetCanAttackFriendly(PlayerPedId(), true, false)
 SetFuelConsumptionRateMultiplier(10.0)
+HideHudAndRadarThisFrame()
+DisablePlayerFiring(PlayerId(), true)
+SetPlayerHealthRechargeMultiplier(PlayerId(), 0.0)
+SetPlayerHealthRechargeLimit(PlayerId(), 0.5)
 print(IsPauseMenuActive(), GetAspectRatio(false), StartAudioScene('x'), RequestScriptAudioBank('x', false, -1), IsPedBeingStunned(PlayerPedId(), 0))
 print(CreateAudioSubmix('a'), CreateAudioSubmix('b'), GetGameBuildNumber(), PrepareAlarm('x'), GetDisplayNameFromVehicleModel(GetHashKey('adder')))
-print(GetPedParachuteState(PlayerPedId()), IsEntityInWater(PlayerPedId()), GetPlayerSprintStaminaRemaining(PlayerId()), IsPlayerSwitchInProgress(), IsPlayerTeleportActive())`),
+print(GetPedParachuteState(PlayerPedId()), IsEntityInWater(PlayerPedId()), GetPlayerSprintStaminaRemaining(PlayerId()), IsPlayerSwitchInProgress(), IsPlayerTeleportActive())
+print(IsPedSwimming(PlayerPedId()), TriggerScreenblurFadeIn(50.0), IsScreenblurFadeRunning(), TriggerScreenblurFadeOut(50.0))`),
     ).toEqual([
       'false\t1.7777777910233\t1\t1\tfalse',
       '0\t1\t2944\t1\tCARNOTFOUND',
       '-1\tfalse\t0.0\tfalse\tfalse',
+      'false\t1\tfalse\t1',
     ])
     expect(test.client.diagnostics).toEqual([])
   })

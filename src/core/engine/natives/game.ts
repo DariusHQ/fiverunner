@@ -107,6 +107,20 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
     nothing('HIDE_HUD_COMPONENT_THIS_FRAME', 0x6806c51ad12b83b8n, ['int id']),
     nothing('DISPLAY_AMMO_THIS_FRAME', 0xa5e78ba2b1331c55n, ['BOOL display']),
     nothing('_HUD_WEAPON_WHEEL_IGNORE_SELECTION', 0x0afc4af510774b47n, []),
+    nothing('HIDE_HUD_AND_RADAR_THIS_FRAME', 0x719ff505f097fd20n, []),
+    // The blur of the screen is only drawn, so it fades in and out at once.
+    ...(
+      [
+        ['TRIGGER_SCREENBLUR_FADE_IN', 0xa328a24aaa6b7fdcn],
+        ['TRIGGER_SCREENBLUR_FADE_OUT', 0xefacc8aef94430d5n],
+      ] as const
+    ).map(([name, hash]) =>
+      defineNative({ name, hash, result: 'BOOL', params: ['float transitionTime'] }, () => true),
+    ),
+    defineNative(
+      { name: 'IS_SCREENBLUR_FADE_RUNNING', hash: 0x7b226c785a52a0a9n, result: 'BOOL', params: [] },
+      () => false,
+    ),
     nothing('DISABLE_IDLE_CAMERA', undefined, ['BOOL state']),
     nothing('DISABLE_VEHICLE_PASSENGER_IDLE_CAMERA', undefined, ['BOOL state']),
     nothing('SET_TIMECYCLE_MODIFIER', 0x2c933abf17a1df41n, ['char* modifierName']),
@@ -216,8 +230,9 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
       'BOOL toggle',
     ]),
     nothing('DISABLE_PLAYER_VEHICLE_REWARDS', 0xc142be3bb9ce125fn, ['Player player']),
+    nothing('DISABLE_PLAYER_FIRING', 0x5e6cc07646bbeab8n, ['Player player', 'BOOL toggle']),
     nothing('TASK_STAND_STILL', 0x919be13eed931959n, ['Ped ped', 'int time']),
-    // No ped has a parachute, nor is in water, which there is none of.
+    // No ped has a parachute, nor is in water, which there is none of, nor swims.
     defineNative(
       {
         name: 'GET_PED_PARACHUTE_STATE',
@@ -234,6 +249,10 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
         result: 'BOOL',
         params: ['Entity entity'],
       },
+      () => false,
+    ),
+    defineNative(
+      { name: 'IS_PED_SWIMMING', hash: 0x9de327631295b4c2n, result: 'BOOL', params: ['Ped ped'] },
       () => false,
     ),
     // Players sprint nowhere, so they use none of their stamina, which GTA V counts up from 0.
@@ -263,6 +282,14 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
     // Nothing damages entities.
     nothing('SET_ENTITY_INVINCIBLE', 0x3882114bde571ad4n, ['Entity entity', 'BOOL toggle']),
     nothing('NETWORK_SET_FRIENDLY_FIRE_OPTION', 0xf808475fa571d823n, ['BOOL toggle']),
+    nothing('SET_PLAYER_HEALTH_RECHARGE_MULTIPLIER', 0x5db660b38dd98a31n, [
+      'Player player',
+      'float regenRate',
+    ]),
+    nothing('_SET_PLAYER_HEALTH_RECHARGE_LIMIT', 0xc388a0f065f5bc34n, [
+      'Player player',
+      'float limit',
+    ]),
     nothing('SET_CAN_ATTACK_FRIENDLY', 0xb3b1cb349ff9c75dn, ['Ped ped', 'BOOL toggle', 'BOOL p2']),
     nothing('SET_BLOCKING_OF_NON_TEMPORARY_EVENTS', 0x9f8aa94d6d97dbf4n, [
       'Ped ped',
