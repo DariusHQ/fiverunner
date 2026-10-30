@@ -65,7 +65,8 @@ export class Chrome {
     )
   }
 
-  static async launch(path: string): Promise<Chrome> {
+  /** Starts Chrome, with `flags` of its command line besides its own. */
+  static async launch(path: string, flags: readonly string[] = []): Promise<Chrome> {
     const profile = mkdtempSync(join(tmpdir(), 'fiverunner-chrome-'))
     const child = spawn(path, [
       '--headless=new',
@@ -75,6 +76,7 @@ export class Chrome {
       '--no-default-browser-check',
       '--no-sandbox',
       '--window-size=1400,1000',
+      ...flags,
       'about:blank',
     ])
     const url = await new Promise<string>((resolve, reject) => {
@@ -295,19 +297,24 @@ export class Page {
   }
 
   /**
-   * Records the page frame by frame, as Chrome paints it, as JPEG, with the
-   * time each frame came in milliseconds, into `frames`, and gives what stops it.
+   * Records the page frame by frame, as Chrome paints it, as JPEG of at most
+   * `width` by `height` pixels, which it hands to `frame` in base64 with the
+   * time it came, in milliseconds, and gives what stops it.
    */
-  async record(frames: { data: string; time: number }[]): Promise<() => Promise<void>> {
+  async record(
+    frame: (data: string, time: number) => void,
+    width = 1920,
+    height = 1080,
+  ): Promise<() => Promise<void>> {
     this.#chrome.on('Page.screencastFrame', (params, session) => {
       if (session !== this.#session) return
       const { data, sessionId } = params as { data: string; sessionId: number }
-      frames.push({ data, time: Date.now() })
+      frame(data, Date.now())
       void this.#chrome.send('Page.screencastFrameAck', { sessionId }, this.#session)
     })
     await this.#chrome.send(
       'Page.startScreencast',
-      { format: 'jpeg', quality: 92, maxWidth: 1920, maxHeight: 1080 },
+      { format: 'jpeg', quality: 92, maxWidth: width, maxHeight: height },
       this.#session,
     )
     return async () => {
@@ -320,25 +327,23 @@ export class Page {
     await this.#chrome.send('Input.insertText', { text }, this.#session)
   }
 
-  /** Lays the page out at `width` by `height` pixels. */
-  async resize(width: number, height: number): Promise<void> {
+  /** Lays the page out at `width` by `height` pixels, each `scale` pixels of the screen wide. */
+  async resize(width: number, height: number, scale = 1): Promise<void> {
     await this.#chrome.send(
       'Emulation.setDeviceMetricsOverride',
-      { width, height, deviceScaleFactor: 1, mobile: false },
+      { width, height, deviceScaleFactor: scale, mobile: false },
       this.#session,
     )
   }
 
-  /** A screenshot of the viewport of the page, or of where `clip` is in the document, as PNG. */
-  async screenshot(clip?: {
-    x: number
-    y: number
-    width: number
-    height: number
-  }): Promise<Uint8Array> {
+  /** A screenshot of the viewport of the page, or of where `clip` is in the document, `scale` times its pixels, as PNG. */
+  async screenshot(
+    clip?: { x: number; y: number; width: number; height: number },
+    scale = 1,
+  ): Promise<Uint8Array> {
     const { data } = (await this.#chrome.send(
       'Page.captureScreenshot',
-      { format: 'png', ...(clip === undefined ? {} : { clip: { ...clip, scale: 1 } }) },
+      { format: 'png', ...(clip === undefined ? {} : { clip: { ...clip, scale } }) },
       this.#session,
     )) as { data: string }
     return Buffer.from(data, 'base64')
@@ -355,7 +360,7 @@ export class Page {
     }
   }
 
-  /** Drags the mouse from `x`, `y` to `toX`, `toY`, through `steps` moves that each take `pause` milliseconds. */
+  /** Drags the mouse from `x`, `y` to `toX`, `toY`, through `steps` moves that each take `pause` milliseconds, as far along at each as `ease` has it. */
   async drag(
     x: number,
     y: number,
@@ -363,6 +368,7 @@ export class Page {
     toY: number,
     steps = 30,
     pause = 16,
+    ease = (t: number) => t,
   ): Promise<void> {
     const send = (type: string, at: readonly [number, number], buttons: number) =>
       this.#chrome.send(
@@ -373,7 +379,8 @@ export class Page {
     await send('mouseMoved', [x, y], 0)
     await send('mousePressed', [x, y], 1)
     for (let step = 1; step <= steps; step++) {
-      await send('mouseMoved', [x + ((toX - x) * step) / steps, y + ((toY - y) * step) / steps], 1)
+      const along = ease(step / steps)
+      await send('mouseMoved', [x + (toX - x) * along, y + (toY - y) * along], 1)
       await new Promise((done) => setTimeout(done, pause))
     }
     await send('mouseReleased', [toX, toY], 0)
