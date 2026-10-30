@@ -433,6 +433,18 @@ main {
   height: 100%;
 }
 
+.screen .world {
+  transition:
+    filter 200ms ease,
+    transform 200ms ease;
+}
+
+/* A little larger, as blurred edges fade out. */
+.screen.blurred .world {
+  filter: blur(8px) brightness(0.8);
+  transform: scale(1.05);
+}
+
 .screen .fade {
   background: #000;
   opacity: 0;

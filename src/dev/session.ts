@@ -52,6 +52,8 @@ export interface DevPlayer {
   readonly rejection?: string
   /** How faded the screen of the game of the player is, from 0, which shows the game, to 1, black, while it is. */
   readonly fade?: number
+  /** Whether scripts blurred the screen of the game of the player, while they did. */
+  readonly blurred?: boolean
 }
 
 /** A state bag of the server, with its keys and their values, as describe writes them. */
@@ -350,6 +352,7 @@ export class DevSession {
           ...(player.card === undefined ? {} : { card: player.card }),
           ...(player.rejection === undefined ? {} : { rejection: player.rejection }),
           ...(fade > 0 ? { fade } : {}),
+          ...(manager.world?.screenBlurred === true ? { blurred: true } : {}),
         }
       }),
       bags: bags.map((bag) => ({

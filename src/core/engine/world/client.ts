@@ -212,8 +212,9 @@ export class ClientWorld {
   readonly #players = new Map<number, RemotePlayer>()
   /** The ped of the local player: player_zero, at 0, 0, 0. */
   readonly playerPed = new ClientEntity(NetObjType.player, PLAYER_ZERO)
-  /** The fade of the screen of the game. */
+  /** The fade of the screen of the game, and whether scripts blurred it. */
   readonly screen = new ScreenFade()
+  screenBlurred = false
   /** The blips of the map of the game. */
   readonly blips = new Blips()
   /** The text of the game, which scripts build with text commands. */

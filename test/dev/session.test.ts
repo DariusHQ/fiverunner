@@ -481,7 +481,10 @@ SetPedHeadBlendData(ped, 1, 2, 0, 4, 5, 0, 0.5, 0.25, 0.0, false)`,
     const { session, told } = await sessionOf(
       '',
       `RegisterNetEvent('fade', function(duration) DoScreenFadeOut(duration) end)
-RegisterNetEvent('show', function() DoScreenFadeIn(0) end)`,
+RegisterNetEvent('show', function() DoScreenFadeIn(0) end)
+RegisterNetEvent('blur', function(blurred)
+    if blurred then TriggerScreenblurFadeIn(50.0) else TriggerScreenblurFadeOut(50.0) end
+end)`,
     )
     await session.connect({ name: 'Ann' })
     session.advance(200)
@@ -497,6 +500,13 @@ RegisterNetEvent('show', function() DoScreenFadeIn(0) end)`,
     faded.push(fade())
     // Halfway through a fade of a second, black once it ends, and none once the game shows again.
     expect(faded).toEqual([undefined, expect.closeTo(0.5, 1), 1, undefined])
+    const blurred = () => states(told()).at(-1)!.players[0]!.blurred
+    session.emit('blur', [true], { to: 1 })
+    session.advance(100)
+    const during = blurred()
+    session.emit('blur', [false], { to: 1 })
+    session.advance(100)
+    expect([during, blurred()]).toEqual([true, undefined])
   })
 
   it('tell of the deferrals of connections, whose cards players submit', async () => {

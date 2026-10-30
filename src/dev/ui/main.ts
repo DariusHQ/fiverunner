@@ -199,6 +199,7 @@ function showState(state: DevState): void {
     view.element.classList.toggle('gone', gone)
     view.screen.world.show(state.map, state.players)
     view.screen.fade(player.fade ?? 0)
+    view.screen.blur(player.blurred === true)
     showCard(player.client, view, player)
   }
 }

@@ -143,6 +143,11 @@ export class Screen {
     this.#fade.style.opacity = String(level)
   }
 
+  /** Blurs the game under the frames, as scripts do behind their windows, or shows it sharp. */
+  blur(blurred: boolean): void {
+    this.element.classList.toggle('blurred', blurred)
+  }
+
   /** Takes where the cursor is over a frame, which the frame told. */
   cursorOver(x: number, y: number): void {
     this.#cursor(x, y)

@@ -108,14 +108,20 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
     nothing('DISPLAY_AMMO_THIS_FRAME', 0xa5e78ba2b1331c55n, ['BOOL display']),
     nothing('_HUD_WEAPON_WHEEL_IGNORE_SELECTION', 0x0afc4af510774b47n, []),
     nothing('HIDE_HUD_AND_RADAR_THIS_FRAME', 0x719ff505f097fd20n, []),
-    // The blur of the screen is only drawn, so it fades in and out at once.
+    // The blur of the screen, which fades in and out at once, as only the dev UI draws it.
     ...(
       [
-        ['TRIGGER_SCREENBLUR_FADE_IN', 0xa328a24aaa6b7fdcn],
-        ['TRIGGER_SCREENBLUR_FADE_OUT', 0xefacc8aef94430d5n],
+        ['TRIGGER_SCREENBLUR_FADE_IN', 0xa328a24aaa6b7fdcn, true],
+        ['TRIGGER_SCREENBLUR_FADE_OUT', 0xefacc8aef94430d5n, false],
       ] as const
-    ).map(([name, hash]) =>
-      defineNative({ name, hash, result: 'BOOL', params: ['float transitionTime'] }, () => true),
+    ).map(([name, hash, blurred]) =>
+      defineNative(
+        { name, hash, result: 'BOOL', params: ['float transitionTime'] },
+        (ctx: NativeContext) => {
+          ctx.manager.world!.screenBlurred = blurred
+          return true
+        },
+      ),
     ),
     defineNative(
       { name: 'IS_SCREENBLUR_FADE_RUNNING', hash: 0x7b226c785a52a0a9n, result: 'BOOL', params: [] },

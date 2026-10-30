@@ -71,7 +71,9 @@ The Stable recipe of Qbox for txAdmin, as it deploys a server, but npwd and scre
 [The tests](../compat/qbox-stable/tests/recipe.test.lua) check that:
 
 - the resources start without script errors;
-- a player who logs in walks up to the Motel Parking of qbx_garages, which ox_lib tells to press E, presses E, chooses the car of the character in the menu of ox_lib, and takes it out, which qbx_garages spawns where the garage has its cars come out.
+- a player who logs in walks up to the Motel Parking of qbx_garages, which ox_lib tells to press E, presses E, chooses the car of the character in the menu of ox_lib, and takes it out, which qbx_garages spawns where the garage has its cars come out;
+- the appearance editor of illenium-appearance gives a freemode character clothes and colours to pick from;
+- a player who logs in opens the inventory of ox_inventory on the key that binds it, and the bank of Renewed-Banking, with the accounts of the character.
 
 ## ESX
 
