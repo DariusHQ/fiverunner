@@ -6,6 +6,9 @@ import { WorldMap } from './map.ts'
 export const GAME_WIDTH = 1920
 export const GAME_HEIGHT = 1080
 
+/** How long after a page loads it listens for messages, in milliseconds. */
+const LISTENING = 250
+
 /** The names that FiveM's keyboard mapper gives the keys of KeyboardEvent.code, but for letters, digits and function keys. */
 const KEY_NAMES: Readonly<Record<string, string>> = {
   Escape: 'ESCAPE',
@@ -76,6 +79,12 @@ export class Screen {
   readonly #port: string
   readonly #host: ScreenHost
   readonly #frames = new Map<string, HTMLIFrameElement>()
+  /**
+   * The messages of frames whose pages did not load yet, by their resources,
+   * which get them once they did: scripts start at once here, where FiveM's
+   * pages load while its game does.
+   */
+  readonly #early = new Map<string, string[]>()
   /** The frames that wait for their bridges, by the number of the wait, which a later one replaces. */
   readonly #waiting = new Map<string, number>()
   #waits = 0
@@ -156,6 +165,7 @@ export class Screen {
   async create({ resource, url }: NuiFrame): Promise<void> {
     const wait = ++this.#waits
     this.#waiting.set(resource, wait)
+    this.#early.set(resource, [])
     const src = devFrameUrl(url, this.#client, this.#tab, this.#port)
     await this.#host.bridge(src)
     if (this.#waiting.get(resource) !== wait) return
@@ -169,6 +179,11 @@ export class Screen {
     frame.tabIndex = -1
     frame.addEventListener('load', () => {
       frame.style.visibility = 'visible'
+      // Pages of frameworks listen for messages a moment after they load.
+      setTimeout(() => {
+        for (const json of this.#early.get(resource) ?? []) this.#post(frame, json)
+        this.#early.delete(resource)
+      }, LISTENING)
     })
     this.#frames.set(resource, frame)
     this.#zStack.push(resource)
@@ -180,6 +195,7 @@ export class Screen {
 
   destroy(resource: string): void {
     this.#waiting.delete(resource)
+    this.#early.delete(resource)
     const frame = this.#frames.get(resource)
     if (frame === undefined) return
     this.#zStack = this.#zStack.filter((name) => name !== resource)
@@ -189,7 +205,14 @@ export class Screen {
 
   /** Posts a frame the message that `json` holds, as an object, as FiveM does. */
   message(resource: string, json: string): void {
-    this.#frames.get(resource)?.contentWindow?.postMessage(JSON.parse(json), '*')
+    const early = this.#early.get(resource)
+    const frame = this.#frames.get(resource)
+    if (early !== undefined) early.push(json)
+    else if (frame !== undefined) this.#post(frame, json)
+  }
+
+  #post(frame: HTMLIFrameElement, json: string): void {
+    frame.contentWindow?.postMessage(JSON.parse(json), '*')
   }
 
   frameFocus(resource: string, focused: boolean): void {

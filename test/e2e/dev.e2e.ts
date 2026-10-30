@@ -37,6 +37,7 @@ end, false)
 `,
   'client.lua': `local blip = AddBlipForCoord(300.0, -300.0, 10.0)
 SetBlipColour(blip, 2)
+CreateThread(function() SendNUIMessage({ type = 'open', text = 'Sent as the client started' }) end)
 RegisterKeyMapping('where', 'Tells where the player is', 'keyboard', 'F6')
 RegisterCommand('where', function() print('at', GetEntityCoords(PlayerPedId())) end, false)
 RegisterKeyMapping('+bankmenu', 'Opens the bank', 'keyboard', 'F5')
@@ -175,6 +176,15 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     const names = await Promise.all(
       origins.map((origin) =>
         page.until<string>(`document.getElementById('name').textContent`, origin),
+      ),
+    )
+    // What scripts send frames as they start waits for their pages to load.
+    await Promise.all(
+      origins.map((origin) =>
+        page.until(
+          `document.getElementById('text').textContent === 'Sent as the client started'`,
+          origin,
+        ),
       ),
     )
     expect([origins.map((origin) => /\.c(\d)\./.exec(origin)?.[1]), names]).toEqual([
