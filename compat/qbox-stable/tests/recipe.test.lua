@@ -99,7 +99,7 @@ it('gives the appearance editor the clothes and the colours of freemode characte
     expect(errors(player:output())).toEqual({})
 end, 30000)
 
-it('lets a player open the inventory, on its default key, and the bank', function()
+it('lets a player open the inventory, on the key that binds it, and the bank', function()
     while GetGameTimer() < 3000 do Wait(100) end
     local player = fiverunner.connect({ name = 'Ann', identifiers = { 'license:ann' } })
     -- The client starts its resources, and shows the menu of characters, before the server logs its player in.
@@ -109,10 +109,12 @@ it('lets a player open the inventory, on its default key, and the bank', functio
     expect(exports.qbx_core:Login(player.id, nil, { charinfo = CHARINFO })).toBe(true)
     fiverunner.waitFor(function() return message(player, 'ox_inventory', 'init') end, 5000)
     Wait(500)
-    player:press('F2')
+    -- The recipe's ox.cfg binds the inventory to a key of its own, and ox_inventory to F2 without it.
+    local key = json.decode(GetConvar('inventory:keys', '["F2"]'))[1]
+    player:press(key)
     local inventory = fiverunner.waitFor(function() return message(player, 'ox_inventory', 'setupInventory') end, 3000)
     expect(inventory.data.leftInventory.label).toBe('Ann Lee')
-    player:press('F2')
+    player:press(key)
     TriggerClientEvent('Renewed-Banking:client:openBankUI', player.id, { atm = false })
     fiverunner.waitFor(function() return shown(player, 'progress') or shown(player, 'circleProgress') end, 3000)
     -- The page of ox_lib completes the progress as its bar fills, which takes the bank 5 seconds at most.
