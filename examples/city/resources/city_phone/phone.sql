@@ -1,0 +1,6 @@
+CREATE TABLE messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender VARCHAR(40) NOT NULL,
+    receiver VARCHAR(40) NOT NULL,
+    text VARCHAR(200) NOT NULL
+);

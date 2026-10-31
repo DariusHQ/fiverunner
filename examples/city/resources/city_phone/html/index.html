@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        color: #111318;
+      }
+      #phone {
+        position: fixed;
+        right: 32px;
+        bottom: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 270px;
+        height: 520px;
+        padding: 16px;
+        box-sizing: border-box;
+        background: #f6f7f9;
+        border: 8px solid #111318;
+        border-radius: 32px;
+      }
+      #phone[hidden] {
+        display: none;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+      }
+      #messages {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      #messages div {
+        padding: 6px 10px;
+        background: #fff;
+        border-radius: 10px;
+      }
+      #messages b {
+        display: block;
+        font-size: 12px;
+        color: #2b6de0;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      select,
+      input,
+      button {
+        padding: 6px 8px;
+        font: inherit;
+        border: 1px solid #c9ced8;
+        border-radius: 8px;
+      }
+      button {
+        background: #2b6de0;
+        color: #fff;
+        border: 0;
+        cursor: pointer;
+      }
+      #close {
+        padding: 2px 8px;
+        background: #8a909c;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="phone" hidden>
+      <header>
+        <span>Messages</span>
+        <button id="close">Close</button>
+      </header>
+      <div id="messages"></div>
+      <form id="send">
+        <select id="receiver" aria-label="Who to write to"></select>
+        <input id="text" autocomplete="off" placeholder="A message" aria-label="Message" />
+        <button>Send</button>
+      </form>
+    </div>
+    <script>
+      const post = (name, data = {}) =>
+        fetch(`https://${GetParentResourceName()}/${name}`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        })
+      const phone = document.getElementById('phone')
+      const messages = document.getElementById('messages')
+      const receiver = document.getElementById('receiver')
+      const text = document.getElementById('text')
+
+      function bubble({ sender, text }) {
+        const element = document.createElement('div')
+        const from = document.createElement('b')
+        from.textContent = sender
+        element.append(from, text)
+        return element
+      }
+
+      addEventListener('message', ({ data }) => {
+        if (data.message) messages.prepend(bubble(data.message))
+        if (!data.phone) return
+        phone.hidden = false
+        messages.replaceChildren(...data.phone.messages.map(bubble))
+        receiver.replaceChildren(
+          ...data.phone.contacts.map(({ name }) => {
+            const option = document.createElement('option')
+            option.textContent = name
+            return option
+          }),
+        )
+      })
+      document.getElementById('send').addEventListener('submit', (event) => {
+        event.preventDefault()
+        post('send', { receiver: receiver.value, text: text.value })
+        text.value = ''
+      })
+      document.getElementById('close').addEventListener('click', () => {
+        phone.hidden = true
+        post('close')
+      })
+    </script>
+  </body>
+</html>

@@ -36,11 +36,12 @@ jobs:
         run: |
           version=$(node -p "require('./package.json').version")
           test "$(node dist/fiverunner.js --version)" = "$version"
-      - name: Run the tests of the example with the package as npm packs it
+      - name: Run the tests of the examples with the package as npm packs it
         run: |
           npm pack --pack-destination "$RUNNER_TEMP"
-          cd examples/bank
-          npx --yes --package "$RUNNER_TEMP"/fiverunner-*.tgz fiverunner test
+          for example in bank city; do
+            (cd "examples/$example" && npx --yes --package "$RUNNER_TEMP"/fiverunner-*.tgz fiverunner test)
+          done
       - name: Check that the package as npm packs it serves the dev UI
         run: |
           cd examples/bank

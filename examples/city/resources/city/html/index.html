@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        color: #fff;
+      }
+      #citizen {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        padding: 10px 16px;
+        text-align: right;
+        background: rgb(17 19 24 / 80%);
+        border-radius: 10px;
+      }
+      #money {
+        font-size: 24px;
+        font-weight: 700;
+        color: #7ee787;
+      }
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 48px;
+        transform: translateX(-50%);
+        padding: 8px 14px;
+        background: rgb(17 19 24 / 80%);
+        border-radius: 8px;
+      }
+      #hint:empty {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="citizen">
+      <div id="name"></div>
+      <div id="money"></div>
+    </div>
+    <div id="hint"></div>
+    <script>
+      const shown = {
+        name: (name) => (document.getElementById('name').textContent = name),
+        money: (money) => (document.getElementById('money').textContent = `$${money}`),
+        hint: (hint) => (document.getElementById('hint').textContent = hint),
+      }
+      addEventListener('message', ({ data }) => {
+        for (const [key, value] of Object.entries(data)) shown[key](value)
+      })
+    </script>
+  </body>
+</html>

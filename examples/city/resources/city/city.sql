@@ -1,0 +1,5 @@
+CREATE TABLE citizens (
+    license VARCHAR(60) PRIMARY KEY,
+    name VARCHAR(40) NOT NULL,
+    money INT NOT NULL DEFAULT 500
+);

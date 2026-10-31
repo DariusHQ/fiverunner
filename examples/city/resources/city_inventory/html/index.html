@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        color: #fff;
+      }
+      #inventory {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 420px;
+        padding: 20px;
+        transform: translate(-50%, -50%);
+        background: rgb(17 19 24 / 92%);
+        border-radius: 14px;
+      }
+      #inventory[hidden] {
+        display: none;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      #items {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        min-height: 92px;
+        margin-top: 14px;
+      }
+      #items button {
+        padding: 10px 0;
+        font-size: 28px;
+        color: inherit;
+        background: rgb(255 255 255 / 8%);
+        border: 0;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      #items button:hover {
+        background: rgb(255 255 255 / 16%);
+      }
+      #items small {
+        display: block;
+        font-size: 12px;
+      }
+      #close {
+        padding: 4px 10px;
+        color: inherit;
+        background: none;
+        border: 1px solid rgb(255 255 255 / 30%);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="inventory" hidden>
+      <header>
+        <h1>Inventory</h1>
+        <button id="close">Close</button>
+      </header>
+      <div id="items"></div>
+    </div>
+    <script>
+      const post = (name, data = {}) =>
+        fetch(`https://${GetParentResourceName()}/${name}`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        })
+      const inventory = document.getElementById('inventory')
+      addEventListener('message', ({ data }) => {
+        if (data.open) inventory.hidden = false
+        if (data.items === undefined) return
+        document.getElementById('items').replaceChildren(
+          ...data.items.map(({ item, label, icon, amount }) => {
+            const button = document.createElement('button')
+            button.title = `Use ${label}`
+            button.textContent = icon
+            const count = document.createElement('small')
+            count.textContent = `${label} x${amount}`
+            button.append(count)
+            button.addEventListener('click', () => post('use', { item }))
+            return button
+          }),
+        )
+      })
+      document.getElementById('close').addEventListener('click', () => {
+        inventory.hidden = true
+        post('close')
+      })
+    </script>
+  </body>
+</html>
