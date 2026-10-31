@@ -1,6 +1,6 @@
 # Testing resources
 
-`fiverunner test` runs Lua tests against your resources in Node: a FiveM server, and the clients of the players that tests connect, on FiveRunner's engine. No GTA V, no FXServer.
+`fiverunner test` runs Lua tests against your resources in Node, whether they are Lua or JavaScript: a FiveM server, and the clients of the players that tests connect, on FiveRunner's engine. No GTA V, no FXServer.
 
 ```bash
 npx fiverunner test

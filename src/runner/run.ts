@@ -109,6 +109,8 @@ export interface FileResult {
 export interface RunOptions {
   /** cfxlua.wasm, compiled. */
   readonly cfxlua: WebAssembly.Module
+  /** QuickJS, compiled, which runs the JavaScript of resources. */
+  readonly quickjs?: WebAssembly.Module
   /** sqlite3.wasm, compiled, which gives each test a database of its own for oxmysql. None by default. */
   readonly sqlite?: WebAssembly.Module
   readonly project: Project
@@ -291,6 +293,7 @@ class World<T> {
     const sqlite = options.sqlite === undefined ? undefined : sqliteDatabase(options.sqlite)
     const engine = await Engine.create({
       cfxlua: options.cfxlua,
+      ...(options.quickjs === undefined ? {} : { quickjs: options.quickjs }),
       epoch: EPOCH,
       output: ({ name }) => output.of(name),
       server: {

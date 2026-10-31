@@ -8,7 +8,8 @@ Every script runtime also loads one Lua library, [lua-promises](#lua-promises). 
 catalog of FiveM natives is generated from the
 [CitizenFX typings](#citizenfx-typings), and the types of the files NUI serves from the
 [mime](#mime) package. The database of FiveRunner's oxmysql is
-[SQLite](#sqlite-and-sqlite-wasm). The dev UI gives the pages of frames [jQuery](#jquery) at
+[SQLite](#sqlite-and-sqlite-wasm), and JavaScript runs on
+[QuickJS](#quickjs-and-quickjs-emscripten). The dev UI gives the pages of frames [jQuery](#jquery) at
 nui://game/ui/jquery.js, as FiveM's NUI does.
 
 ## Lua and LuaGLM
@@ -384,6 +385,66 @@ from the npm package [@sqlite.org/sqlite-wasm](https://www.npmjs.com/package/@sq
 at the version pinned in [package.json](package.json). SQLite is in the
 [public domain](https://sqlite.org/copyright.html). The package is licensed under the
 Apache License, Version 2.0. The license text is at the end of this file.
+
+## QuickJS and quickjs-emscripten
+
+`quickjs.wasm`, next to the built tool, and its copy among the assets of the dev UI, are
+QuickJS compiled to WebAssembly, and the built tool and the dev UI bundle the JavaScript
+that runs them, all from the npm packages
+[@jitl/quickjs-wasmfile-release-sync](https://www.npmjs.com/package/@jitl/quickjs-wasmfile-release-sync),
+[@jitl/quickjs-ffi-types](https://www.npmjs.com/package/@jitl/quickjs-ffi-types) and
+[quickjs-emscripten-core](https://www.npmjs.com/package/quickjs-emscripten-core) at the
+versions pinned in [package.json](package.json). MIT License.
+
+```text
+quickjs-emscripten:
+The MIT License
+
+quickjs-emscripten copyright (c) 2019-2024 Jake Teton-Landis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+quickjs:
+QuickJS Javascript Engine
+
+Copyright (c) 2017-2021 Fabrice Bellard
+Copyright (c) 2017-2021 Charlie Gordon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
 
 ## Apache License 2.0
 

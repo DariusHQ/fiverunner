@@ -709,6 +709,29 @@ export function readValue(value: SqlValue, type: Type, mode: ReadMode, zone: Tim
   }
 }
 
+/**
+ * The text of a value of a column of a type, as the protocol of MariaDB gives
+ * it, for drivers to read by the type of the column: bytes as one char each.
+ */
+export function protocolText(value: SqlValue, type: Type, zone: TimeZone): string | null {
+  if (value === null) return null
+  switch (type.field) {
+    case 'DATE':
+    case 'DATETIME':
+    case 'TIMESTAMP':
+    case 'TIME':
+      return textOf(value)
+    case 'FLOAT':
+    case 'DOUBLE':
+      return String(readValue(value, type, 'query', zone))
+    default: {
+      const read = readValue(value, type, 'execute', zone)
+      if (!Array.isArray(read)) return read === null ? null : String(read)
+      return read.map((byte) => String.fromCharCode(byte as number)).join('')
+    }
+  }
+}
+
 /** The integer a value holds, as mysql2 reads them: a number, or a string for those no double holds. */
 function integerOf(value: Exclude<SqlValue, null>): number | string {
   if (

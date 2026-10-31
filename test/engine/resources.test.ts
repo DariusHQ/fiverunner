@@ -265,14 +265,14 @@ files { 'html/*', 'stream/**' }`,
     ])
   })
 
-  it('have no runtime without Lua scripts, and say which scripts FiveRunner skips', async () => {
+  it('have no runtime without scripts it runs, and say which scripts FiveRunner skips', async () => {
     const proc = await createProcess()
-    const res = proc.add('a', { 'server.js': `console.log('js')` })
+    const res = proc.add('a', { 'server.net.dll': 'MZ' })
     res.start()
-    expect(res.runtime).toBe(null)
+    expect(res.runtimes).toEqual([])
     expect(proc.take()).toEqual(['[resources] Started resource a'])
     expect(proc.diagnostics).toEqual([
-      'a: FiveRunner runs only Lua scripts, so it skips server.js.',
+      'a: FiveRunner runs only Lua and JavaScript scripts, so it skips server.net.dll.',
     ])
   })
 
@@ -313,7 +313,6 @@ dependencies 'b'`,
     expect(proc.diagnostics).toEqual([
       `a: FiveM would give the scripts of a the natives of natives_0193d0af.lua, by the versions its manifest names, which FiveRunner does not have: it gives them those of natives_universal.lua, ${later}`,
       `c: FiveM would give the scripts of c the natives of natives_21e43a33.lua, by the versions its manifest names, which FiveRunner does not have: it gives them those of natives_universal.lua, ${later}`,
-      'd: FiveRunner runs only Lua scripts, so it skips client.js.',
     ])
     const server = await createProcess()
     server

@@ -1,5 +1,8 @@
 import { Hook } from '../hook.ts'
-import { ScriptRuntime, type ScriptHost } from '../scripting/runtime.ts'
+import { JavaScriptRuntime } from '../scripting/javascript.ts'
+import { ScriptRuntime, type ResourceRuntime, type ScriptHost } from '../scripting/runtime.ts'
+import type { RegisteredNative } from '../natives/index.ts'
+import { typeInfo } from '../natives/types.ts'
 import { NativeContext } from './context.ts'
 import { addFile, MemoryFileSystem, type FileSystem } from './files.ts'
 import { glob, normalizePath } from './glob.ts'
@@ -82,11 +85,12 @@ export class Resource {
   #metadata: readonly MetadataEntry[]
   #state: ResourceState = 'stopped'
   #runtime: ScriptRuntime | null = null
+  #javascript: JavaScriptRuntime | null = null
   #context: NativeContext | null = null
   /** How many calls into each runtime of the resource are running. */
-  readonly #depth = new Map<ScriptRuntime, number>()
+  readonly #depth = new Map<ResourceRuntime, number>()
   /** Runtimes of a stopped resource that close when their last call returns. */
-  readonly #retired = new Set<ScriptRuntime>()
+  readonly #retired = new Set<ResourceRuntime>()
   /** On servers, what clients get of the resource since it last started; see packedForClients. */
   #packed: ResourceDefinition | undefined
 
@@ -178,6 +182,11 @@ export class Resource {
     return this.#runtime
   }
 
+  /** The runtimes of the started resource: the Lua one and the JavaScript one, those it has. */
+  get runtimes(): ResourceRuntime[] {
+    return [this.#runtime, this.#javascript].filter((runtime) => runtime !== null)
+  }
+
   /** The values of the manifest entries with `key`, in order. */
   entries(key: string): string[] {
     return this.metadata.filter(([name]) => name === key).map(([, value]) => value)
@@ -248,9 +257,10 @@ export class Resource {
    * scripts handle the event, or "*", and it has a runtime to run them in.
    */
   handleEvent(name: string, payload: Uint8Array, source: string): void {
-    const runtime = this.#runtime
-    if (runtime === null || !(this.handledEvents.has(name) || this.handledEvents.has('*'))) return
-    this.enter(() => runtime.triggerEvent(name, payload, source))
+    if (!(this.handledEvents.has(name) || this.handledEvents.has('*'))) return
+    for (const runtime of this.runtimes) {
+      this.enter(() => runtime.triggerEvent(name, payload, source), runtime)
+    }
   }
 
   /**
@@ -258,8 +268,7 @@ export class Resource {
    * pushing the runtime onto the process's runtime stack: GetCurrentResourceName
    * names the resource on top, and GetInvokingResource the one below it.
    */
-  enter<T>(fn: () => T): T {
-    const runtime = this.#runtime
+  enter<T>(fn: () => T, runtime: ResourceRuntime | null = this.runtimes[0] ?? null): T {
     this.manager.pushCall(this, runtime)
     if (runtime !== null) this.#depth.set(runtime, (this.#depth.get(runtime) ?? 0) + 1)
     try {
@@ -362,22 +371,24 @@ export class Resource {
       )
       return
     }
-    const scripts = this.scripts
     const emulated = this.emulatesOxmysql
-    for (const path of scripts) {
-      if (!path.includes('.lua')) {
-        this.manager.output.diagnose(
-          this.name,
-          emulated
-            ? `FiveRunner runs only Lua scripts, so it skips ${path}, and runs its own emulation of oxmysql in its place, which gives oxmysql's exports.`
-            : `FiveRunner runs only Lua scripts, so it skips ${path}.`,
-        )
-      }
-    }
-    const lua = scripts.filter((path) => path.includes('.lua'))
-    if (lua.length === 0 && !emulated) return
+    const { javascript: quickjs } = this.manager
+    const scripts = this.scripts.filter((path) => {
+      if (path.includes('.lua')) return true
+      if (path.includes('.js') && quickjs !== undefined && !emulated) return true
+      this.manager.output.diagnose(
+        this.name,
+        emulated
+          ? `FiveRunner skips ${path}, and runs its own emulation of oxmysql in its place, which gives oxmysql's exports.`
+          : `FiveRunner runs only Lua and JavaScript scripts, so it skips ${path}.`,
+      )
+      return false
+    })
+    const lua = scripts.some((path) => path.includes('.lua')) || emulated
+    const javascript = scripts.some((path) => !path.includes('.lua'))
+    if (!lua && !javascript) return
     this.manager.trace('citizen-scripting-core', `Creating script environments for ${this.name}\n`)
-    if (this.manager.side === 'client') {
+    if (lua && this.manager.side === 'client') {
       const natives = clientNativesFile(this.metadata)
       if (natives !== 'natives_universal.lua') {
         this.manager.output.diagnose(
@@ -386,15 +397,21 @@ export class Resource {
         )
       }
     }
-    const runtime = this.enter(() => ScriptRuntime.create(this.manager.lua, this.#host()))
-    this.#runtime = runtime
+    if (lua) this.#runtime = this.enter(() => ScriptRuntime.create(this.manager.lua, this.#host()))
+    if (javascript) {
+      this.#javascript = this.enter(() => JavaScriptRuntime.create(quickjs!, this.#host()))
+    }
     this.manager.addRuntime(this)
-    if (emulated) this.enter(() => runtime.runBuiltin('oxmysql.lua', oxmysqlSource))
-    for (const path of lua) {
-      // A script that stopped the resource took the runtime the rest would load into.
-      if (this.#runtime !== runtime) break
+    const runtimes = this.runtimes
+    const { runtime: luaRuntime } = this
+    if (emulated) this.enter(() => luaRuntime!.runBuiltin('oxmysql.lua', oxmysqlSource))
+    for (const path of scripts) {
+      // A script that stopped the resource took the runtimes the rest would load into.
+      if (this.runtimes.length !== runtimes.length) break
+      const runtime = path.includes('.lua') ? this.#runtime! : this.#javascript!
       const source = this.#openScript(path)
-      const loaded = source !== undefined && this.enter(() => runtime.runFile(path, source))
+      const loaded =
+        source !== undefined && this.enter(() => runtime.runFile(path, source), runtime)
       if (!loaded) this.manager.trace('citizen-scripting-core', `Failed to load script ${path}.\n`)
     }
   }
@@ -414,22 +431,25 @@ export class Resource {
   }
 
   #destroyRuntime(): void {
-    const runtime = this.#runtime
-    if (runtime === null) return
+    const runtimes = this.runtimes
+    if (runtimes.length === 0) return
     // The pool of an oxmysql that stops closes its connections, whose transactions roll back.
     if (this.emulatesOxmysql) this.manager.oxmysql!.stopped()
     this.#runtime = null
+    this.#javascript = null
     this.#context = null
     this.manager.removeRuntime(this)
-    if (this.#depth.has(runtime)) this.#retired.add(runtime)
-    else this.#close(runtime)
+    for (const runtime of runtimes) {
+      if (this.#depth.has(runtime)) this.#retired.add(runtime)
+      else this.#close(runtime)
+    }
   }
 
   /**
    * Closes a runtime as FiveM destroys one: as a call into it, for the
    * finalizers that closing runs.
    */
-  #close(runtime: ScriptRuntime): void {
+  #close(runtime: ResourceRuntime): void {
     this.manager.pushCall(this, runtime)
     try {
       runtime.close()
@@ -449,6 +469,13 @@ export class Resource {
         client: manager.side === 'client',
         load: (native) => manager.nativeWrapper(native),
         invoke: (runtime, ptr) => manager.natives.invoke(this.#contextFor(runtime), ptr),
+        find: (native) => foundNative(manager.natives.byName(native)),
+        invokeDirectly: (runtime, native, args) =>
+          manager.natives.invokeDirectly(
+            this.#contextFor(runtime),
+            native as RegisteredNative<NativeContext>,
+            args,
+          ),
       },
       ...(manager.side === 'client'
         ? {}
@@ -467,6 +494,10 @@ export class Resource {
       trace: (text) => manager.log(`script:${name}`, text),
       warn: (message) => manager.output.warn(name, message),
       log: (channel, text) => manager.log(channel, text),
+      wallClock: () => manager.wallClock(),
+      files: manager.files,
+      resourcePath: this.path,
+      database: () => manager.oxmysql?.scriptConnection(),
       diagnose: (message) => manager.output.diagnose(name, message),
       submitBoundary: (which, id) => manager.submitBoundary(which, id),
       formatStackTrace: () => manager.formatStackTrace(null) ?? '',
@@ -474,10 +505,27 @@ export class Resource {
     }
   }
 
-  #contextFor(runtime: ScriptRuntime): NativeContext {
+  #contextFor(runtime: ResourceRuntime): NativeContext {
     if (this.#context?.runtime !== runtime) this.#context = new NativeContext(runtime, this)
     return this.#context
   }
+}
+
+/** What a runtime without memory of Lua needs of a native; see ScriptNatives.find. */
+function foundNative(native: RegisteredNative<NativeContext> | undefined) {
+  if (native === undefined) return undefined
+  const { paramTypes } = native
+  const pointers = paramTypes.filter((info) => info.pointer).length
+  const initial = pointers === 1 && paramTypes.at(-1)!.pointer
+  const kinds = paramTypes
+    .filter((info) => !info.pointer || initial)
+    .map((info) => (info.kind === 'func' ? 'f' : info.kind === 'object' ? 'o' : '-'))
+    .join('')
+  const object =
+    native.result !== 'void' &&
+    native.result !== 'Any*' &&
+    typeInfo(native.result).kind === 'object'
+  return { native, kinds, object }
 }
 
 /** Whether FiveM's server takes a name for that of a category of resources: one in brackets. */

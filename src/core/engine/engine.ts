@@ -1,4 +1,5 @@
 import { LuaRuntime } from '../lua/index.ts'
+import { loadJavaScript, type QuickJSWASMModule } from '../scripting/javascript.ts'
 import type { Side } from '../natives/index.ts'
 import { Clock } from './clock.ts'
 import { ResourceManager, type ProcessOutput, type ResourceManagerOptions } from './manager.ts'
@@ -23,6 +24,8 @@ export type EngineProcessOptions = Omit<ResourceManagerOptions, 'side' | 'lua' |
 export interface EngineOptions {
   /** cfxlua.wasm, compiled, which each process runs an instance of. */
   readonly cfxlua: WebAssembly.Module
+  /** QuickJS, compiled, which runs the JavaScript of resources. Without it, FiveRunner skips their scripts of JavaScript. */
+  readonly quickjs?: WebAssembly.Module
   /** Where each process writes what it reports, which it is given as it is created. Nowhere by default. */
   readonly output?: (process: EngineProcess) => ProcessOutput
   /** The options of the server. */
@@ -51,10 +54,17 @@ export class Engine {
   readonly server: ResourceManager
   readonly session: Session
   readonly #options: EngineOptions
+  readonly #javascript: QuickJSWASMModule | undefined
   readonly #clients: ResourceManager[] = []
 
-  private constructor(options: EngineOptions, clock: Clock, server: ResourceManager) {
+  private constructor(
+    options: EngineOptions,
+    clock: Clock,
+    server: ResourceManager,
+    javascript: QuickJSWASMModule | undefined,
+  ) {
     this.#options = options
+    this.#javascript = javascript
     this.clock = clock
     this.server = server
     this.session = new Session(server)
@@ -65,8 +75,18 @@ export class Engine {
   static async create(options: EngineOptions): Promise<Engine> {
     const clock = new Clock()
     const lua = await createRuntime(options)
-    const server = createProcess(options, clock, 'server', 'server', lua, 0, options.server)
-    return new Engine(options, clock, server)
+    const javascript =
+      options.quickjs === undefined ? undefined : await loadJavaScript(options.quickjs)
+    const server = createProcess(
+      options,
+      clock,
+      'server',
+      'server',
+      lua,
+      0,
+      withJavaScript(options.server, javascript),
+    )
+    return new Engine(options, clock, server, javascript)
   }
 
   /** The clients that the engine started, in the order they came. */
@@ -87,7 +107,15 @@ export class Engine {
     const start = this.clock.now
     const lua = await createRuntime(this.#options)
     const name = `client ${this.#clients.length + 1}`
-    const client = createProcess(this.#options, this.clock, 'client', name, lua, start, options)
+    const client = createProcess(
+      this.#options,
+      this.clock,
+      'client',
+      name,
+      lua,
+      start,
+      withJavaScript(options, this.#javascript),
+    )
     this.#clients.push(client)
     this.clock.every(this.#options.clientFrameTime ?? CLIENT_FRAME_TIME, () => client.tick())
     return { client, player: this.session.connect(client, identity) }
@@ -97,6 +125,14 @@ export class Engine {
   advance(ms: number): void {
     this.clock.advance(ms)
   }
+}
+
+/** The options of a process, with QuickJS, if the engine has it. */
+function withJavaScript(
+  options: EngineProcessOptions = {},
+  javascript: QuickJSWASMModule | undefined,
+): EngineProcessOptions {
+  return javascript === undefined ? options : { ...options, javascript }
 }
 
 /** An instance of cfxlua.wasm for a process. */

@@ -1,3 +1,4 @@
+import { MemoryFileSystem } from '../../src/core/engine/files.ts'
 import {
   catalogNatives,
   defineNative,
@@ -70,6 +71,8 @@ export function scriptNatives(
       return native === undefined ? null : nativeWrapper(native, name, { direct: client })
     },
     invoke: (runtime, ptr) => registry.invoke(runtime, ptr),
+    find: () => undefined,
+    invokeDirectly: () => [],
   }
 }
 
@@ -115,6 +118,9 @@ export async function createResource(options: ResourceOptions = {}): Promise<Tes
     },
     warn: (message) => warnings.push(message),
     log: (channel, text) => log.push(`[${channel}] ${text}`),
+    wallClock: () => 0,
+    files: new MemoryFileSystem(),
+    resourcePath: name,
     diagnose: (message) => diagnostics.push(message),
     submitBoundary: (which, id) => {
       boundaries[which] = id

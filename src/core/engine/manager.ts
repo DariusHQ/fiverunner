@@ -19,7 +19,13 @@ import {
   type NativeDefinition,
   type Side,
 } from '../natives/index.ts'
-import { CLOCK_START, type ScriptRuntime, type StackBoundaries } from '../scripting/runtime.ts'
+import type { QuickJSWASMModule } from '../scripting/javascript.ts'
+import {
+  CLOCK_START,
+  type ResourceRuntime,
+  type ScriptRuntime,
+  type StackBoundaries,
+} from '../scripting/runtime.ts'
 import { localTimeZone, type TimeZone } from '../scripting/time.ts'
 import { ConsoleBuffer } from './buffer.ts'
 import {
@@ -82,6 +88,8 @@ export interface ResourceManagerOptions {
   readonly side: Side
   /** The instance of cfxlua.wasm that hosts the process's script runtimes. */
   readonly lua: LuaRuntime
+  /** QuickJS, which runs the process's scripts of JavaScript: none by default, which skips them. */
+  readonly javascript?: QuickJSWASMModule
   /** Milliseconds since the process started. It must not go back. */
   readonly time: () => number
   readonly output: ProcessOutput
@@ -110,8 +118,8 @@ export interface ResourceManagerOptions {
   /**
    * On servers, what opens the database that oxmysql connects to, by the
    * connection string it reads, for FiveRunner's emulation of oxmysql, and
-   * of its own when the server has none. None by default, which leaves
-   * oxmysql's JavaScript unrun, as FiveRunner runs only Lua.
+   * of its own when the server has none. None by default, which runs oxmysql's
+   * JavaScript, if QuickJS is there.
    */
   readonly database?: DatabaseOpener
 }
@@ -119,7 +127,7 @@ export interface ResourceManagerOptions {
 /** What a function reference names; see ResourceManager.lookUpRef. */
 export interface FoundRef {
   readonly resource: Resource
-  readonly runtime: ScriptRuntime
+  readonly runtime: ResourceRuntime
   /** The index of the reference in the runtime. */
   readonly index: number
 }
@@ -131,7 +139,7 @@ export interface FoundRef {
 interface RuntimeCall {
   readonly resource: Resource
   /** The runtime the call entered, or null if the resource had none. */
-  readonly runtime: ScriptRuntime | null
+  readonly runtime: ResourceRuntime | null
   start: bigint | null
   end: bigint | null
 }
@@ -143,6 +151,7 @@ interface RuntimeCall {
 export class ResourceManager {
   readonly side: Side
   readonly lua: LuaRuntime
+  readonly javascript: QuickJSWASMModule | undefined
   readonly output: ProcessOutput
   /** What the process's code may access, as FiveM's security keeps it. */
   readonly security = new Security()
@@ -263,6 +272,7 @@ export class ResourceManager {
   constructor(options: ResourceManagerOptions) {
     this.side = options.side
     this.lua = options.lua
+    this.javascript = options.javascript
     this.output = options.output
     this.#time = options.time
     this.#wallClock = options.wallClock ?? Date.now
@@ -802,10 +812,8 @@ export class ResourceManager {
     // The callbacks of FiveM's own code have no runtime of a resource.
     if (name === CALLBACK_RESOURCE) return undefined
     const resource = this.getResource(name)
-    const runtime = resource?.runtime
-    if (resource === undefined || runtime == null || runtime.host.instanceId !== instance) {
-      return undefined
-    }
+    const runtime = resource?.runtimes.find(({ host }) => host.instanceId === instance)
+    if (resource === undefined || runtime === undefined) return undefined
     return { resource, runtime, index }
   }
 
@@ -822,7 +830,7 @@ export class ResourceManager {
     const found = this.lookUpRef(ref)
     if (found === undefined) return undefined
     const { resource, runtime, index } = found
-    return resource.enter(() => runtime.callRef(index, args))
+    return resource.enter(() => runtime.callRef(index, args), runtime)
   }
 
   /**
@@ -837,7 +845,7 @@ export class ResourceManager {
     if (found === undefined) return null
     const { resource, runtime, index } = found
     // FiveM names the runtime's resource, which may provide the name the reference has.
-    const kept = resource.enter(() => runtime.duplicateRef(index))
+    const kept = resource.enter(() => runtime.duplicateRef(index), runtime)
     return `${resource.name}:${runtime.host.instanceId}:${kept}`
   }
 
@@ -851,7 +859,7 @@ export class ResourceManager {
     const found = this.lookUpRef(ref)
     if (found === undefined) return
     const { resource, runtime, index } = found
-    resource.enter(() => runtime.deleteRef(index))
+    resource.enter(() => runtime.deleteRef(index), runtime)
   }
 
   /**
@@ -879,11 +887,13 @@ export class ResourceManager {
     this.#oxmysql?.tick()
     this.security.runAs('system.console', () => this.console.executeBuffer())
     this.events.tick()
-    const ticking = this.#ticking.map((resource) => ({ resource, runtime: resource.runtime! }))
+    const ticking = this.#ticking.flatMap((resource) =>
+      resource.runtimes.map((runtime) => ({ resource, runtime })),
+    )
     for (const { runtime } of ticking) runtime.collect()
     for (const { resource, runtime } of ticking) {
       // A runtime closed by a thread that ran before it has nothing to resume.
-      if (resource.runtime === runtime) resource.enter(() => runtime.resume())
+      if (resource.runtimes.includes(runtime)) resource.enter(() => runtime.resume(), runtime)
     }
     if (this.side === 'server') this.#replicateVariables()
     for (const fn of this.#queued.splice(0)) fn()
@@ -972,7 +982,7 @@ export class ResourceManager {
         // FiveM reports it on the console of the current runtime.
         this.log(
           `script:${current!.resource.name}`,
-          runtime.describeRoutineError('stack trace', error),
+          (runtime as ScriptRuntime).describeRoutineError('stack trace', error),
         )
       }
     }
@@ -1102,7 +1112,7 @@ export class ResourceManager {
   }
 
   /** @internal Called by a resource when a call enters its runtime, or the resource if it has none. */
-  pushCall(resource: Resource, runtime: ScriptRuntime | null): void {
+  pushCall(resource: Resource, runtime: ResourceRuntime | null): void {
     this.#calls.push({ resource, runtime, start: null, end: null })
   }
 

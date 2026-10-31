@@ -408,6 +408,7 @@ const ROUND_TRIPS = 50
 export class OxMysql {
   readonly #host: OxMysqlHost
   #client: DatabaseClient | undefined
+  #scripts: DatabaseConnection | undefined
   #connecting = false
   /** The tokens of the connections the script of oxmysql asked for, which complete once it is connected. */
   readonly #connects: number[] = []
@@ -470,7 +471,13 @@ export class OxMysql {
       return false
     }
     this.#connects.push(token)
-    if (this.#connecting) return true
+    this.#open()
+    return true
+  }
+
+  /** Opens the database, unless it is opening. */
+  #open(): void {
+    if (this.#connecting) return
     this.#connecting = true
     const connectionString =
       this.#host.convar('mysql_connection_string', '') || 'mysql://root@localhost'
@@ -502,7 +509,13 @@ export class OxMysql {
         )
       },
     )
-    return true
+  }
+
+  /** The connection that JavaScript resources reach the database by, once it is open, which their drivers ask it to. */
+  scriptConnection(): DatabaseConnection | undefined {
+    if (this.#client === undefined) this.#open()
+    else this.#scripts ??= this.#client.connection()
+    return this.#scripts
   }
 
   /**

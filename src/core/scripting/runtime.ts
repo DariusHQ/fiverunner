@@ -10,6 +10,9 @@ import {
   LuaVector,
   type WatchdogOptions,
 } from '../lua/index.ts'
+import type { DirectValue } from '../natives/direct.ts'
+import type { DatabaseConnection } from '../db/client.ts'
+import type { FileSystem } from '../engine/files.ts'
 import type { NativeCaller } from '../natives/invoker.ts'
 import eventsSource from './lua/events.lua?raw'
 import exportsSource from './lua/exports.lua?raw'
@@ -30,6 +33,50 @@ export interface ScriptNatives {
   load(name: string): string | null
   /** Runs a native call that cfxlua.wasm marshalled at `ptr` for a script of `runtime`. */
   invoke(runtime: ScriptRuntime, ptr: number): LuaValue[]
+  /**
+   * What a runtime that has no memory of Lua needs of the native called
+   * `name` to load it: the native, the kinds of the arguments it takes, a
+   * letter each, f for functions, o for objects and - for others, and whether
+   * it gives an object.
+   */
+  find(name: string): FoundNative | undefined
+  /** Runs a native with the values that a script of `runtime` passed. */
+  invokeDirectly(
+    runtime: ResourceRuntime,
+    native: unknown,
+    args: readonly DirectValue[],
+  ): DirectValue[]
+}
+
+/** What ScriptNatives.find gives. */
+export interface FoundNative {
+  readonly native: unknown
+  readonly kinds: string
+  readonly object: boolean
+}
+
+/** A runtime of the scripts of a resource, in Lua or in JavaScript, as the engine drives it. */
+export interface ResourceRuntime extends NativeCaller {
+  readonly host: ScriptHost
+  /** Loads and runs a script file of the resource, and returns whether it ran. */
+  runFile(path: string, source: string | Uint8Array): boolean
+  /** Takes what is due out of the queue, for resume() to run. */
+  collect(): void
+  /** Runs what collect() took. */
+  resume(): void
+  close(): void
+  /** Gives the scripts an event, with its msgpack payload and its source. */
+  triggerEvent(name: string, payload: Uint8Array, source: string): void
+  /** The frames of what runs, between boundaries of a call into the runtime. */
+  walkStack(boundaries: StackBoundaries): StackFrame[]
+  /** Calls the function of a reference, and gives its results packed, or null if it failed. */
+  callRef(index: number, args: Uint8Array): Uint8Array | null
+  /** Counts another holder of a reference, and gives the index it keeps. */
+  duplicateRef(index: number): number
+  /** Takes a holder of a reference away. */
+  deleteRef(index: number): void
+  /** Reports a warning of FiveM's own code on `channel`. */
+  emitWarning(channel: string, message: string): void
 }
 
 /**
@@ -73,6 +120,14 @@ export interface ScriptHost {
   warn(message: string): void
   /** Writes to the console outside of the resource, on a channel such as citizen-scripting-core. */
   log(channel: string, text: string): void
+  /** Milliseconds since the epoch, by the wall clock of the process. */
+  wallClock(): number
+  /** On servers, the connection to the database that the mysql2 of JavaScript resources reaches, once it is open. */
+  database?(): DatabaseConnection | undefined
+  /** The files of the process, as the fs module of JavaScript resources reaches them. */
+  readonly files: FileSystem
+  /** The directory of the resource in the files of the process. */
+  readonly resourcePath: string
   /** Reports a mistake in how a script uses FiveM that FiveRunner noticed. */
   diagnose(message: string): void
   /**
@@ -165,7 +220,7 @@ export function unimplementedDiagnosis(name: string): string {
  * events, function references, exports, NUI helpers on clients, and state
  * bags.
  */
-export class ScriptRuntime implements NativeCaller {
+export class ScriptRuntime implements ResourceRuntime {
   readonly state: LuaState
   readonly host: ScriptHost
   #collect: LuaRef | undefined

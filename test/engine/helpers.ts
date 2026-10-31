@@ -14,7 +14,7 @@ import type { DatabaseOpener } from '../../src/core/engine/oxmysql.ts'
 import type { WatchdogOptions } from '../../src/core/lua/index.ts'
 import type { NativeDefinition, Side } from '../../src/core/natives/index.ts'
 import type { TimeZone } from '../../src/core/scripting/time.ts'
-import { createRuntime } from '../lua/helpers.ts'
+import { createRuntime, quickjs } from '../lua/helpers.ts'
 
 export interface ProcessOptions {
   readonly side?: Side
@@ -78,6 +78,7 @@ export function runCommand(
 export async function createProcess(options: ProcessOptions = {}): Promise<TestProcess> {
   const { side = 'server' } = options
   const lua = await createRuntime()
+  const javascript = await quickjs()
   const lines: string[] = []
   const partial = new Map<string, string>()
   const warnings: string[] = []
@@ -87,6 +88,7 @@ export async function createProcess(options: ProcessOptions = {}): Promise<TestP
     manager: new ResourceManager({
       side,
       lua,
+      javascript,
       time: () => process.time,
       output: {
         write: (channel, text) => {

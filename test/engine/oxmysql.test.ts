@@ -496,7 +496,7 @@ end)
       '[script:app] done',
     ])
     expect(proc.diagnostics).toEqual([
-      "oxmysql: FiveRunner runs only Lua scripts, so it skips dist/build.js, and runs its own emulation of oxmysql in its place, which gives oxmysql's exports.",
+      "oxmysql: FiveRunner skips dist/build.js, and runs its own emulation of oxmysql in its place, which gives oxmysql's exports.",
       "oxmysql: FiveRunner's database failed to run a statement: resources/schema/sql/install.sql:3: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'NOPE' at line 1 (NOPE)",
       "oxmysql: FiveRunner's database starts empty, with the tables of the .sql files of the resources, which it ran: resources/[SQL]/legacy.sql, resources/schema/sql/install.sql, resources/schema/sql/tables.sql.",
     ])

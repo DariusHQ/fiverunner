@@ -4,7 +4,8 @@ import { SqlError } from './lexer.ts'
 import { parseScript, type ScriptStatement } from './parser.ts'
 import type { SqlValue } from './sqlite.ts'
 import { format } from './sqlstring.ts'
-import { readValue, type JsValue, type ReadMode } from './values.ts'
+import type { FieldType } from './types.ts'
+import { protocolText, readValue, type JsValue, type ReadMode } from './values.ts'
 
 /** An error of a statement, as mysql2 gives them: with MariaDB's code, number and SQL state, and the SQL. */
 export interface DatabaseError extends Error {
@@ -76,11 +77,30 @@ export interface DatabaseConnection {
   query(sql: string, values?: unknown): QueryResult
   /** Runs a statement as mysql2's execute does, with its values bound, as oxmysql's typeCastExecute reads them. */
   execute(sql: string, values?: readonly unknown[]): QueryResult
+  /** Runs a statement as the MySQL protocol gives its results: rows of values, by columns, or what it changed. */
+  statement(sql: string, values: readonly unknown[]): StatementResult
   /** Whether a statement of `sql`, or one that writes, would wait for the transaction of another connection to end: all but those that lock nothing do. */
   blocked(sql?: string): boolean
   /** Gives the connection back to the pool, rolling back the transaction it has open. */
   release(): void
 }
+
+/** A column of the rows of DatabaseConnection.statement, as the protocol of MariaDB describes them. */
+export interface StatementColumn {
+  readonly name: string
+  readonly field: FieldType
+  readonly decimals: number
+  readonly unsigned: boolean
+  readonly binary: boolean
+}
+
+/** What DatabaseConnection.statement gives. */
+export type StatementResult =
+  | {
+      readonly columns: readonly StatementColumn[]
+      readonly rows: readonly (string | null)[][]
+    }
+  | { readonly affectedRows: number; readonly insertId: number }
 
 /** A database, as oxmysql's pool of mysql2 connects to it. */
 export interface DatabaseClient {
@@ -164,6 +184,32 @@ class SqliteConnection implements DatabaseConnection {
   execute(sql: string, values: readonly unknown[] = []): QueryResult {
     const bound = values.map(boundValue)
     return this.#run(sql, () => this.#connection.execute(sql, bound), 'execute')
+  }
+
+  statement(sql: string, values: readonly unknown[]): StatementResult {
+    const bound = values.map(boundValue)
+    try {
+      const result = this.#connection.execute(sql, bound)
+      if (result.kind !== 'rows') {
+        return { affectedRows: result.affectedRows, insertId: Number(result.insertId) }
+      }
+      const { zone } = this.#client
+      return {
+        columns: result.fields.map(({ name, type: { field, decimals, unsigned, binary } }) => ({
+          name,
+          field,
+          decimals,
+          unsigned: unsigned === true,
+          binary: binary === true || field === 'BIT',
+        })),
+        rows: result.rows.map((row) =>
+          result.fields.map(({ type }, i) => protocolText(row[i] ?? null, type, zone)),
+        ),
+      }
+    } catch (error) {
+      if (error instanceof SqlError) throw databaseError(error, sql)
+      throw error
+    }
   }
 
   blocked(sql?: string): boolean {

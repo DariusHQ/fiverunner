@@ -4,6 +4,7 @@
  * the engine needs them, on the clock of the host, which it tells the UI
  * the events of, and starts anew, with the players it had, as the UI asks.
  */
+import quickjsUrl from '@jitl/quickjs-wasmfile-release-sync/wasm?url'
 import sqliteUrl from '@sqlite.org/sqlite-wasm/sqlite3.wasm?url'
 
 import { MemoryFileSystem } from '../core/engine/index.ts'
@@ -22,6 +23,7 @@ const decoder = new TextDecoder()
 const tell = (message: FromWorker) => postMessage(message)
 
 let cfxlua: Promise<WebAssembly.Module> | undefined
+let quickjs: Promise<WebAssembly.Module> | undefined
 let sqlite: Promise<WebAssembly.Module> | undefined
 let session: DevSession | undefined
 /** Where the server of the session has the files of its project. */
@@ -57,10 +59,12 @@ async function start(): Promise<void> {
     cfxlua ??= WebAssembly.compileStreaming(
       fetch(`${API}cfxlua.wasm`, { headers: { [API_HEADER]: '1' } }),
     )
+    quickjs ??= WebAssembly.compileStreaming(fetch(quickjsUrl))
     sqlite ??= WebAssembly.compileStreaming(fetch(sqliteUrl))
     const source = new RemoteSource(getSync)
     const started = await DevSession.start({
       cfxlua: await cfxlua,
+      quickjs: await quickjs,
       sqlite: await sqlite,
       project: {
         files: () => {

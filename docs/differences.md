@@ -8,6 +8,14 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 - NaN prints as `-nan` and `nan`, as the C library of FiveRunner's WebAssembly build writes it, where FiveM's MSVC build writes `-nan(ind)` and `nan`. This goes for `tostring`, `string.format` and `f:write`.
 - Where FiveM throws exceptions with MSVC's texts, such as for convars that `std::stof` reads, FiveRunner approximates the texts, and the sign of the NaN that `std::stof` reads.
 
+## JavaScript
+
+- Scripts run on QuickJS, where FiveM's run on V8: nothing compiles them, so they run slower, their stacks are QuickJS's, which `Error.captureStackTrace` gives `Error.prepareStackTrace` as well as it can, and promises that reject with no handler are not reported, as QuickJS does not tell of them.
+- `console` writes objects as JSON, as `util.format` and `util.inspect` do, where Node writes them in its own way.
+- Servers get of Node what resources ask of it, on FiveRunner's files and clock, and nothing of the machine: `require`, which reads the `main` of a `package.json` but not its `exports`, `process`, whose `platform` is `win32`, `Buffer`, `URL`, and modules such as `fs`, `path`, `events`, `stream`, `util` and `crypto`, which hashes and signs with MD5, SHA-1 and SHA-2 and encrypts nothing. Streams pass on what they get at once, with no buffers. What reaches the machine, such as `http.request`, `dns.lookup` or `child_process.spawn`, throws, and there is no `fetch`.
+- `net.connect` reaches only the port of the database of the server, 3306 or the one that `mysql_connection_string` names, whatever its host, where FiveRunner's database speaks the protocol of MariaDB to the drivers that resources carry, such as mysql2 and mysql, and takes any password. Other ports fail with `ECONNREFUSED`. All connections of drivers share one of the database, so their transactions are one, and packets of 16 MiB or more do not go through.
+- Scripts in C# do not run: FiveRunner skips them, with a diagnosis.
+
 ## Console
 
 - Command lines with surrogates encoded in UTF-8 keep a high and a low surrogate as the one character they spell, where FiveM writes them back to UTF-8 one by one.
@@ -80,7 +88,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 
 ## oxmysql
 
-- FiveRunner runs only Lua, so it runs its own oxmysql, in Lua, in place of oxmysql's `dist/build.js`: the exports of oxmysql 2.14.3, those of mysql-async and ghmattimysql that oxmysql provides, and its `lib/MySQL.lua`. Servers without an oxmysql resource get FiveRunner's, as `citizen/system_resources/oxmysql`, once a resource depends on it or a command starts it.
+- FiveRunner runs its own oxmysql, in Lua, in place of oxmysql's `dist/build.js`: the exports of oxmysql 2.14.3, those of mysql-async and ghmattimysql that oxmysql provides, and its `lib/MySQL.lua`. Servers without an oxmysql resource get FiveRunner's, as `citizen/system_resources/oxmysql`, once a resource depends on it or a command starts it.
 - The database is FiveRunner's own, in memory: SQLite, which runs the SQL of MariaDB 11.4 and fails with its errors, as `11.4.0-MariaDB-FiveRunner`. There is one database, named as `mysql_connection_string` names it, or `fiverunner`, whatever server the string names. It starts empty, with the tables of the `.sql` files in the `resources` directory, those of resources and of categories such as ESX's `[SQL]`, which it runs in the order of their paths, then again the statements that failed, while more of them succeed, as those of a file may need the tables of one that comes after it. It leaves out those that still fail, with a diagnosis, as `mysql --force` would. Nothing in it outlives the server.
 - Triggers, stored procedures and functions, and events fail with error 1235.
 - A connection with an open transaction keeps the writes of the others waiting until it ends, as SQLite has one writer, where MariaDB locks only the rows it touches. Their reads and `SET` run meanwhile, and see what the transaction changed before it commits, where MariaDB's repeatable reads see only what was committed. Writes that wait 50 seconds of the server's clock fail with error 1205, as `innodb_lock_wait_timeout` has them.

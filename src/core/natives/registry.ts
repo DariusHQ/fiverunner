@@ -1,3 +1,4 @@
+import { invokeDirectly, type DirectValue } from './direct.ts'
 import type { LuaValue } from '../lua/index.ts'
 import {
   invokeNative,
@@ -173,6 +174,16 @@ export class NativeRegistry<Ctx extends NativeCaller> {
     const native = this.#byName.get(name)
     if (native !== undefined) this.#mocks.set(native.hash, impl)
     return native
+  }
+
+  /** Runs a native with the values that a script of a runtime without memory of Lua passed. */
+  invokeDirectly(
+    ctx: Ctx,
+    native: RegisteredNative<Ctx>,
+    args: readonly DirectValue[],
+  ): DirectValue[] {
+    const mock = this.#mocks.get(native.hash)
+    return invokeDirectly(ctx, mock === undefined ? native : { ...native, impl: mock }, args)
   }
 
   /** Runs a call cfxlua.wasm marshalled; see invokeNative. */

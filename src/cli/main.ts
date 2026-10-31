@@ -17,6 +17,8 @@ export interface CliHost {
   readonly cfxlua: () => Promise<WebAssembly.Module>
   /** Compiles sqlite3.wasm, the database of oxmysql in tests. */
   readonly sqlite: () => Promise<WebAssembly.Module>
+  /** Compiles quickjs.wasm, which runs the JavaScript of resources. */
+  readonly quickjs?: () => Promise<WebAssembly.Module>
   /** Reads the bytes of cfxlua.wasm, which the dev UI gets. */
   readonly wasm: () => Uint8Array
   /** The directory of the built dev UI. */

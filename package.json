@@ -1,7 +1,7 @@
 {
   "name": "fiverunner",
   "version": "0.10.0",
-  "description": "Run FiveM resources (Lua + NUI) in your browser and in CI. No GTA V, no server, no restarts.",
+  "description": "Run FiveM resources (Lua, JavaScript and NUI) in your browser and in CI. No GTA V, no server, no restarts.",
   "keywords": [
     "fivem",
     "cfx",
@@ -49,10 +49,12 @@
   "devDependencies": {
     "@citizenfx/client": "2.0.37175-1",
     "@citizenfx/server": "2.0.37175-1",
+    "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
     "@sqlite.org/sqlite-wasm": "3.53.4-build2",
     "@types/node": "22.18.13",
     "mime": "2.4.0",
     "prettier": "3.9.9",
+    "quickjs-emscripten-core": "^0.32.0",
     "typescript": "6.0.3",
     "vite": "8.3.3",
     "vitest": "5.0.2"

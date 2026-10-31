@@ -96,6 +96,8 @@ export type DevEvent =
 export interface DevSessionOptions {
   /** cfxlua.wasm, compiled. */
   readonly cfxlua: WebAssembly.Module
+  /** QuickJS, compiled, which runs the JavaScript of resources. */
+  readonly quickjs?: WebAssembly.Module
   /** sqlite3.wasm, compiled, the database of oxmysql on the server. None by default. */
   readonly sqlite?: WebAssembly.Module
   readonly project: Project
@@ -140,6 +142,7 @@ export class DevSession {
     const output = new LineOutput((line) => options.onEvent({ type: 'output', line }))
     const engine = await Engine.create({
       cfxlua: options.cfxlua,
+      ...(options.quickjs === undefined ? {} : { quickjs: options.quickjs }),
       output: ({ name }) => output.of(name),
       server: {
         files: options.project.files(),

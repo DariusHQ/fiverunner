@@ -17,6 +17,7 @@ const FILES: Record<string, string> = {
 game 'gta5'
 server_script '@oxmysql/lib/MySQL.lua'
 server_script 'server.lua'
+server_script 'server.js'
 client_script 'client.lua'
 ui_page 'html/index.html'
 files { 'html/index.html', 'html/app.js', 'html/logo.svg' }
@@ -34,6 +35,8 @@ end, false)
 RegisterCommand('fade', function(_, args)
     TriggerClientEvent('bank:fade', -1, args[1] == 'out')
 end, false)
+`,
+  'server.js': `console.log('bank in JavaScript on', require('path').basename(GetResourcePath('bank')))
 `,
   'client.lua': `local blip = AddBlipForCoord(300.0, -300.0, 10.0)
 SetBlipColour(blip, 2)
@@ -166,6 +169,7 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     )
     expect(console).toContain('[script:bank] bank server started')
     expect(console).toContain('[script:bank] bank accounts	2')
+    expect(console).toContain('[script:bank] bank in JavaScript on bank')
   })
 
   it('connects players, each with the frames of their NUI at origins of their own', async () => {
