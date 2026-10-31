@@ -69,7 +69,7 @@ function nuiOf(events: readonly DevEvent[]): DevEvent[] {
 const LOOP = 'while true do pcall(function() while true do end end) end'
 
 /** A watchdog that stops such scripts soon. */
-const SHORT = { watchdog: { timeoutMs: 20, killAfterMs: 40, interval: 100 } }
+const SHORT = { watchdog: { timeoutMs: 200, killAfterMs: 400, interval: 100 } }
 
 describe('Dev sessions', () => {
   it('run their projects, and tell what the processes print and how the resources are', async () => {

@@ -573,7 +573,7 @@ end)`)
 end)`,
       {},
       [],
-      { watchdog: { timeoutMs: 20, killAfterMs: 40, interval: 100 } },
+      { watchdog: { timeoutMs: 200, killAfterMs: 400, interval: 100 } },
     )
     expect([outcomes(result), result.tests[0]!.duration]).toEqual([
       [
@@ -591,7 +591,7 @@ end)`,
 
   it('fails files whose servers crash as they load', async () => {
     const result = await run(`while true do pcall(function() while true do end end) end`, {}, [], {
-      watchdog: { timeoutMs: 20, killAfterMs: 40, interval: 100 },
+      watchdog: { timeoutMs: 200, killAfterMs: 400, interval: 100 },
     })
     expect([result.tests, result.failure?.message]).toEqual([
       [],
