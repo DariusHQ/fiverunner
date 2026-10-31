@@ -19,6 +19,8 @@ export interface VehicleMod {
  */
 export class VehicleParts {
   engineOn = false
+  /** Whether a driver starts the engine by getting in, which scripts turn off as they turn the engine off for good. */
+  autoStart = true
   engineHealth = 1000
   bodyHealth = 1000
   petrolTankHealth = 1000

@@ -104,7 +104,6 @@ const NAMES: readonly string[] = [
   'ApplyForceToEntity',
   'SetEntityCompletelyDisableCollision',
   'SetEntityVelocity',
-  'GetEntityVelocity',
   'GetEntityHeightAboveGround',
   'HasEntityClearLosToEntity',
   'HasEntityCollidedWithAnything',

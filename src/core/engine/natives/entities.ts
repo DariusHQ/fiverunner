@@ -22,7 +22,8 @@ import {
   quaternionRotation,
   radiansToDegrees,
 } from '../world/quantize.ts'
-import { ClientEntity } from '../world/client.ts'
+import { ClientEntity, PED_DEATH_HEALTH } from '../world/client.ts'
+import { SPRINT_SPEED } from '../world/movement.ts'
 import { apply, fromEuler, fromHeading, headingOf, toEuler } from '../world/rotation.ts'
 import type { EntityLockdown, ServerGameState } from '../world/server.ts'
 import { objectState, pedState, vehicleState } from '../world/setters.ts'
@@ -117,14 +118,16 @@ function vector([x, y, z]: readonly [number, number, number]): Vector3Like {
 
 const ZERO: Vector3Like = { x: 0, y: 0, z: 0 }
 
-/** The health that peds die below, as GTA V's die below their fatally injured thresholds, 100 by default. */
-const FATALLY_INJURED = 100
-
 /** Whether an entity is dead: a ped below its fatally injured threshold, and others with no health left. */
 function isDead(entity: ClientEntity): boolean {
   return entityTypeOf(entity.type) === EntityType.ped
-    ? entity.health < FATALLY_INJURED
+    ? entity.health < PED_DEATH_HEALTH
     : entity.health <= 0
+}
+
+/** How fast an entity goes: a ped in a vehicle goes as fast as it. */
+function speedOf(entity: ClientEntity | undefined): number {
+  return (entity?.vehicle ?? entity)?.speed ?? 0
 }
 
 /** Whether the ped of a handle on a client is injured, as GTA V says of the handles of no ped too. */
@@ -484,7 +487,7 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
       { name: 'IS_PED_CUFFED', hash: 0x74e559b3bc910685n, result: 'BOOL', params: ['Ped ped'] },
       (ctx: NativeContext, ped) => clientEntityOf(ctx, ped)?.configFlags.has(HANDCUFFED) ?? false,
     ),
-    // Nothing moves entities, which have no speed.
+    // Only the keys of players give entities speed, and peds in vehicles have those of their vehicles.
     defineNative(
       {
         name: 'GET_ENTITY_SPEED',
@@ -492,22 +495,58 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
         result: 'float',
         params: ['Entity entity'],
       },
-      () => 0,
+      (ctx: NativeContext, entity) => Math.abs(speedOf(clientEntityOf(ctx, entity))),
     ),
-    // Nothing moves peds, which stand still, nor knocks them down.
+    defineNative(
+      {
+        name: 'GET_ENTITY_VELOCITY',
+        hash: 0x4805d2b1d8cf94a9n,
+        result: 'Vector3',
+        params: ['Entity entity'],
+      },
+      (ctx: NativeContext, entity) => {
+        const found = clientEntityOf(ctx, entity)
+        if (found === undefined) return ZERO
+        return vector(apply((found.vehicle ?? found).rotation, 0, speedOf(found), 0))
+      },
+    ),
     ...(
       [
-        ['IS_PED_WALKING', 0xde4c184b2b9b071an, false],
-        ['IS_PED_RUNNING', 0xc5286ffc176f28a2n, false],
-        ['IS_PED_SPRINTING', 0x57e457cd2c0fc168n, false],
-        ['IS_PED_STILL', 0xac29253eef8f0180n, true],
-        ['IS_PED_RAGDOLL', 0x47e4e977581c5b55n, false],
+        [
+          'IS_PED_RUNNING',
+          0xc5286ffc176f28a2n,
+          (speed: number) => speed > 0 && speed < SPRINT_SPEED,
+        ],
+        ['IS_PED_SPRINTING', 0x57e457cd2c0fc168n, (speed: number) => speed >= SPRINT_SPEED],
+        ['IS_PED_STILL', 0xac29253eef8f0180n, (speed: number) => speed === 0],
+        ['IS_PED_STOPPED', 0x530944f6f4b8a214n, (speed: number) => speed === 0],
       ] as const
-    ).map(([name, hash, still]) =>
+    ).map(([name, hash, is]) =>
       defineNative(
         { name, hash, result: 'BOOL', params: ['Ped ped'] },
-        (ctx: NativeContext, ped) => still && clientEntityOf(ctx, ped) !== undefined,
+        (ctx: NativeContext, ped) => {
+          const found = clientEntityOf(ctx, ped)
+          return found !== undefined && is(found.speed)
+        },
       ),
+    ),
+    defineNative(
+      {
+        name: 'IS_VEHICLE_STOPPED',
+        hash: 0x5721b434ad84d57an,
+        result: 'BOOL',
+        params: ['Vehicle vehicle'],
+      },
+      (ctx: NativeContext, vehicle) => clientEntityOf(ctx, vehicle)?.speed === 0,
+    ),
+    // Players run or sprint, and nothing knocks peds down.
+    ...(
+      [
+        ['IS_PED_WALKING', 0xde4c184b2b9b071an],
+        ['IS_PED_RAGDOLL', 0x47e4e977581c5b55n],
+      ] as const
+    ).map(([name, hash]) =>
+      defineNative({ name, hash, result: 'BOOL', params: ['Ped ped'] }, () => false),
     ),
     // Resurrected peds get all their health back.
     defineNative(

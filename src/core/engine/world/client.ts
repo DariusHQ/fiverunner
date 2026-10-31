@@ -5,6 +5,7 @@ import { Cameras } from './cameras.ts'
 import type { Door } from './doors.ts'
 import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.ts'
 import { Input } from './input.ts'
+import { moveWithKeys } from './movement.ts'
 import { Pool } from './pool.ts'
 import { decompressQuaternion, fromSector } from './quantize.ts'
 import { apply, fromHeading, fromQuaternion, IDENTITY, type Matrix } from './rotation.ts'
@@ -39,6 +40,9 @@ const PED_MODELS: ReadonlySet<number> = new Set(
   ].map(hashString),
 )
 
+/** The health that peds die below, as GTA V's die below their fatally injured thresholds, 100 by default. */
+export const PED_DEATH_HEALTH = 100
+
 /** The constants of a minstd_rand, which draws the numbers that worlds need. */
 const MINSTD_MULTIPLIER = 48_271
 const MINSTD_MODULUS = 2_147_483_647
@@ -50,7 +54,7 @@ const FEW_OBJECT_IDS = 4
  * An entity in the world of a client, as GTA V keeps it: where it is, how
  * it turns, its model, the script that owns it, as mission entities have,
  * and the object id of its network object, which networked entities have.
- * Nothing moves it but scripts.
+ * Only scripts and the keys of its player move it.
  */
 export class ClientEntity {
   readonly type: NetObjType
@@ -63,6 +67,8 @@ export class ClientEntity {
   rotation: Matrix = IDENTITY
   frozen = false
   visible = true
+  /** How fast the keys of the player move the entity, in metres a second, which is below 0 for a vehicle that backs up. */
+  speed = 0
   /** How see-through scripts make the entity, from 0 to 255, which is not at all, and whether it collides. */
   alpha = 255
   collision = true
@@ -160,8 +166,10 @@ export class ClientEntity {
     vehicle.occupants.get(seat)?.leaveVehicle()
     this.vehicle = this.lastVehicle = vehicle
     this.seat = seat
+    this.speed = 0
     vehicle.occupants.set(seat, this)
     vehicle.lastOccupants.set(seat, this)
+    if (seat === -1 && vehicle.parts.autoStart) vehicle.parts.engineOn = true
     this.moveTo(vehicle.x, vehicle.y, vehicle.z)
   }
 
@@ -292,6 +300,8 @@ export class ClientWorld {
   /** Whether nothing hurts the local player, and whether its keys move it. */
   playerInvincible = false
   playerControl = true
+  /** The time of the last tick, which the keys that move the player are held for. */
+  #lastTick = 0
 
   readonly #hooks: WorldHooks
 
@@ -539,8 +549,18 @@ export class ClientWorld {
     this.#randomSeed = state === 0 ? 1 : state
   }
 
-  /** Runs a tick of the world, which starts a frame of its input: it loads the models and the assets that scripts requested. */
-  tick(): void {
+  /**
+   * Runs a tick of the world at a time of its client: the keys of the
+   * last frame move the player, unless NUI has them, and a frame of its
+   * input starts, and the models and the assets that scripts requested load.
+   */
+  tick(now: number, keysInGame = true): void {
+    const seconds = (now - this.#lastTick) / 1000
+    this.#lastTick = now
+    const ped = this.playerPed
+    if (keysInGame && this.playerControl && ped.health >= PED_DEATH_HEALTH) {
+      moveWithKeys(ped, this.input, seconds)
+    } else ped.speed = 0
     this.input.frame()
     for (const model of this.#requested) this.#loaded.add(model)
     this.#requested.clear()

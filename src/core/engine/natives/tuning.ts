@@ -323,9 +323,11 @@ export function tuningNatives(side: Side): NativeDefinition<NativeContext>[] {
         result: 'void',
         params: ['Vehicle vehicle', 'BOOL value', 'BOOL instantly', 'BOOL disableAutoStart'],
       },
-      (ctx: NativeContext, vehicle, value) => {
+      (ctx: NativeContext, vehicle, value, _instantly, disableAutoStart) => {
         const parts = partsOf(ctx, vehicle)
-        if (parts !== undefined) parts.engineOn = value
+        if (parts === undefined) return
+        parts.engineOn = value
+        parts.autoStart = !disableAutoStart
       },
     ),
     defineNative(

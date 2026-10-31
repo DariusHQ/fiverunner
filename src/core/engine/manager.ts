@@ -874,7 +874,7 @@ export class ResourceManager {
     this.#player?.touch()
     for (const fn of this.#received.splice(0)) fn()
     this.gameState?.tick()
-    this.#world?.tick()
+    this.#world?.tick(this.time(), !this.nui?.focused || this.nui.keepingInput)
     this.#rpc?.tick()
     this.#oxmysql?.tick()
     this.security.runAs('system.console', () => this.console.executeBuffer())

@@ -382,6 +382,25 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     expect(console).toContain('[script:bank] bank menu opened')
   })
 
+  it('runs the players whose screens have the focus where their keys say', async () => {
+    const position = () =>
+      page.evaluate<number[]>(
+        `JSON.parse(document.querySelector('.player .screen canvas').dataset.players)[0]`,
+      )
+    const [, x, y] = await position()
+    const screen = `document.querySelector('.player .screen')`
+    const fire = (type: string) =>
+      page.evaluate(
+        `(() => { ${screen}.focus(); ${screen}.dispatchEvent(new KeyboardEvent('${type}', { code: 'KeyW', bubbles: true, cancelable: true })) })()`,
+      )
+    await fire('keydown')
+    await page.until(
+      `JSON.parse(document.querySelector('.player .screen canvas').dataset.players)[0][2] > ${y! + 1}`,
+    )
+    await fire('keyup')
+    expect((await position())[1]).toBe(x)
+  })
+
   it('restarts the resources whose files change, with the players they had, whose frames keep their storage', async () => {
     writeFileSync(join(project, 'server.lua'), `print('bank server changed')\n`)
     await page.until(`document.getElementById('console').innerText.includes('bank server changed')`)

@@ -66,7 +66,7 @@ Run your project in your browser:
 npx fiverunner dev
 ```
 
-The dev UI has the console of your server, where you run commands, its resources, which you start, stop and restart, the events that the server and the players send each other, which you trigger too, its state bags, and a map of its entities and of the blips of the players, classic, as a cartoon or in the style of GTA V, where you drag players to move them. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI over the world round their ped: click through your pages, which talk to your callbacks as they do in FiveM. As you save files, the dev UI restarts the resources that they belong to, and the players stay. [docs/dev.md](docs/dev.md) tells all that it does.
+The dev UI has the console of your server, where you run commands, its resources, which you start, stop and restart, the events that the server and the players send each other, which you trigger too, its state bags, and a map of its entities and of the blips of the players, classic, as a cartoon or in the style of GTA V, where you drag players to move them. Connect players, whose clients run your client scripts, each with a screen that shows the frames of its NUI over the world round their ped: click through your pages, which talk to your callbacks as they do in FiveM, and walk or drive with W, A, S and D. As you save files, the dev UI restarts the resources that they belong to, and the players stay. [docs/dev.md](docs/dev.md) tells all that it does.
 
 ![The Stable recipe of Qbox in the dev UI: the console of its server, the events that its player sent, its resources and state bags, and the map of its world](docs/media/dev-ui.png)
 

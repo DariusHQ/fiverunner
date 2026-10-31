@@ -28,9 +28,14 @@ const CONTROL_KEYS: ReadonlyMap<number, readonly string[]> = new Map([
   [52, ['Q']],
   [56, ['F9']],
   [57, ['F10']],
+  [63, ['A']],
+  [64, ['D']],
+  [71, ['W']],
+  [72, ['S']],
   [73, ['X']],
   [74, ['H']],
   [75, ['F']],
+  [76, ['SPACE']],
   [140, ['R']],
   [157, ['1']],
   [158, ['2']],
@@ -75,6 +80,7 @@ const CONTROL_KEYS: ReadonlyMap<number, readonly string[]> = new Map([
 const AXES: ReadonlyMap<number, readonly [negative: string, positive: string]> = new Map([
   [30, ['A', 'D']],
   [31, ['W', 'S']],
+  [59, ['A', 'D']],
 ])
 
 /** A command that a resource bound to a key, as RegisterKeyMapping binds them. */
