@@ -73,6 +73,16 @@ export function interiorNatives(side: Side): NativeDefinition<NativeContext>[] {
       },
       () => false,
     ),
+    // Scripts wait for interiors to load before they use them, which there are none of to wait for.
+    defineNative(
+      {
+        name: 'IS_INTERIOR_READY',
+        hash: 0x6726bdccc1932f0en,
+        result: 'BOOL',
+        params: ['Interior interior'],
+      },
+      () => true,
+    ),
     defineNative(
       {
         name: 'ACTIVATE_INTERIOR_ENTITY_SET',

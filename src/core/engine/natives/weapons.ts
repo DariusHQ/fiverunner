@@ -23,6 +23,19 @@ export function weaponNatives(side: Side): NativeDefinition<NativeContext>[] {
 
 function clientNatives(): NativeDefinition<NativeContext>[] {
   return [
+    // FiveRunner has no list of the weapons of GTA V to tell guns from melee weapons by.
+    defineNative(
+      {
+        name: 'IS_PED_ARMED',
+        hash: 0x475768a975d5ad17n,
+        result: 'BOOL',
+        params: ['Ped ped', 'int typeFlags'],
+      },
+      (ctx: NativeContext, ped) => {
+        const weapon = pedOf(ctx, ped)?.weapon
+        return weapon !== undefined && weapon !== UNARMED
+      },
+    ),
     defineNative(
       {
         name: 'GIVE_WEAPON_TO_PED',

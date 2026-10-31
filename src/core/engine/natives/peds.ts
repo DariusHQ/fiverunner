@@ -3,6 +3,7 @@ import type { NativeContext } from '../context.ts'
 import { HAIR_COLOURS, MAKEUP_COLOURS, type PedAppearance } from '../world/appearance.ts'
 import type { ClientEntity, PedAnim } from '../world/client.ts'
 import { EntityType, entityTypeOf } from '../world/entity.ts'
+import { fromEuler } from '../world/rotation.ts'
 import { clientEntityOf } from './entities.ts'
 import { localPlayerIndex } from './players.ts'
 
@@ -66,6 +67,36 @@ export function pedNatives(side: Side): NativeDefinition<NativeContext>[] {
   if (side === 'server') return []
   /** The anim dicts that each client played clips of unloaded, which it is told of once. */
   const unloaded = new WeakMap<object, Set<string>>()
+  /** Has a ped play a clip of an anim dict, if it is loaded, and diagnoses that it is not otherwise, once. */
+  const playAnim = (
+    ctx: NativeContext,
+    ped: ClientEntity,
+    dict: string | null,
+    name: string | null,
+    duration: number,
+    flag: number,
+  ) => {
+    if (!ctx.manager.world!.assetLoaded('anim', dict ?? '')) {
+      const told = unloaded.get(ctx.manager) ?? new Set<string>()
+      unloaded.set(ctx.manager, told)
+      const key = (dict ?? '').toLowerCase()
+      if (!told.has(key)) {
+        told.add(key)
+        ctx.diagnose(
+          `TaskPlayAnim was given the anim dict ${dict ?? ''}, which is not loaded, so the ped played nothing, as in GTA V: request it with RequestAnimDict, then wait until HasAnimDictLoaded says it loaded.`,
+        )
+      }
+      return
+    }
+    const held = (flag & (ANIM_LOOPING | ANIM_HOLD_LAST_FRAME)) !== 0
+    const anim = {
+      dict: (dict ?? '').toLowerCase(),
+      name: (name ?? '').toLowerCase(),
+      until: ctx.manager.time() + (duration > 0 ? duration : held ? Infinity : CLIP_LENGTH),
+    }
+    if ((flag & ANIM_SECONDARY) !== 0) ped.secondaryAnim = anim
+    else ped.anim = anim
+  }
   return [
     defineNative(
       {
@@ -403,6 +434,86 @@ export function pedNatives(side: Side): NativeDefinition<NativeContext>[] {
     // Peds play the anims of the anim dicts that are loaded, which only scripts see.
     defineNative(
       {
+        name: 'TASK_PLAY_ANIM_ADVANCED',
+        hash: 0x83cdb10ea29b370bn,
+        result: 'void',
+        params: [
+          'Ped ped',
+          'char* animDictionary',
+          'char* animationName',
+          'float posX',
+          'float posY',
+          'float posZ',
+          'float rotX',
+          'float rotY',
+          'float rotZ',
+          'float animEnterSpeed',
+          'float animExitSpeed',
+          'int duration',
+          'int flag',
+          'float animTime',
+          'int rotOrder',
+          'int ikFlags',
+        ],
+      },
+      (
+        ctx: NativeContext,
+        ped,
+        dict,
+        name,
+        x,
+        y,
+        z,
+        rotX,
+        rotY,
+        rotZ,
+        _in,
+        _out,
+        duration,
+        flag,
+        _t,
+        order,
+      ) => {
+        const found = pedOf(ctx, ped)
+        if (found === undefined) return
+        found.moveTo(x, y, z)
+        found.rotation = fromEuler(rotX, rotY, rotZ, order)
+        playAnim(ctx, found, dict, name, duration, flag)
+      },
+    ),
+    defineNative(
+      {
+        name: 'TASK_TURN_PED_TO_FACE_ENTITY',
+        hash: 0x5ad23d40115353acn,
+        result: 'void',
+        params: ['Ped ped', 'Entity entity', 'int duration'],
+      },
+      (ctx: NativeContext, ped, entity) => {
+        const found = pedOf(ctx, ped)
+        const target = ctx.manager.world!.byHandle(entity)
+        if (found !== undefined && target !== undefined) found.face(target.x, target.y)
+      },
+    ),
+    defineNative(
+      {
+        name: 'TASK_TURN_PED_TO_FACE_COORD',
+        hash: 0x1dda930a0ac38571n,
+        result: 'void',
+        params: ['Ped ped', 'float x', 'float y', 'float z', 'int duration'],
+      },
+      (ctx: NativeContext, ped, x, y) => pedOf(ctx, ped)?.face(x, y),
+    ),
+    defineNative(
+      {
+        name: 'GET_ANIM_DURATION',
+        hash: 0xfeddf04d62b8d790n,
+        result: 'float',
+        params: ['char* animDict', 'char* animName'],
+      },
+      () => CLIP_LENGTH / 1000,
+    ),
+    defineNative(
+      {
         name: 'TASK_PLAY_ANIM',
         hash: 0xea47fe3719165b94n,
         result: 'void',
@@ -422,27 +533,7 @@ export function pedNatives(side: Side): NativeDefinition<NativeContext>[] {
       },
       (ctx: NativeContext, ped, dict, name, _blendIn, _blendOut, duration, flag) => {
         const found = pedOf(ctx, ped)
-        if (found === undefined) return
-        if (!ctx.manager.world!.assetLoaded('anim', dict ?? '')) {
-          const told = unloaded.get(ctx.manager) ?? new Set<string>()
-          unloaded.set(ctx.manager, told)
-          const key = (dict ?? '').toLowerCase()
-          if (!told.has(key)) {
-            told.add(key)
-            ctx.diagnose(
-              `TaskPlayAnim was given the anim dict ${dict ?? ''}, which is not loaded, so the ped played nothing, as in GTA V: request it with RequestAnimDict, then wait until HasAnimDictLoaded says it loaded.`,
-            )
-          }
-          return
-        }
-        const held = (flag & (ANIM_LOOPING | ANIM_HOLD_LAST_FRAME)) !== 0
-        const anim = {
-          dict: (dict ?? '').toLowerCase(),
-          name: (name ?? '').toLowerCase(),
-          until: ctx.manager.time() + (duration > 0 ? duration : held ? Infinity : CLIP_LENGTH),
-        }
-        if ((flag & ANIM_SECONDARY) !== 0) found.secondaryAnim = anim
-        else found.anim = anim
+        if (found !== undefined) playAnim(ctx, found, dict, name, duration, flag)
       },
     ),
     defineNative(

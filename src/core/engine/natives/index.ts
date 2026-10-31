@@ -12,11 +12,13 @@ import { gameNatives } from './game.ts'
 import { httpNatives } from './http.ts'
 import { interiorNatives } from './interiors.ts'
 import { kvpNatives } from './kvp.ts'
+import { miscNatives } from './misc.ts'
 import { networkNatives } from './network.ts'
 import { nuiNatives } from './nui.ts'
 import { oxmysqlNatives } from './oxmysql.ts'
 import { pedNatives } from './peds.ts'
 import { playerNatives } from './players.ts'
+import { positionNatives } from './positions.ts'
 import { refNatives } from './refs.ts'
 import { resourceNatives } from './resources.ts'
 import { rpcNatives } from './rpc.ts'
@@ -24,6 +26,7 @@ import { screenNatives } from './screen.ts'
 import { scriptingNatives } from './scripting.ts'
 import { stateBagNatives } from './states.ts'
 import { streamingNatives } from './streaming.ts'
+import { tuningNatives } from './tuning.ts'
 import { vehicleNatives } from './vehicles.ts'
 import { voiceNatives } from './voice.ts'
 import { weaponNatives } from './weapons.ts'
@@ -43,7 +46,10 @@ export function engineNatives(side: Side): NativeDefinition<NativeContext>[] {
     ...playerNatives(side),
     ...stateBagNatives(side),
     ...entityNatives(side),
+    ...positionNatives(side),
+    ...miscNatives(side),
     ...vehicleNatives(side),
+    ...tuningNatives(side),
     ...rpcNatives(side),
     ...streamingNatives(side),
     ...screenNatives(side),

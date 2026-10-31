@@ -1,6 +1,7 @@
 import type { LuaRuntime, LuaValue } from '../lua/index.ts'
 import type { NativeCaller } from '../natives/index.ts'
 import type { ResourceManager } from './manager.ts'
+import { silentNative } from './natives/silent.ts'
 import type { Resource } from './resource.ts'
 
 /**
@@ -47,6 +48,7 @@ export class NativeContext implements NativeCaller {
   }
 
   unimplemented(name: string, hash: bigint): void {
+    if (this.manager.side === 'client' && silentNative(hash)) return
     this.runtime.unimplemented(name, hash)
   }
 }

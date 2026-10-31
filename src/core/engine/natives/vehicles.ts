@@ -60,6 +60,42 @@ function clientNatives(): NativeDefinition<NativeContext>[] {
     seat('TASK_WARP_PED_INTO_VEHICLE', 0x9a7d091411c5f684n),
     defineNative(
       {
+        name: 'TASK_ENTER_VEHICLE',
+        hash: 0xc20e50aa46d09ca8n,
+        result: 'void',
+        params: [
+          'Ped ped',
+          'Vehicle vehicle',
+          'int timeout',
+          'int seatIndex',
+          'float speed',
+          'int flag',
+          'int p6',
+        ],
+      },
+      (ctx: NativeContext, ped, vehicle, _timeout, seatIndex) => {
+        const found = pedOf(ctx, ped)
+        const into = vehicleOf(ctx, vehicle)
+        if (found === undefined || into === undefined || seatIndex < -2) return
+        let at = seatIndex === -2 ? 0 : seatIndex
+        while (seatIndex === -2 && into.occupants.has(at)) at++
+        found.enterVehicle(into, at)
+      },
+    ),
+    defineNative(
+      {
+        name: 'TASK_EVERYONE_LEAVE_VEHICLE',
+        hash: 0x7f93691ab4b92272n,
+        result: 'void',
+        params: ['Vehicle vehicle'],
+      },
+      (ctx: NativeContext, vehicle) => {
+        const found = vehicleOf(ctx, vehicle)
+        for (const ped of [...(found?.occupants.values() ?? [])]) ped.leaveVehicle()
+      },
+    ),
+    defineNative(
+      {
         name: 'TASK_LEAVE_VEHICLE',
         hash: 0xd3dbce61a490be02n,
         result: 'void',
@@ -111,6 +147,18 @@ function clientNatives(): NativeDefinition<NativeContext>[] {
         params: ['Ped ped'],
       },
       (ctx: NativeContext, ped) => handleOf(pedOf(ctx, ped)?.vehicle),
+    ),
+    defineNative(
+      {
+        name: 'IS_PED_ON_FOOT',
+        hash: 0x01fee67db37f59b2n,
+        result: 'BOOL',
+        params: ['Ped ped'],
+      },
+      (ctx: NativeContext, ped) => {
+        const found = pedOf(ctx, ped)
+        return found !== undefined && found.vehicle === undefined
+      },
     ),
     // Peds get into vehicles at once, so none is getting into one.
     defineNative(

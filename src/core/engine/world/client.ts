@@ -7,12 +7,13 @@ import { EntityType, entityTypeOf, NetObjType, type SyncState } from './entity.t
 import { Input } from './input.ts'
 import { Pool } from './pool.ts'
 import { decompressQuaternion, fromSector } from './quantize.ts'
-import { fromHeading, fromQuaternion, IDENTITY, type Matrix } from './rotation.ts'
+import { apply, fromHeading, fromQuaternion, IDENTITY, type Matrix } from './rotation.ts'
 import { ScreenFade } from './screen.ts'
 import type { ServerClone } from './server.ts'
 import { sameState, syncStateOf } from './sync.ts'
 import { GameText } from './text.ts'
 import { GameClock, Weather } from './weather.ts'
+import { VehicleParts } from './vehicle.ts'
 import { UNARMED, type PedWeapon } from './weapons.ts'
 
 /** The model of the ped that GTA V's player has until scripts change it: player_zero, Michael. */
@@ -24,6 +25,23 @@ export interface PedAnim {
   readonly name: string
   readonly until: number
 }
+
+/** The peds that FXServer's default maps spawn players as, and the freemode models, which FiveRunner knows to be peds without a list of the models of GTA V. */
+const PED_MODELS: ReadonlySet<number> = new Set(
+  [
+    'player_zero',
+    'mp_m_freemode_01',
+    'mp_f_freemode_01',
+    'a_m_y_skater_01',
+    'a_m_y_skater_02',
+    'a_m_y_hipster_01',
+    'a_m_y_hipster_02',
+  ].map(hashString),
+)
+
+/** The constants of a minstd_rand, which draws the numbers that worlds need. */
+const MINSTD_MULTIPLIER = 48_271
+const MINSTD_MODULUS = 2_147_483_647
 
 /** How few object ids FiveM's clients in OneSync's big mode keep before they ask their servers for more. */
 const FEW_OBJECT_IDS = 4
@@ -45,6 +63,12 @@ export class ClientEntity {
   rotation: Matrix = IDENTITY
   frozen = false
   visible = true
+  /** How see-through scripts make the entity, from 0 to 255, which is not at all, and whether it collides. */
+  alpha = 255
+  collision = true
+  /** The entity that the entity is attached to, if any, and those attached to it, which go where it goes. */
+  attachedTo: ClientEntity | undefined = undefined
+  readonly attachments = new Set<ClientEntity>()
   /** The object id of the network object of the entity, which is its network id, if it is networked. */
   objectId: number | undefined = undefined
   /** The resource whose script owns the entity, which makes it a mission entity, if any. */
@@ -77,6 +101,8 @@ export class ClientEntity {
   /** For vehicles, the peds in their seats, and those that were last in each seat, by the seats. */
   readonly occupants = new Map<number, ClientEntity>()
   readonly lastOccupants = new Map<number, ClientEntity>()
+  /** What scripts set of a vehicle, which they read back. */
+  readonly parts = new VehicleParts()
   /** For vehicles, the text of their number plates, which worlds give the vehicles they add, and its style. */
   plate = ''
   plateIndex = 0
@@ -89,12 +115,43 @@ export class ClientEntity {
     this.health = this.maxHealth = entityTypeOf(type) === EntityType.ped ? 200 : 1000
   }
 
-  /** Puts the entity at a position, which natives give in single precision, and the peds in it, if it is a vehicle. */
+  /** Puts the entity at a position, which natives give in single precision, with the peds in it, if it is a vehicle, and the entities attached to it. */
   moveTo(x: number, y: number, z: number): void {
+    const [dx, dy, dz] = [x - this.x, y - this.y, z - this.z]
     this.x = x
     this.y = y
     this.z = z
     for (const ped of this.occupants.values()) ped.moveTo(x, y, z)
+    for (const entity of this.attachments) {
+      entity.moveTo(entity.x + dx, entity.y + dy, entity.z + dz)
+    }
+  }
+
+  /** Turns the entity to face a point, about z. */
+  face(x: number, y: number): void {
+    this.rotation = fromHeading((Math.atan2(this.x - x, y - this.y) * 180) / Math.PI)
+  }
+
+  /** Attaches the entity to another, at an offset from it, unless that entity is attached to this one, as GTA V keeps entities from going round. */
+  attachTo(parent: ClientEntity, x: number, y: number, z: number): void {
+    for (
+      let above: ClientEntity | undefined = parent;
+      above !== undefined;
+      above = above.attachedTo
+    ) {
+      if (above === this) return
+    }
+    this.detach()
+    this.attachedTo = parent
+    parent.attachments.add(this)
+    const [offsetX, offsetY, offsetZ] = apply(parent.rotation, x, y, z)
+    this.moveTo(parent.x + offsetX, parent.y + offsetY, parent.z + offsetZ)
+  }
+
+  /** Detaches the entity from the one that it is attached to, if any, where it is. */
+  detach(): void {
+    this.attachedTo?.attachments.delete(this)
+    this.attachedTo = undefined
   }
 
   /** Seats a ped in a seat of a vehicle, which the ped that sat there leaves, and puts it where the vehicle is. */
@@ -194,6 +251,8 @@ export class ClientWorld {
   readonly ipls = new Set<string>()
   /** The state of the generator of the plates of vehicles. */
   #plateSeed = 1
+  /** The state of the generator of the random numbers of scripts. */
+  #randomSeed = 1
   /** The entity types of the models that the world learned of, as scripts created entities of them. */
   readonly #kinds = new Map<number, number>()
   /** The object ids that the world may network entities with. */
@@ -230,6 +289,9 @@ export class ClientWorld {
   readonly weather = new Weather()
   /** Whether the local player is in a solo tutorial session of the game, as character menus put it. */
   tutorial = false
+  /** Whether nothing hurts the local player, and whether its keys move it. */
+  playerInvincible = false
+  playerControl = true
 
   readonly #hooks: WorldHooks
 
@@ -293,7 +355,7 @@ export class ClientWorld {
   /** A plate as GTA V gives new vehicles: two digits, three letters and three digits, drawn from a minstd_rand seeded with 1. */
   #plate(): string {
     const draw = (count: number) => {
-      this.#plateSeed = (this.#plateSeed * 48_271) % 2_147_483_647
+      this.#plateSeed = (this.#plateSeed * MINSTD_MULTIPLIER) % MINSTD_MODULUS
       return this.#plateSeed % count
     }
     const digit = () => String(draw(10))
@@ -462,7 +524,19 @@ export class ClientWorld {
 
   /** The entity type of a model, as far as the world learned of it. */
   kindOf(model: number): number {
-    return this.#kinds.get(model) ?? EntityType.none
+    return this.#kinds.get(model) ?? (PED_MODELS.has(model) ? EntityType.ped : EntityType.none)
+  }
+
+  /** A random number from 0 up to 1, drawn from a minstd_rand, which starts the same on every run. */
+  random(): number {
+    this.#randomSeed = (this.#randomSeed * MINSTD_MULTIPLIER) % MINSTD_MODULUS
+    return (this.#randomSeed - 1) / (MINSTD_MODULUS - 1)
+  }
+
+  /** Seeds the generator of random numbers, whose state is never 0. */
+  seedRandom(seed: number): void {
+    const state = ((seed % MINSTD_MODULUS) + MINSTD_MODULUS) % MINSTD_MODULUS
+    this.#randomSeed = state === 0 ? 1 : state
   }
 
   /** Runs a tick of the world, which starts a frame of its input: it loads the models and the assets that scripts requested. */
@@ -527,6 +601,8 @@ export class ClientWorld {
   #forget(entity: ClientEntity): boolean {
     this.#hooks.forgotten(entity)
     this.blips.forget(entity)
+    entity.detach()
+    for (const attached of [...entity.attachments]) attached.detach()
     entity.leaveVehicle()
     for (const ped of [...entity.occupants.values()]) ped.leaveVehicle()
     for (const other of this.#entities) {

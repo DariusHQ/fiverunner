@@ -197,12 +197,12 @@ export function gameNatives(side: Side): NativeDefinition<NativeContext>[] {
     nothing('SET_AUDIO_SUBMIX_OUTPUT_VOLUMES', undefined, [
       'int submixId',
       'int outputSlot',
-      'int frontLeftVolume',
-      'int frontRightVolume',
-      'int rearLeftVolume',
-      'int rearRightVolume',
-      'int channel5Volume',
-      'int channel6Volume',
+      'float frontLeftVolume',
+      'float frontRightVolume',
+      'float rearLeftVolume',
+      'float rearRightVolume',
+      'float channel5Volume',
+      'float channel6Volume',
     ]),
     defineNative(
       {

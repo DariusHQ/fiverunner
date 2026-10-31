@@ -27,7 +27,101 @@ export function streamingNatives(side: Side): NativeDefinition<NativeContext>[] 
       },
     )
   }
+  /** The names of the movies of scaleform that the scripts of each client requested, by their handles. */
+  const movies = new WeakMap<object, Map<number, string>>()
+  const moviesOf = (ctx: NativeContext) => {
+    const found = movies.get(ctx.manager) ?? new Map<number, string>()
+    movies.set(ctx.manager, found)
+    return found
+  }
+  /** A native that requests a movie of scaleform, which loads at the next tick, and gives its handle. */
+  const requestMovie = (name: string, hash: bigint) =>
+    defineNative(
+      { name, hash, result: 'int', params: ['char* scaleformName'] },
+      (ctx: NativeContext, movie) => {
+        const handles = moviesOf(ctx)
+        const handle = handles.size + 1
+        handles.set(handle, movie ?? '')
+        ctx.manager.world!.requestAsset('scaleform', movie ?? '')
+        return handle
+      },
+    )
   return [
+    requestMovie('REQUEST_SCALEFORM_MOVIE', 0x11fe353cf9733e6fn),
+    requestMovie('REQUEST_SCALEFORM_MOVIE_INSTANCE', 0xc514489cfb8af806n),
+    defineNative(
+      {
+        name: 'HAS_SCALEFORM_MOVIE_LOADED',
+        hash: 0x85f01b8d5b90570en,
+        result: 'BOOL',
+        params: ['int scaleformHandle'],
+      },
+      (ctx: NativeContext, handle) => {
+        const movie = moviesOf(ctx).get(handle)
+        return movie !== undefined && ctx.manager.world!.assetLoaded('scaleform', movie)
+      },
+    ),
+    defineNative(
+      {
+        name: 'HAS_SCALEFORM_MOVIE_FILENAME_LOADED',
+        hash: 0x0c1c5d756fb5f337n,
+        result: 'BOOL',
+        params: ['char* scaleformName'],
+      },
+      (ctx: NativeContext, movie) => ctx.manager.world!.assetLoaded('scaleform', movie ?? ''),
+    ),
+    defineNative(
+      {
+        name: 'SET_SCALEFORM_MOVIE_AS_NO_LONGER_NEEDED',
+        hash: 0x1d132d614dd86811n,
+        result: 'void',
+        params: ['int* scaleformHandle'],
+      },
+      (_ctx, handle) => handle.set(0),
+    ),
+    // Assets of the game that scripts wait for, which have nothing to load.
+    defineNative(
+      { name: 'HAS_PTFX_ASSET_LOADED', hash: 0xca7d9b86eca7481bn, result: 'BOOL', params: [] },
+      () => true,
+    ),
+    ...(
+      [
+        ['REQUEST_AMBIENT_AUDIO_BANK', 0xfe02ffbed8ca9d99n],
+        ['REQUEST_MISSION_AUDIO_BANK', 0x7345bdd95e62e0f2n],
+      ] as const
+    ).map(([name, hash]) =>
+      defineNative(
+        { name, hash, result: 'BOOL', params: ['char* bankName', 'BOOL bOverNetwork'] },
+        () => true,
+      ),
+    ),
+    // Headshots of peds: the txds of those that scripts register, which show nothing.
+    defineNative(
+      {
+        name: 'REGISTER_PEDHEADSHOT',
+        hash: 0x4462658788425076n,
+        result: 'int',
+        params: ['Ped ped'],
+      },
+      (ctx: NativeContext, ped) => (ctx.manager.world!.byHandle(ped) === undefined ? 0 : 1),
+    ),
+    ...(
+      [
+        ['IS_PEDHEADSHOT_READY', 0x7085228842b13a67n],
+        ['IS_PEDHEADSHOT_VALID', 0xa0a9668f158129a2n],
+      ] as const
+    ).map(([name, hash]) =>
+      defineNative({ name, hash, result: 'BOOL', params: ['int id'] }, (_ctx, id) => id !== 0),
+    ),
+    defineNative(
+      {
+        name: 'GET_PEDHEADSHOT_TXD_STRING',
+        hash: 0xdb4eacd4ad0a5d6bn,
+        result: 'char*',
+        params: ['int id'],
+      },
+      () => 'CHAR_DEFAULT',
+    ),
     defineNative(
       { name: 'REQUEST_MODEL', hash: 0x963d27a58df860acn, result: 'void', params: ['Hash model'] },
       (ctx: NativeContext, model) => {
