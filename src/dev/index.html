@@ -58,6 +58,39 @@
         <div id="bags"></div>
       </aside>
       <section id="map" class="map"></section>
+      <section class="inspector">
+        <div class="toolbar">
+          <h2>Inspector</h2>
+          <select id="inspected" aria-label="The process to inspect"></select>
+        </div>
+        <div class="columns">
+          <div
+            id="inspected-resources"
+            aria-label="Resources, with the time they take each tick"
+          ></div>
+          <div id="inspected-details">Pick a resource</div>
+          <div class="convars">
+            <input
+              id="convar-filter"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Filter the convars"
+              aria-label="Filter the convars"
+            />
+            <dl id="convars"></dl>
+          </div>
+        </div>
+        <form id="evaluate">
+          <input
+            id="code"
+            autocomplete="off"
+            spellcheck="false"
+            disabled
+            placeholder="Pick a resource to run code in it"
+            aria-label="Code to run in the resource"
+          />
+        </form>
+      </section>
       <section class="players">
         <div class="toolbar">
           <h2>Players</h2>

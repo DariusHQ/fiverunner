@@ -210,6 +210,9 @@ export class ResourceManager {
   #suppressErrors = false
   readonly #time: () => number
   readonly #wallClock: () => number
+  #ticks = 0
+  /** When a call into a runtime last started or ended, by the clock of the host. */
+  #lastCall = 0
   /** The time zone of local times, as os.date and os.time take them. */
   readonly timeZone: TimeZone
   /** What interrupts the scripts of the process that run too long, if anything. */
@@ -879,6 +882,7 @@ export class ResourceManager {
    * sv_enableNetEventReassembly is on.
    */
   tick(): void {
+    this.#ticks++
     this.#player?.touch()
     for (const fn of this.#received.splice(0)) fn()
     this.gameState?.tick()
@@ -899,6 +903,11 @@ export class ResourceManager {
     for (const fn of this.#queued.splice(0)) fn()
     if (this.#player !== undefined) this.#player.session.syncWorld(this.#player)
     if (this.reassembling) this.latent.tick()
+  }
+
+  /** The ticks that the process ran so far. */
+  get ticks(): number {
+    return this.#ticks
   }
 
   /** Whether the process sends latent events, as sv_enableNetEventReassembly says. */
@@ -1113,13 +1122,23 @@ export class ResourceManager {
 
   /** @internal Called by a resource when a call enters its runtime, or the resource if it has none. */
   pushCall(resource: Resource, runtime: ResourceRuntime | null): void {
+    this.#countTime()
     this.#calls.push({ resource, runtime, start: null, end: null })
   }
 
   /** @internal Called by a resource when the innermost call into its runtime returns. */
   popCall(): void {
+    this.#countTime()
     this.#calls.pop()
     if (this.#calls.length === 0) this.#suppressErrors = false
+  }
+
+  /** Gives the time since a call last started or ended to the resource of the innermost call. */
+  #countTime(): void {
+    const now = performance.now()
+    const call = this.#calls.at(-1)
+    if (call !== undefined) call.resource.cpuTime += now - this.#lastCall
+    this.#lastCall = now
   }
 
   /** @internal Sets a boundary of the innermost call; see ScriptHost.submitBoundary. */

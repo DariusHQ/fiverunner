@@ -563,6 +563,61 @@ end)`)
     ])
   })
 
+  it('inspect what the resources of processes have, and the time their scripts take', async () => {
+    const { session } = await sessionOf(
+      `exports('balance', function() return 5 end)
+AddEventHandler('bank:opened', function() end)
+RegisterCommand('open', function() end, false)
+SetResourceKvp('plan', 'gold')
+for i = 1, 1000000 do end`,
+      `RegisterNUICallback('close', function(_, cb) cb({}) end)`,
+    )
+    const client = await session.connect({ name: 'Ann' })
+    session.advance(1000)
+    const server = session.inspect('server')!
+    const bank = server.resources.find(({ name }) => name === 'bank')!
+    expect(bank).toMatchObject({
+      state: 'started',
+      exports: ['balance'],
+      events: ['bank:opened'],
+      nuiCallbacks: [],
+      commands: ['open'],
+      kvp: [{ key: 'plan', value: '"gold"' }],
+    })
+    expect(bank.cpu).toBeGreaterThan(0)
+    expect(server.ticks).toBeGreaterThan(0)
+    expect(server.convars).toContainEqual({ name: 'onesync', value: 'on' })
+    const player = session.inspect(client)!
+    expect(player.process).toBe(client)
+    expect(player.resources.find(({ name }) => name === 'bank')?.nuiCallbacks).toEqual(['close'])
+    expect(session.inspect(9)).toBeUndefined()
+  })
+
+  it('run code in the resources of processes, as their scripts would, and print what it gives', async () => {
+    const { session, told } = await sessionOf(`Balance = 5`, `Greeting = 'hi'`)
+    const client = await session.connect({ name: 'Ann' })
+    session.advance(1000)
+    told()
+    session.evaluate('server', 'bank', 'Balance + 1')
+    session.evaluate('server', 'bank', `local doubled = Balance * 2 return doubled, { a = 1 }`)
+    session.evaluate('server', 'bank', `print('é', GetCurrentResourceName())`)
+    session.evaluate(client, 'bank', 'Greeting')
+    session.evaluate('server', 'bank', 'Balance.nope.nope')
+    session.evaluate('server', 'bank', 'this is no lua')
+    const lines = printed(told())
+    expect(lines.slice(0, 4)).toEqual([
+      'server: [script:bank] 6',
+      'server: [script:bank] 10\t{"a":1}',
+      'server: [script:bank] é\tbank',
+      'client 1: [script:bank] hi',
+    ])
+    expect(lines[4]).toContain('console:1: attempt to index a number value')
+    expect(lines.join('\n')).toContain('syntax error')
+    session.evaluate('server', 'missing', 'Balance')
+    session.evaluate(9, 'bank', 'Balance')
+    expect(printed(told())).toEqual([])
+  })
+
   it('stop as runtimes of their servers crash, in commands', async () => {
     const { session, told } = await sessionOf(
       `RegisterCommand('loop', function() ${LOOP} end, false)

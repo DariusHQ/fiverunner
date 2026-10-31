@@ -77,6 +77,8 @@ export interface ResourceRuntime extends NativeCaller {
   deleteRef(index: number): void
   /** Reports a warning of FiveM's own code on `channel`. */
   emitWarning(channel: string, message: string): void
+  /** Runs `code` as consoles do: as a script, whose console says what it gives. */
+  evaluate(code: string): void
 }
 
 /**
@@ -181,6 +183,18 @@ for i = 1, select('#', ...), 2 do
     t[name] = value
 end
 return t`
+
+/** Runs the text of the local `code` as consoles do: as an expression if it is one, and prints what it gives. */
+const EVALUATE = `local chunk, failure = load('return ' .. code, '=console')
+if chunk == nil then chunk, failure = load(code, '=console') end
+if chunk == nil then error(failure, 0) end
+local results = table.pack(chunk())
+for i = 1, results.n do
+    local value = results[i]
+    local ok, text = pcall(json.encode, value)
+    results[i] = type(value) == 'table' and ok and text or tostring(value)
+end
+if results.n > 0 then print(table.unpack(results, 1, results.n)) end`
 
 /** Reads the entry points the FiveRunner scripts leave in their shared table. */
 const ENTRY_POINTS = `local fiverunner = ...
@@ -303,6 +317,12 @@ export class ScriptRuntime implements ResourceRuntime {
     } finally {
       chunk.release()
     }
+  }
+
+  evaluate(code: string): void {
+    const bytes = new TextEncoder().encode(code)
+    const literal = Array.from(bytes, (byte) => `\\${String(byte).padStart(3, '0')}`).join('')
+    this.runBuiltin('console.lua', `local code = "${literal}"\n${EVALUATE}`)
   }
 
   /**

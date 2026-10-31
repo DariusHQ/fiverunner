@@ -35,6 +35,14 @@ The form under it triggers an event as the network would: on the server, as a pl
 
 The state bags panel shows the state bags of the server that have keys, such as `global`, which `GlobalState` sets, and `player:<id>`, which `Player(id).state` sets, with the values of their keys, as they change.
 
+## Inspector
+
+The inspector shows what a process has: the server, or the client of a player, which the list next to its title picks.
+
+- **Resources**: each resource of the process, with the milliseconds that its scripts take each tick, as `resmon` shows them, which leave out the calls that they make of other resources. Clicking one shows what it has: its exports, the events that it handles, its NUI callbacks, its commands and its KVP.
+- **Convars**: the convars of the process, with their values, which the box above them filters.
+- **Code**: the box under them runs Lua in the resource that is picked, as one of its scripts would, so it sees its globals and may call its natives and `Wait`, or JavaScript if the resource has no Lua. An expression prints what it gives on the console of the process, such as `GetNumResources()`, and the arrow keys go back through what ran.
+
 ## Map
 
 The map shows the world of the server on a grid of metres, with the north up: the entities of its game state, where their owners last synced them, the peds of players as arrows that turn as they do, with their names, and the blips that the scripts of the players put on their maps, with the circles and areas of those around coordinates, and lines to those that show routes. There is no map of GTA V under them, whose pictures are Rockstar's, but the blips of garages, shops and jobs draw the city well enough. The map fits what is on it as it changes, until the wheel zooms it, dragging moves it or a player is dragged on it, and **Fit** has it fit again, clear of what its style draws over its edges. The names of blips show as the map zooms in, where they have room, clear of each other and of what the map draws, and the names of players always show. Hovering a blip or an entity tells of it.

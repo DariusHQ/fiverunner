@@ -309,6 +309,26 @@ console.log(GlobalState.fromLua, GlobalState.missing)`,
   })
 })
 
+describe('Consoles of JavaScript', () => {
+  it('run code in the global scope of a resource, and print what it gives', async () => {
+    const server = await createProcess()
+    const resource = server.add('js', {
+      'fxmanifest.lua': `fx_version 'cerulean'\ngame 'gta5'\nserver_script 'main.js'`,
+      'main.js': `const balance = 5`,
+    })
+    resource.start()
+    const [runtime] = resource.runtimes
+    const evaluate = (code: string) => resource.enter(() => runtime!.evaluate(code), runtime!)
+    evaluate('balance + 1')
+    evaluate('Promise.resolve(balance * 2)')
+    evaluate('undefined')
+    evaluate('balance.nope.nope')
+    const lines = printed(server)
+    expect(lines.slice(0, 2)).toEqual(['6', '10'])
+    expect(lines[2]).toContain('SCRIPT ERROR in console: TypeError')
+  })
+})
+
 describe('A resource of both languages', () => {
   it('has a runtime for each, which stop together', async () => {
     const server = await createProcess()

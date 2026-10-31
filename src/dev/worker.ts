@@ -145,6 +145,14 @@ addEventListener('message', (event: MessageEvent<ToWorker>) => {
     case 'key':
       session?.key(message.client, message.key, message.down)
       break
+    case 'inspect': {
+      const inspection = session?.inspect(message.process)
+      if (inspection !== undefined) tell({ type: 'inspection', inspection })
+      break
+    }
+    case 'evaluate':
+      session?.evaluate(message.process, message.resource, message.code)
+      break
     case 'cursor': {
       const nui = session?.nui(message.client)
       if (nui !== undefined) nui.cursor = { x: message.x, y: message.y }

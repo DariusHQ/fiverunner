@@ -1,5 +1,6 @@
 import type { PackedValue } from '../core/engine/msgpack.ts'
 import type { Answer, Ask } from './answers.ts'
+import type { DevInspection, DevProcess } from './inspection.ts'
 import type { DevEvent, EventTarget } from './session.ts'
 
 /** What the dev server tells the dev UI of its project. */
@@ -43,6 +44,15 @@ export type ToWorker =
   | { readonly type: 'waypoint'; readonly client: number; readonly x: number; readonly y: number }
   /** A key of the keyboard of a client went down or up, by the name of FiveM's keyboard mapper. */
   | { readonly type: 'key'; readonly client: number; readonly key: string; readonly down: boolean }
+  /** Asks what the inspector shows of a process. */
+  | { readonly type: 'inspect'; readonly process: DevProcess }
+  /** Runs code in a resource of a process, from the inspector. */
+  | {
+      readonly type: 'evaluate'
+      readonly process: DevProcess
+      readonly resource: string
+      readonly code: string
+    }
   /** Where the cursor is in the game window of a client, in pixels. */
   | { readonly type: 'cursor'; readonly client: number; readonly x: number; readonly y: number }
   /** What the service worker of the frames of a client at a host of FiveM's asks, which the worker answers by `id`. */
@@ -63,6 +73,7 @@ export type FromWorker =
   /** The session restarted the resources that files changed in, or none, when it needs to start anew. */
   | { readonly type: 'changed'; readonly restarted: readonly string[] | null }
   | { readonly type: 'event'; readonly event: DevEvent }
+  | { readonly type: 'inspection'; readonly inspection: DevInspection }
   | { readonly type: 'answer'; readonly id: number; readonly answer: Answer }
 
 /**

@@ -28,6 +28,9 @@ INSERT INTO accounts VALUES (), ();
   'server.lua': `print('bank server started')
 MySQL.ready(function() print('bank accounts', MySQL.scalar.await('SELECT COUNT(*) FROM accounts')) end)
 GlobalState.bank = 'open'
+exports('balance', function() return 5 end)
+SetResourceKvp('plan', 'gold')
+Rate = 3
 RegisterNetEvent('bank:ping', function(value) print('ping', source, value) end)
 RegisterCommand('open', function()
     TriggerClientEvent('bank:open', -1, 'Opened by the server')
@@ -403,6 +406,46 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     )
     await fire('keyup')
     expect((await position())[1]).toBe(x)
+  })
+
+  it('inspects what resources have, and runs code in them', async () => {
+    const pick = `[...document.querySelectorAll('#inspected-resources button')].find((b) => b.textContent.startsWith('bank')).click()`
+    await page.until(`document.querySelectorAll('#inspected-resources button').length > 0`)
+    await page.evaluate(pick)
+    const details = await page.until<string>(
+      `document.getElementById('inspected-details').innerText.includes('Exports') && document.getElementById('inspected-details').innerText`,
+    )
+    expect(details).toContain('balance')
+    expect(details).toContain('bank:ping')
+    expect(details).toContain('open')
+    expect(details).toContain('plan = "gold"')
+    await page.until(
+      `[...document.querySelectorAll('#inspected-resources button.chosen span')].at(-1)?.textContent.endsWith(' ms')`,
+    )
+    const convars = await page.evaluate<string>(`document.getElementById('convars').innerText`)
+    expect(convars).toContain('sv_enforceGameBuild')
+    await page.evaluate(`(() => {
+      const code = document.getElementById('code')
+      code.value = 'Rate * 7'
+      document.getElementById('evaluate').requestSubmit()
+    })()`)
+    await page.until(`document.getElementById('console').innerText.includes('[script:bank] 21')`)
+    expect(await page.evaluate<string>(`document.getElementById('console').innerText`)).toContain(
+      'bank> Rate * 7',
+    )
+    // The convars and the resources of a player are those of its client.
+    await page.evaluate(`(() => {
+      const select = document.getElementById('inspected')
+      select.value = '1'
+      select.dispatchEvent(new Event('change'))
+    })()`)
+    await page.until(
+      `document.getElementById('inspected-details').innerText.includes('NUI callbacks')`,
+    )
+    const client = await page.evaluate<string>(
+      `document.getElementById('inspected-details').innerText`,
+    )
+    expect(client).toContain('close')
   })
 
   it('restarts the resources whose files change, with the players they had, whose frames keep their storage', async () => {

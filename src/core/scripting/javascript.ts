@@ -119,6 +119,16 @@ export class JavaScriptRuntime implements ResourceRuntime {
     return false
   }
 
+  evaluate(code: string): void {
+    this.runFile(
+      '@console',
+      `Promise.resolve()
+  .then(() => (0, eval)(${JSON.stringify(code)}))
+  .then((value) => { if (value !== undefined) console.log(value) })
+  .catch((error) => printError('console', error))`,
+    )
+  }
+
   /** Timers and ticks run as resume() does, by the clock of then, so nothing is taken here. */
   collect(): void {}
 

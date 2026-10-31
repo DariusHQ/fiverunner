@@ -47,6 +47,22 @@ export class Console {
   }
 }
 
+/** Has the arrow keys go back through the lines of `input`, and gives what remembers a line that ran. */
+export function keepHistory(input: HTMLInputElement): (line: string) => void {
+  const lines: string[] = []
+  let at = 0
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    event.preventDefault()
+    at = Math.max(0, Math.min(lines.length, at + (event.key === 'ArrowUp' ? -1 : 1)))
+    input.value = lines[at] ?? ''
+  })
+  return (line) => {
+    lines.push(line)
+    at = lines.length
+  }
+}
+
 /** The pieces of `text`, colored as its codes say. */
 function colored(text: string): HTMLElement[] {
   const pieces: HTMLElement[] = []

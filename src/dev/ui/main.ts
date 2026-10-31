@@ -1,8 +1,8 @@
 /**
  * The dev UI: the console of the server, its resources, the events that
  * the server and its clients send each other, its state bags, a map of its
- * world, and the players that connect to it, each with a screen that shows
- * the frames of its NUI.
+ * world, an inspector of its processes, and the players that connect to it,
+ * each with a screen that shows the frames of its NUI.
  * Its worker runs the engine, and the bridges of the origins of frames
  * pass the requests of their pages on to it.
  */
@@ -14,8 +14,9 @@ import type { BridgeToUi, FromWorker, ToWorker, UiToBridge } from '../protocol.t
 import { API } from '../remote.ts'
 import { DEV_PATH } from '../routes.ts'
 import type { DevPlayer, DevState, NuiEvent } from '../session.ts'
-import { Console } from './console.ts'
+import { Console, keepHistory } from './console.ts'
 import { Events, showBags } from './inspect.ts'
+import { Inspector } from './inspector.ts'
 import { WorldMap } from './map.ts'
 import { Screen } from './screen.ts'
 
@@ -61,6 +62,26 @@ const map = new WorldMap(byId('map'), {
     for (const view of players.values()) view.screen.world.use(name)
   },
 })
+
+const inspector = new Inspector(
+  {
+    process: byId('inspected'),
+    resources: byId('inspected-resources'),
+    details: byId('inspected-details'),
+    filter: byId('convar-filter'),
+    convars: byId('convars'),
+    form: byId('evaluate'),
+    code: byId('code'),
+  },
+  {
+    inspect: (process) => send({ type: 'inspect', process }),
+    evaluate: (process, resource, code) => {
+      const console = process === 'server' ? server : playerView(process).console
+      console.note(`${resource}> ${code}`)
+      send({ type: 'evaluate', process, resource, code })
+    },
+  },
+)
 
 /** What the dev UI shows of a player. */
 interface PlayerView {
@@ -189,6 +210,7 @@ function showState(state: DevState): void {
     }),
   )
   events.players(state.players)
+  inspector.players(state.players)
   showBags(bags, state.bags)
   map.show(state.map, state.players)
   for (const player of state.players) {
@@ -275,6 +297,9 @@ worker.addEventListener('message', (event: MessageEvent<FromWorker>) => {
       }
       break
     }
+    case 'inspection':
+      inspector.show(message.inspection)
+      break
     case 'answer': {
       const found = asked.get(message.id)
       if (found === undefined) break
@@ -332,22 +357,13 @@ byId<HTMLFormElement>('command').addEventListener('submit', (event) => {
   const input = byId<HTMLInputElement>('command-line')
   const line = input.value
   if (line.trim() === '') return
-  history.push(line)
-  historyAt = history.length
+  rememberCommand(line)
   server.note(`> ${line}`)
   send({ type: 'command', line })
   input.value = ''
 })
 
-/** The commands that were run, which the arrow keys go back through. */
-const history: string[] = []
-let historyAt = 0
-byId<HTMLInputElement>('command-line').addEventListener('keydown', (event) => {
-  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-  event.preventDefault()
-  historyAt = Math.max(0, Math.min(history.length, historyAt + (event.key === 'ArrowUp' ? -1 : 1)))
-  ;(event.target as HTMLInputElement).value = history[historyAt] ?? ''
-})
+const rememberCommand = keepHistory(byId<HTMLInputElement>('command-line'))
 
 byId<HTMLFormElement>('connect').addEventListener('submit', (event) => {
   event.preventDefault()

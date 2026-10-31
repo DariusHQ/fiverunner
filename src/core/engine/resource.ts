@@ -74,6 +74,8 @@ export class Resource {
    * them for as long as the resource exists, across restarts.
    */
   readonly handledEvents = new Set<string>()
+  /** The milliseconds that its scripts took, by the clock of the host, which the calls they make of other resources leave out. */
+  cpuTime = 0
   /** Runs when the resource starts. A callback that returns false keeps it from starting. */
   readonly onBeforeStart = new Hook()
   /** Runs when the resource is starting, after onBeforeStart. A callback that returns false fails the start. */

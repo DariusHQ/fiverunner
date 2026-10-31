@@ -18,6 +18,7 @@ import { pack, type PackedValue } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
 import type { Project } from '../runner/index.ts'
 import { LineOutput, type OutputLine } from '../runner/output.ts'
+import { describeProcess, type DevInspection, type DevProcess } from './inspection.ts'
 import { describeMap, type DevMap } from './map.ts'
 import { describeArgs, describeValue } from './values.ts'
 
@@ -339,9 +340,28 @@ export class DevSession {
     this.#tell()
   }
 
+  /** What the inspector shows of `process`, if it is there. */
+  inspect(process: DevProcess): DevInspection | undefined {
+    const manager = this.#manager(process)
+    return manager === undefined ? undefined : describeProcess(manager, process)
+  }
+
+  /** Runs `code` in `resource` of `process`, in Lua if it has Lua, whose console tells what it gives. */
+  evaluate(process: DevProcess, resource: string, code: string): void {
+    const found = this.#manager(process)?.getResource(resource)
+    const runtime = found?.runtimes[0]
+    if (found === undefined || runtime === undefined || this.#crash !== undefined) return
+    this.#survive(() => found.enter(() => runtime.evaluate(code), runtime))
+    this.#tell()
+  }
+
   /** The NUI of the client `client`, which pages make their requests of. */
   nui(client: number): Nui | undefined {
     return this.#clients[client - 1]?.manager.nui
+  }
+
+  #manager(process: DevProcess): ResourceManager | undefined {
+    return process === 'server' ? this.#engine.server : this.#clients[process - 1]?.manager
   }
 
   /** Tells the state of the session, if it changed since it last told it. */
