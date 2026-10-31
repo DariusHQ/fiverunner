@@ -314,6 +314,35 @@ Duration: 0.63 s
     ])
   })
 
+  it('writes a JUnit report, with what passed, failed and was skipped', async () => {
+    const cwd = bank({
+      'tests/bank.test.lua': `describe('bank', function()
+    it('<passes>', function() expect(1).toBe(1) end)
+    it('fails', function() expect(1).toBe(2) end)
+    it.skip('waits', function() end)
+end)`,
+      'tests/broken.test.lua': `error('<broken>', 0)`,
+    })
+    const paths = ['--junit', 'reports/junit.xml', 'tests']
+    expect((await test(cwd, paths)).code).toBe(1)
+    const report = readFileSync(join(cwd, 'reports/junit.xml'), 'utf8')
+    expect(report.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>\n')).toBe(true)
+    expect(report).toContain(
+      '<testsuite name="tests/bank.test.lua" tests="3" failures="1" skipped="1"',
+    )
+    expect(report).toContain(
+      'classname="tests/bank.test.lua" name="bank &gt; &lt;passes&gt;" time="',
+    )
+    expect(report).toContain('<failure message="expected 1 to be 2">')
+    expect(report).toMatch(/name="bank &gt; waits" time="[\d.]+"><skipped\/><\/testcase>/)
+    expect(report).toContain('<testsuite name="tests/broken.test.lua" tests="1" failures="1"')
+    expect(report).toContain('name="(did not load)"')
+    expect(report).toContain('&lt;broken&gt;')
+    const { code, stderr } = await test(cwd, ['--junit'])
+    expect(code).toBe(2)
+    expect(stderr).toContain('--junit needs a file')
+  })
+
   it('runs the tests again as files of the project change, when it watches, until it is interrupted', async () => {
     const directory = bank({
       'tests/a.test.lua': `it('a', function() expect(exports.bank:balance()).toBe(500) end)`,
@@ -394,6 +423,8 @@ describe('fiverunner init', () => {
       readFileSync(join(resource, '.github/workflows/fiverunner.yml'), 'utf8').includes(
         'npx fiverunner test',
       ),
+      readFileSync(join(resource, '.fiverunner/fiverunner.lua'), 'utf8').startsWith('---@meta'),
+      JSON.parse(readFileSync(join(resource, '.luarc.json'), 'utf8'))['workspace.library'],
       (await test(resource)).code,
       (await test(server)).code,
       (await test(broken)).code,
@@ -401,13 +432,15 @@ describe('fiverunner init', () => {
     ]).toEqual([
       {
         code: 0,
-        stdout: `Wrote tests/bank.test.lua\nWrote .github/workflows/fiverunner.yml\n${run}`,
+        stdout: `Wrote tests/bank.test.lua\nWrote .fiverunner/fiverunner.lua\nWrote .luarc.json\nWrote .github/workflows/fiverunner.yml\n${run}`,
         stderr: '',
       },
-      `Kept tests/bank.test.lua, which is there\nKept .github/workflows/fiverunner.yml, which is there\n${run}`,
-      `Wrote tests/server.test.lua\nWrote no GitHub workflow, as GitHub looks for them at the root of a git repository, which this is not\n${run}`,
+      `Kept tests/bank.test.lua, which is there\nKept .fiverunner/fiverunner.lua, which is there\nKept .luarc.json, which is there\nKept .github/workflows/fiverunner.yml, which is there\n${run}`,
+      `Wrote tests/server.test.lua\nWrote .fiverunner/fiverunner.lua\nWrote .luarc.json\nWrote no GitHub workflow, as GitHub looks for them at the root of a git repository, which this is not\n${run}`,
       0,
       true,
+      true,
+      ['.fiverunner'],
       0,
       0,
       1,

@@ -13,9 +13,11 @@ It runs the tests of the project in the directory it runs in:
 
 Test files are the files whose names end in `.test.lua`, anywhere in the project but in `node_modules` and hidden directories. They are not part of your resources: their resources do not see them, so a manifest that globs `**/*.lua` does not load them as scripts.
 
-`fiverunner init` adds a first test file to the project, `tests/<name of the resource>.test.lua` or `tests/server.test.lua`, whose test checks that the project starts without script errors, and, at the root of a git repository, the workflow of [GitHub Actions](#github-actions) as `.github/workflows/fiverunner.yml`. It writes over nothing that is there.
+`fiverunner init` adds a first test file to the project, `tests/<name of the resource>.test.lua` or `tests/server.test.lua`, whose test checks that the project starts without script errors, `.fiverunner/fiverunner.lua` and `.luarc.json`, which tell the Lua language server of your editor the functions of tests, and, at the root of a git repository, the workflow of [GitHub Actions](#github-actions) as `.github/workflows/fiverunner.yml`. It writes over nothing that is there.
 
 With `--watch`, it runs them again as files of the project change, until Ctrl+C.
+
+With `--junit <file>`, it also writes a JUnit report of the tests to the file, which the test summaries of CI read.
 
 To run only some of them, give their paths, or the directories they are in:
 

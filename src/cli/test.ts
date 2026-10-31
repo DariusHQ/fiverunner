@@ -1,10 +1,12 @@
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import type { FileSource } from '../core/engine/index.ts'
 import { compareUtf8 } from '../core/libc.ts'
 import { findTestFiles, openProject, type LocalProject } from '../node/project.ts'
 import { watchProject } from '../node/watch.ts'
 import { runFile, type FileResult } from '../runner/index.ts'
+import { junitReport } from './junit.ts'
 import type { CliHost } from './main.ts'
 import { Reporter } from './report.ts'
 
@@ -17,8 +19,9 @@ it has a resources directory, whose server.cfg, if there is one, starts
 the resources of the server.
 
 Options:
-  -w, --watch  Run the tests again as files of the project change, until Ctrl+C
-  -h, --help   Show this help
+  -w, --watch     Run the tests again as files of the project change, until Ctrl+C
+  --junit <file>  Write a JUnit report of the tests to the file
+  -h, --help      Show this help
 `
 
 /** What the arguments of the command ask for that the project does not have. */
@@ -37,13 +40,20 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
     return 0
   }
   const watching = args.some((arg) => arg === '-w' || arg === '--watch')
-  const paths = args.filter((arg) => arg !== '-w' && arg !== '--watch')
+  const rest = args.filter((arg) => arg !== '-w' && arg !== '--watch')
+  const at = rest.indexOf('--junit')
+  const junit = at === -1 ? undefined : rest[at + 1]
+  if (at !== -1 && (junit === undefined || junit.startsWith('-'))) {
+    host.stderr(`fiverunner: --junit needs a file\n\n${USAGE}`)
+    return 2
+  }
+  const paths = at === -1 ? rest : rest.toSpliced(at, 2)
   const option = paths.find((arg) => arg.startsWith('-'))
   if (option !== undefined) {
     host.stderr(`fiverunner: unknown option ${option}\n\n${USAGE}`)
     return 2
   }
-  if (!watching) return runTests(paths, host)
+  if (!watching) return runTests(paths, junit, host)
   const interrupted = host.interrupted().then(() => false)
   for (;;) {
     // What changes as the tests run runs them again too.
@@ -51,7 +61,7 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
     const changed = new Promise<boolean>((resolve) => {
       stop = watchProject(host.cwd, () => resolve(true))
     })
-    const code = await runTests(paths, host)
+    const code = await runTests(paths, junit, host)
     if (code === 2) {
       stop()
       return code
@@ -65,7 +75,11 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
 }
 
 /** Runs the tests of the project in the directory that the tool runs in, in `paths`, as test does once. */
-async function runTests(args: readonly string[], host: CliHost): Promise<number> {
+async function runTests(
+  args: readonly string[],
+  junit: string | undefined,
+  host: CliHost,
+): Promise<number> {
   const project = openProject(host.cwd)
   if (project === undefined) {
     host.stderr(
@@ -92,7 +106,17 @@ async function runTests(args: readonly string[], host: CliHost): Promise<number>
     host.quickjs?.(),
   ])
   const reporter = new Reporter(host)
-  for (const path of paths) reporter.file(await run(project, path, cfxlua, sqlite, quickjs))
+  const results: FileResult[] = []
+  for (const path of paths) {
+    const result = await run(project, path, cfxlua, sqlite, quickjs)
+    results.push(result)
+    reporter.file(result)
+  }
+  if (junit !== undefined) {
+    const file = resolve(host.cwd, junit)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, junitReport(results))
+  }
   return reporter.end(host.now() - start)
 }
 

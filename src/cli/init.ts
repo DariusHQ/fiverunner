@@ -3,11 +3,13 @@ import { dirname, join } from 'node:path'
 
 import { openProject } from '../node/project.ts'
 import type { CliHost } from './main.ts'
+import typesSource from './types.lua?raw'
 
 const USAGE = `Usage: fiverunner init
 
 Adds tests to the project in this directory: a test file, which checks
-that the project starts without script errors, and, at the root of a git
+that the project starts without script errors, what the Lua language
+server needs to know the functions of tests, and, at the root of a git
 repository, a GitHub Actions workflow that runs the tests on each push.
 It writes over nothing that is there.
 
@@ -30,6 +32,18 @@ jobs:
           node-version: 24
       - run: npx fiverunner test
 `
+
+/** Where the types of tests go, which the settings of the Lua language server name. */
+const TYPES = '.fiverunner/fiverunner.lua'
+
+const SETTINGS = `${JSON.stringify(
+  {
+    'runtime.version': 'Lua 5.4',
+    'workspace.library': ['.fiverunner'],
+  },
+  null,
+  2,
+)}\n`
 
 /** A test file of `subject`, a Lua expression of the name of the tests, whose test checks the start of the project and what `checks` says. */
 function testFile(subject: string, checks: string): string {
@@ -82,6 +96,7 @@ export function init(args: readonly string[], host: CliHost): number {
           ],
         ]
       : [['tests/server.test.lua', testFile("'the server'", '')]]
+  files.push([TYPES, typesSource], ['.luarc.json', SETTINGS])
   const repository = existsSync(join(host.cwd, '.git'))
   if (repository) files.push(['.github/workflows/fiverunner.yml', WORKFLOW])
   for (const [path, text] of files) {
