@@ -1,0 +1,14 @@
+name: Feature
+description: Something that FiveRunner should do, such as a framework or a resource to support.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you are trying to do
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What FiveRunner could do

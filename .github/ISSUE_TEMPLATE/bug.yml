@@ -1,0 +1,52 @@
+name: Bug
+description: A resource behaves differently than in FiveM, or FiveRunner fails.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        [docs/differences.md](https://github.com/DariusHQ/fiverunner/blob/main/docs/differences.md) lists where FiveRunner differs from FiveM, on purpose or for now.
+  - type: textarea
+    id: happened
+    attributes:
+      label: What FiveRunner does
+      description: With what it printed, such as a script error or a line that says a native is not implemented.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What FiveM does
+    validations:
+      required: true
+  - type: textarea
+    id: resource
+    attributes:
+      label: The resource
+      description: The smallest resource that shows it, or a link to a release of it and its version.
+    validations:
+      required: true
+  - type: dropdown
+    id: command
+    attributes:
+      label: Command
+      options:
+        - fiverunner test
+        - fiverunner dev
+        - fiverunner init
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version of FiveRunner
+      description: What `npx fiverunner --version` says.
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: The operating system, the version of Node, and for the dev UI the browser.
+    validations:
+      required: true

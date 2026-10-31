@@ -6,7 +6,13 @@
 
 <p align="center">Run FiveM resources in your browser and in CI.<br>No GTA V, no FXServer, no restarts.</p>
 
-> **Status:** early development. `npx fiverunner test` runs the Lua tests of FiveM resources in Node, and `npx fiverunner dev` runs resources and their NUI in your browser. Watch the repository to follow along.
+<p align="center">
+  <a href="https://www.npmjs.com/package/fiverunner"><img src="https://img.shields.io/npm/v/fiverunner" alt="Version on npm"></a>
+  <a href="https://github.com/DariusHQ/fiverunner/actions/workflows/ci.yml"><img src="https://github.com/DariusHQ/fiverunner/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/DariusHQ/fiverunner/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/fiverunner" alt="License"></a>
+</p>
+
+> **Status:** before 1.0, so what it does can change between versions. Where a resource behaves differently than in FiveM, [tell us](https://github.com/DariusHQ/fiverunner/issues/new/choose).
 
 ![The appearance editor of illenium-appearance on the screen of a player, over a cartoon meadow where her little character wears what the editor picks](docs/media/appearance.png)
 
@@ -99,6 +105,10 @@ FiveRunner follows FiveM's Windows server and its clients down to their error me
 ## Clean room
 
 FiveRunner's scripting runtime is a clean-room implementation and contains no code from the FiveM platform. CfxLua and its libraries are open source; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). FiveRunner is not affiliated with or endorsed by Cfx.re, Rockstar Games or Take-Two Interactive.
+
+## Contributing
+
+Resources that behave differently than in FiveM help most. [CONTRIBUTING.md](CONTRIBUTING.md) tells how to report them, how to run FiveRunner from its source, and the rules of its clean room. [CHANGELOG.md](CHANGELOG.md) tells what each version brought.
 
 ## License
 
