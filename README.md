@@ -12,7 +12,7 @@
   <a href="https://github.com/DariusHQ/fiverunner/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/fiverunner" alt="License"></a>
 </p>
 
-> **Status:** before 1.0, so what it does can change between versions. Where a resource behaves differently than in FiveM, [tell us](https://github.com/DariusHQ/fiverunner/issues/new/choose).
+> Where a resource behaves differently than in FiveM, [tell us](https://github.com/DariusHQ/fiverunner/issues/new/choose).
 
 ![The appearance editor of illenium-appearance on the screen of a player, over a cartoon meadow where her little character wears what the editor picks](docs/media/appearance.png)
 

@@ -1,9 +1,9 @@
 name: Playground
 
-# Publishes the playground with each release, as its page says what the tool does.
+# Publishes the playground as main changes, which is all that GitHub Pages deploys from.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
 
 permissions:

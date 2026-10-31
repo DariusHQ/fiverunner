@@ -116,7 +116,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 
 ## The playground
 
-The playground is the dev UI on a static site, so it differs from it as well:
+The [playground](https://dariushq.github.io/fiverunner/) is the dev UI on a static site, so it differs from it as well:
 
 - Frames share the origin of the page, under `frames/`, as a static site has one origin, so their pages share their storage, and may reach the page and each other.
 - The project is in the memory of the page, where edits stay until it reloads, and nothing watches files: Run starts it anew.

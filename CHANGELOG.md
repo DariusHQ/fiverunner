@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.0.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.0.0) - 2026-11-01
+
+A [playground](https://dariushq.github.io/fiverunner/) that runs in the page, with nothing to install, and a small city to play in it, in Lua and JavaScript. The adaptive cards of deferrals are forms, which tests answer too.
+
 ## [0.12.0](https://github.com/DariusHQ/fiverunner/releases/tag/v0.12.0) - 2026-11-01
 
 The dev UI gets an inspector of the server and of each player: what each resource has, the time it takes each tick, the convars, and a box that runs code inside a resource.
