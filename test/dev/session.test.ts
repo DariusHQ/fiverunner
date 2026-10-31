@@ -191,6 +191,16 @@ describe('Dev sessions', () => {
     ])
   })
 
+  it('connect players once scripts of their servers had the time to set what clients read', async () => {
+    const { session, told } = await sessionOf(
+      `SetTimeout(2000, function() GlobalState.weather = 'sunny' end)`,
+      `print(GlobalState.weather)`,
+    )
+    await session.connect({ name: 'Ann' })
+    session.advance(1000)
+    expect(printed(told())).toContain('client 1: [script:bank] sunny')
+  })
+
   it('connect players, whose NUI they tell of, and quit them', async () => {
     const { session, told } = await sessionOf(
       `AddEventHandler('playerDropped', function(reason) print('dropped', reason) end)`,

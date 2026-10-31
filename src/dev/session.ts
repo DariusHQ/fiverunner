@@ -24,6 +24,9 @@ import { describeArgs, describeValue } from './values.ts'
 /** Interrupts the scripts that run for 5 seconds without returning, which would hang the session. */
 const WATCHDOG: WatchdogOptions = { timeoutMs: 5000 }
 
+/** How long servers run before players reach them, in ms: scripts take frames to set what clients read as they load. */
+const STARTUP = 3000
+
 const encoder = new TextEncoder()
 
 /** What the NUI of a client tells as it happens. */
@@ -225,6 +228,8 @@ export class DevSession {
    * process is named by: client 1, client 2 and on.
    */
   async connect(identity: PlayerIdentity = {}): Promise<number> {
+    const { now } = this.#engine.clock
+    if (now < STARTUP) this.advance(STARTUP - now)
     const watchdog = this.#options.watchdog ?? WATCHDOG
     // Players of FiveM have the license of their Rockstar account, which frameworks turn players away without: here, one of their names.
     const identifiers = identity.identifiers ?? [
