@@ -23,6 +23,9 @@
 #include <emscripten/stack.h>
 
 #include "lua.hpp"
+#include "ldebug.h"
+#include "lobject.h"
+#include "lstate.h"
 #include "lgrit_lib.h"
 #include "lglmlib.hpp"
 #include "lua_cmsgpacklib.h"
@@ -46,6 +49,9 @@ FR_IMPORT("call") int fr_host_call(int vm, lua_State *L, int fn, int nargs);
 
 /* Runs on every count hook. Returns 1 after pushing an error object to raise. */
 FR_IMPORT("hook") int fr_host_hook(int vm, lua_State *L);
+
+/* Tells of a line of a chunk: one that runs, or one that could if it is negative. */
+FR_IMPORT("line") void fr_host_line(int vm, const char *source, size_t len, int line);
 
 /* Unprotected error: the error object is on top of the stack. Never returns. */
 FR_IMPORT("panic") void fr_host_panic(int vm, lua_State *L);
@@ -71,6 +77,7 @@ struct FRState {
   size_t used;  /* bytes currently allocated by this state */
   size_t limit;  /* allocation limit in bytes; 0 means unlimited */
   int vm;  /* host identifier of the VM */
+  int lines;  /* whether the host wants to hear of the lines of chunks */
 };
 
 static FRState *fr_state(lua_State *L) {
@@ -155,7 +162,11 @@ static int fr_hostfunction(lua_State *L) {
 }
 
 static void fr_hook(lua_State *L, lua_Debug *ar) {
-  (void)ar;
+  if (ar->event == LUA_HOOKLINE) {
+    lua_getinfo(L, "S", ar);
+    fr_host_line(fr_state(L)->vm, ar->source, ar->srclen, ar->currentline);
+    return;
+  }
   if (fr_host_hook(fr_state(L)->vm, L) != 0) {
     if (lua_type(L, -1) == LUA_TSTRING) {  /* add the position, as luaL_error does */
       luaL_where(L, 0);
@@ -858,10 +869,40 @@ EMSCRIPTEN_KEEPALIVE int fr_gc(lua_State *L, int what, int arg) {
 
 /* Count hook every `count` instructions, inherited by new threads. */
 EMSCRIPTEN_KEEPALIVE void fr_sethook(lua_State *L, int count) {
+  int lines = fr_state(L)->lines ? LUA_MASKLINE : 0;
   if (count > 0)
-    lua_sethook(L, fr_hook, LUA_MASKCOUNT, count);
+    lua_sethook(L, fr_hook, LUA_MASKCOUNT | lines, count);
   else
-    lua_sethook(L, NULL, 0, 0);
+    lua_sethook(L, lines ? fr_hook : NULL, lines, 0);
+}
+
+/* Has the host hear of the lines that run, from now on, beside the count hook of `count`. */
+EMSCRIPTEN_KEEPALIVE void fr_watchlines(lua_State *L, int count) {
+  fr_state(L)->lines = 1;
+  fr_sethook(L, count);
+}
+
+/* Tells of the lines of a function and of those in it, whose lineinfo holds the steps between them. */
+static void fr_protolines(int vm, const Proto *p) {
+  int line = p->linedefined;
+  int abs = 0;
+  for (int pc = 0; pc < p->sizelineinfo; pc++) {
+    if (p->lineinfo[pc] == ABSLINEINFO)
+      line = p->abslineinfo[abs++].line;
+    else
+      line += p->lineinfo[pc];
+    /* The first instruction of a vararg function never counts as a line, as in debug.getinfo. */
+    if (line > 0 && !(pc == 0 && p->is_vararg))
+      fr_host_line(vm, getstr(p->source), tsslen(p->source), -line);
+  }
+  for (int i = 0; i < p->sizep; i++)
+    fr_protolines(vm, p->p[i]);
+}
+
+/* Tells the host of the lines that could run of the Lua function on the top of the stack. */
+EMSCRIPTEN_KEEPALIVE void fr_chunklines(lua_State *L) {
+  const LClosure *closure = static_cast<const LClosure *>(lua_topointer(L, -1));
+  fr_protolines(fr_state(L)->vm, closure->p);
 }
 
 EMSCRIPTEN_KEEPALIVE uintptr_t fr_stacksave(void) {

@@ -1,3 +1,4 @@
+export { Coverage } from './coverage.ts'
 export {
   DEFAULT_TIMEOUT,
   EPOCH,

@@ -19,6 +19,8 @@ With `--watch`, it runs them again as files of the project change, until Ctrl+C.
 
 With `--junit <file>`, it also writes a JUnit report of the tests to the file, which the test summaries of CI read.
 
+With `--coverage`, it counts the lines of Lua of your resources that the tests ran, on the server and on clients, and writes them to `coverage/lcov.info`, which editors and services such as Codecov read. JavaScript is not counted, and tests take longer.
+
 To run only some of them, give their paths, or the directories they are in:
 
 ```bash

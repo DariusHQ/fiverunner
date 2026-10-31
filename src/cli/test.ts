@@ -5,7 +5,7 @@ import type { FileSource } from '../core/engine/index.ts'
 import { compareUtf8 } from '../core/libc.ts'
 import { findTestFiles, openProject, type LocalProject } from '../node/project.ts'
 import { watchProject } from '../node/watch.ts'
-import { runFile, type FileResult } from '../runner/index.ts'
+import { Coverage, runFile, type FileResult } from '../runner/index.ts'
 import { junitReport } from './junit.ts'
 import type { CliHost } from './main.ts'
 import { Reporter } from './report.ts'
@@ -21,8 +21,18 @@ the resources of the server.
 Options:
   -w, --watch     Run the tests again as files of the project change, until Ctrl+C
   --junit <file>  Write a JUnit report of the tests to the file
+  --coverage      Write the lines of Lua that the tests ran to coverage/lcov.info
   -h, --help      Show this help
 `
+
+/** Where the report of coverage goes, in the project. */
+const LCOV = 'coverage/lcov.info'
+
+/** What the options of the command ask of each run. */
+interface Reports {
+  readonly junit: string | undefined
+  readonly coverage: boolean
+}
 
 /** What the arguments of the command ask for that the project does not have. */
 class UsageError extends Error {}
@@ -40,7 +50,7 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
     return 0
   }
   const watching = args.some((arg) => arg === '-w' || arg === '--watch')
-  const rest = args.filter((arg) => arg !== '-w' && arg !== '--watch')
+  const rest = args.filter((arg) => !['-w', '--watch', '--coverage'].includes(arg))
   const at = rest.indexOf('--junit')
   const junit = at === -1 ? undefined : rest[at + 1]
   if (at !== -1 && (junit === undefined || junit.startsWith('-'))) {
@@ -53,7 +63,8 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
     host.stderr(`fiverunner: unknown option ${option}\n\n${USAGE}`)
     return 2
   }
-  if (!watching) return runTests(paths, junit, host)
+  const reports = { junit, coverage: args.includes('--coverage') }
+  if (!watching) return runTests(paths, reports, host)
   const interrupted = host.interrupted().then(() => false)
   for (;;) {
     // What changes as the tests run runs them again too.
@@ -61,7 +72,7 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
     const changed = new Promise<boolean>((resolve) => {
       stop = watchProject(host.cwd, () => resolve(true))
     })
-    const code = await runTests(paths, junit, host)
+    const code = await runTests(paths, reports, host)
     if (code === 2) {
       stop()
       return code
@@ -77,7 +88,7 @@ export async function test(args: readonly string[], host: CliHost): Promise<numb
 /** Runs the tests of the project in the directory that the tool runs in, in `paths`, as test does once. */
 async function runTests(
   args: readonly string[],
-  junit: string | undefined,
+  { junit, coverage }: Reports,
   host: CliHost,
 ): Promise<number> {
   const project = openProject(host.cwd)
@@ -107,8 +118,9 @@ async function runTests(
   ])
   const reporter = new Reporter(host)
   const results: FileResult[] = []
+  const lines = coverage ? new Coverage() : undefined
   for (const path of paths) {
-    const result = await run(project, path, cfxlua, sqlite, quickjs)
+    const result = await run(project, path, cfxlua, sqlite, quickjs, lines)
     results.push(result)
     reporter.file(result)
   }
@@ -117,7 +129,16 @@ async function runTests(
     mkdirSync(dirname(file), { recursive: true })
     writeFileSync(file, junitReport(results))
   }
-  return reporter.end(host.now() - start)
+  const code = reporter.end(host.now() - start)
+  if (lines !== undefined) {
+    const file = join(host.cwd, LCOV)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, lines.lcov(project.mount))
+    const { hit, found } = lines.totals
+    const share = found === 0 ? 0 : (hit / found) * 100
+    host.stdout(`Coverage: ${share.toFixed(1)}% of ${found} lines of Lua, in ${LCOV}\n`)
+  }
+  return code
 }
 
 /** Runs the test file at `path` in the project, which fails with what the runner threw, if it did. */
@@ -127,11 +148,18 @@ async function run(
   cfxlua: WebAssembly.Module,
   sqlite: WebAssembly.Module,
   quickjs: WebAssembly.Module | undefined,
+  coverage: Coverage | undefined,
 ): Promise<FileResult> {
   try {
     return await runFile(
       { path, source: project.source.read(path) },
-      { cfxlua, sqlite, project, ...(quickjs === undefined ? {} : { quickjs }) },
+      {
+        cfxlua,
+        sqlite,
+        project,
+        ...(quickjs === undefined ? {} : { quickjs }),
+        ...(coverage === undefined ? {} : { coverage }),
+      },
     )
   } catch (error) {
     const message = `FiveRunner failed to run the file: ${error instanceof Error ? error.message : String(error)}`

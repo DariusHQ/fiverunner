@@ -320,6 +320,9 @@ export class LuaState {
   /** When the watchdog last raised its error in this slice, if it did. */
   #interruptedAt: number | undefined
   #watchdog: Required<WatchdogOptions> | undefined
+  /** What hears of the lines of chunks, and the names of chunks by where the module has them. */
+  #onLine: ((chunk: string, line: number) => void) | undefined
+  readonly #chunkNames = new Map<Ptr, string>()
   #closed = false
   #dead: LuaFatalError | undefined
 
@@ -378,6 +381,7 @@ export class LuaState {
         ex.fr_load(L, buf, length, name, modePtr),
       )
       if (status !== LUA_OK) throw this.#popError(L, status, top, false)
+      if (this.#onLine !== undefined) ex.fr_chunklines(L)
       return this.#popRef(L)
     })
   }
@@ -616,6 +620,28 @@ export class LuaState {
     }
     this.#watchdog = { timeoutMs, killAfterMs, interval }
     this.runtime.exports.fr_sethook(this.L, interval)
+  }
+
+  /**
+   * Tells `listener` of the lines of chunks: those that can run, as negative
+   * numbers, as chunks load, and those that run, as they do, which takes time.
+   * Applies to threads created after the call, so set it before running code.
+   */
+  watchLines(listener: (chunk: string, line: number) => void): void {
+    this.#checkOpen()
+    this.#onLine = listener
+    this.runtime.exports.fr_watchlines(this.L, this.#watchdog?.interval ?? 0)
+  }
+
+  /** Takes a line of the chunk named at `source`, for the fiverunner.line import. */
+  line(source: Ptr, length: number, line: number): void {
+    // Lines that load tell of chunks that may have the addresses of chunks that went.
+    let chunk = line < 0 ? undefined : this.#chunkNames.get(source)
+    if (chunk === undefined) {
+      chunk = this.runtime.readString(source, length)
+      this.#chunkNames.set(source, chunk)
+    }
+    this.#onLine?.(chunk, line)
   }
 
   /** Runs a full garbage collection cycle. */

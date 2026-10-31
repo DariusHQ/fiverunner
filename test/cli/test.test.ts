@@ -343,6 +343,54 @@ end)`,
     expect(stderr).toContain('--junit needs a file')
   })
 
+  it('counts the lines of Lua that the tests ran, on servers and clients, in the format of lcov', async () => {
+    const cwd = write('coverage', {
+      'fxmanifest.lua': `fx_version 'cerulean'
+game 'gta5'
+server_script 'server.lua'
+client_script 'client.lua'`,
+      'server.lua': `local function ran()
+    return 1
+end
+
+-- A comment.
+local function never()
+    return 2
+end
+
+RegisterNetEvent('ping', function()
+    ran()
+end)`,
+      'client.lua': `print('client')`,
+      'tests/ran.test.lua': `it('runs', function()
+    local ann = fiverunner.connect({ name = 'Ann' })
+    ann:emit('ping')
+end)`,
+    })
+    const { code, stdout } = await test(cwd, ['--coverage'])
+    expect(code).toBe(0)
+    expect(stdout).toContain('Coverage: 87.5% of 8 lines of Lua, in coverage/lcov.info')
+    const report = readFileSync(join(cwd, 'coverage/lcov.info'), 'utf8')
+    const records = report.split('end_of_record\n').filter((record) => record !== '')
+    expect(records.map((record) => record.split('\n').filter(Boolean))).toEqual([
+      ['TN:', 'SF:client.lua', 'DA:1,1', 'LF:1', 'LH:1'],
+      [
+        'TN:',
+        'SF:server.lua',
+        // The files ran on two servers, which collected the test and ran it, and functions run at their ends.
+        'DA:2,1',
+        'DA:3,2',
+        'DA:7,0',
+        'DA:8,2',
+        'DA:10,4',
+        'DA:11,1',
+        'DA:12,5',
+        'LF:7',
+        'LH:6',
+      ],
+    ])
+  })
+
   it('runs the tests again as files of the project change, when it watches, until it is interrupted', async () => {
     const directory = bank({
       'tests/a.test.lua': `it('a', function() expect(exports.bank:balance()).toBe(500) end)`,

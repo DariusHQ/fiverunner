@@ -500,6 +500,7 @@ export class Resource {
       files: manager.files,
       resourcePath: this.path,
       database: () => manager.oxmysql?.scriptConnection(),
+      ...(manager.lines === undefined ? {} : { lines: manager.lines }),
       diagnose: (message) => manager.output.diagnose(name, message),
       submitBoundary: (which, id) => manager.submitBoundary(which, id),
       formatStackTrace: () => manager.formatStackTrace(null) ?? '',

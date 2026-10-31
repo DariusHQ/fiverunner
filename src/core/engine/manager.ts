@@ -99,6 +99,8 @@ export interface ResourceManagerOptions {
   readonly oneSync?: boolean
   /** On servers, the game build that sv_enforceGameBuild enforces, 3258 by default as in FiveM. */
   readonly gameBuild?: number
+  /** What hears of the lines of the Lua of resources, as LuaState.watchLines tells them, if anything does. */
+  readonly lines?: (chunk: string, line: number) => void
   /** The KVP of the resources, which FiveM keeps in a database: an empty one by default. */
   readonly kvp?: KvpStore
   /**
@@ -174,6 +176,8 @@ export class ResourceManager {
   readonly consoleBuffer: ConsoleBuffer | undefined
   /** The KVP of the resources, in the database of the process. */
   readonly kvp: KvpStore
+  /** What hears of the lines of the Lua of resources, if anything does. */
+  readonly lines: ((chunk: string, line: number) => void) | undefined
   /** The files of the process, which its resources are in. */
   readonly files: FileSystem
   /** The files that handles of the process have open, which Windows keeps others from. */
@@ -282,6 +286,7 @@ export class ResourceManager {
     this.timeZone = options.timeZone ?? localTimeZone()
     this.watchdog = options.watchdog
     this.kvp = options.kvp ?? new KvpStore()
+    this.lines = options.lines
     this.files = options.files ?? new MemoryFileSystem()
     this.openFiles = new OpenFiles(this.files)
     this.http = options.http ?? fetchHttpClient

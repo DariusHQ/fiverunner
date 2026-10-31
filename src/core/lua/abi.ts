@@ -19,6 +19,8 @@ export interface CfxLuaExports {
   fr_setmemlimit(L: Ptr, limit: number): void
   fr_gc(L: Ptr, what: number, arg: number): number
   fr_sethook(L: Ptr, count: number): void
+  fr_watchlines(L: Ptr, count: number): void
+  fr_chunklines(L: Ptr): void
   fr_stacksave(): Ptr
   fr_stackrestore(sp: Ptr): void
 
@@ -76,6 +78,7 @@ export interface CfxLuaExports {
 export interface CfxLuaHostImports {
   call(vm: number, L: Ptr, fn: number, nargs: number): number
   hook(vm: number, L: Ptr): number
+  line(vm: number, source: Ptr, length: number, line: number): void
   panic(vm: number, L: Ptr): void
   warn(vm: number, msg: Ptr, len: number, tocont: number): void
 }

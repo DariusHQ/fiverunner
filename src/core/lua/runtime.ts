@@ -349,6 +349,9 @@ export class LuaRuntime {
           this.#importDepth--
         }
       },
+      line: (vm, source, length, line) => {
+        this.#states.get(vm)?.line(source >>> 0, length >>> 0, line)
+      },
       panic: (vm, L) => {
         throw this.#state(vm).panic(L >>> 0)
       },

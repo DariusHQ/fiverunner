@@ -21,6 +21,7 @@ import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
 import { defineNative, type ResultType } from '../core/natives/index.ts'
 import { typeInfo } from '../core/natives/types.ts'
 import { UTC } from '../core/scripting/time.ts'
+import type { Coverage } from './coverage.ts'
 import client from './lua/client.lua?raw'
 import harness from './lua/harness.lua?raw'
 import { LineOutput, type OutputLine } from './output.ts'
@@ -116,6 +117,8 @@ export interface RunOptions {
   readonly project: Project
   /** Called with each test as it ends, or as it is skipped. */
   readonly onResult?: (result: TestResult) => void
+  /** What counts the lines of Lua that the tests run, if anything does, which takes time. */
+  readonly coverage?: Coverage
   /** What interrupts the scripts of tests that run too long without returning: 5 seconds by default. */
   readonly watchdog?: WatchdogOptions
 }
@@ -295,12 +298,26 @@ class World<T> {
       },
     )
     const sqlite = options.sqlite === undefined ? undefined : sqliteDatabase(options.sqlite)
+    const { coverage } = options
+    const lines =
+      coverage === undefined
+        ? {}
+        : {
+            lines: (chunk: string, line: number) => {
+              coverage.add(chunk, line, (name) => {
+                const path =
+                  name === TEST_RESOURCE ? undefined : engine.server.getResource(name)?.path
+                return path?.startsWith('resources/') === true ? path : undefined
+              })
+            },
+          }
     const engine = await Engine.create({
       cfxlua: options.cfxlua,
       ...(options.quickjs === undefined ? {} : { quickjs: options.quickjs }),
       epoch: EPOCH,
       output: ({ name }) => output.of(name),
       server: {
+        ...lines,
         files: options.project.files(),
         natives: [call],
         timeZone: UTC,
@@ -496,7 +513,10 @@ class World<T> {
     this.#connections.push(connection)
     this.#actions.push(async () => {
       const watchdog = this.#options.watchdog ?? WATCHDOG
-      const { client, player } = await this.engine.connect(identity, { watchdog })
+      const { client, player } = await this.engine.connect(identity, {
+        watchdog,
+        ...(this.engine.server.lines === undefined ? {} : { lines: this.engine.server.lines }),
+      })
       connection.player = player
       connection.client = client
       client.nui!.onMessage.connect((resource, json) => {

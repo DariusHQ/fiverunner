@@ -130,6 +130,8 @@ export interface ScriptHost {
   readonly files: FileSystem
   /** The directory of the resource in the files of the process. */
   readonly resourcePath: string
+  /** What hears of the lines of chunks, as LuaState.watchLines tells them, if anything does. */
+  readonly lines?: (chunk: string, line: number) => void
   /** Reports a mistake in how a script uses FiveM that FiveRunner noticed. */
   diagnose(message: string): void
   /**
@@ -265,6 +267,7 @@ export class ScriptRuntime implements ResourceRuntime {
       onWarning: (message) => host.warn(message),
       ...(host.watchdog === undefined ? {} : { watchdog: host.watchdog }),
     })
+    if (host.lines !== undefined) state.watchLines(host.lines)
     const script = new ScriptRuntime(state, host)
     try {
       script.#init()
