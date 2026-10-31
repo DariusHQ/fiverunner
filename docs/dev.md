@@ -39,7 +39,7 @@ The state bags panel shows the state bags of the server that have keys, such as 
 
 The inspector shows what a process has: the server, or the client of a player, which the list next to its title picks.
 
-- **Resources**: each resource of the process, with the milliseconds that its scripts take each tick, as `resmon` shows them, which leave out the calls that they make of other resources. Clicking one shows what it has: its exports, the events that it handles, its NUI callbacks, its commands and its KVP.
+- **Resources**: each resource of the process, with the milliseconds that its scripts take each tick, as `resmon` shows them, which leave out the calls that they make of other resources. Clicking one shows what it has: its exports, the events that it handles, its NUI callbacks, its commands, the keys that it bound them to on the client of a player, and its KVP.
 - **Convars**: the convars of the process, with their values, which the box above them filters.
 - **Code**: the box under them runs Lua in the resource that is picked, as one of its scripts would, so it sees its globals and may call its natives and `Wait`, or JavaScript if the resource has no Lua. An expression prints what it gives on the console of the process, such as `GetNumResources()`, and the arrow keys go back through what ran.
 

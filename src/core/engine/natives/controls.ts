@@ -39,7 +39,13 @@ export function controlNatives(side: Side): NativeDefinition<NativeContext>[] {
         ],
       },
       (ctx: NativeContext, command, description, mapper, key) =>
-        inputOf(ctx).map(command ?? '', description ?? '', mapper ?? '', key ?? ''),
+        inputOf(ctx).map(
+          ctx.resource.name,
+          command ?? '',
+          description ?? '',
+          mapper ?? '',
+          key ?? '',
+        ),
     ),
     control('IS_CONTROL_PRESSED', 0xf3a21bcd95725a4an, (input, action) =>
       input.pressed(action, false),

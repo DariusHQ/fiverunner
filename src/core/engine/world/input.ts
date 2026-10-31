@@ -85,6 +85,8 @@ const AXES: ReadonlyMap<number, readonly [negative: string, positive: string]> =
 
 /** A command that a resource bound to a key, as RegisterKeyMapping binds them. */
 export interface KeyMapping {
+  /** The resource that bound it. */
+  readonly resource: string
   readonly command: string
   readonly description: string
   /** The mapper of the key, such as keyboard, in lower case. */
@@ -112,8 +114,9 @@ export class Input {
   readonly mappings = new Map<string, KeyMapping>()
 
   /** Binds a command to a key, as RegisterKeyMapping does: the last binding of a command is the one it has. */
-  map(command: string, description: string, mapper: string, key: string): void {
+  map(resource: string, command: string, description: string, mapper: string, key: string): void {
     this.mappings.set(command, {
+      resource,
       command,
       description,
       mapper: mapper.toLowerCase(),

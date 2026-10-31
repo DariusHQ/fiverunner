@@ -15,6 +15,8 @@ export interface DevResource {
   readonly events: readonly string[]
   readonly nuiCallbacks: readonly string[]
   readonly commands: readonly string[]
+  /** The keys that it bound commands to, on clients: the key, the command and its description. */
+  readonly keyMappings: readonly string[]
   /** Its KVP, with the values as describe writes them. */
   readonly kvp: readonly { readonly key: string; readonly value: string }[]
 }
@@ -51,6 +53,9 @@ function describeResource(manager: ResourceManager, resource: Resource): DevReso
     commands: manager.console.commands.list
       .filter((command) => command.resource === name)
       .map((command) => command.name),
+    keyMappings: Array.from(manager.world?.input.mappings.values() ?? [])
+      .filter((mapping) => mapping.resource === name)
+      .map(({ key, command, description }) => `${key}: ${command}, ${description}`),
     kvp: manager.kvp.keysWith(kvpKey).map((key) => ({
       key: key.slice(kvpKey.length),
       value: describeValue(manager.kvp.get(key)!),

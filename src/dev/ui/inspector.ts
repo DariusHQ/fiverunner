@@ -30,6 +30,7 @@ const LISTS: readonly (readonly [string, (resource: DevResource) => readonly str
   ['Events', ({ events }) => events],
   ['NUI callbacks', ({ nuiCallbacks }) => nuiCallbacks],
   ['Commands', ({ commands }) => commands],
+  ['Key mappings', ({ keyMappings }) => keyMappings],
   ['KVP', ({ kvp }) => kvp.map(({ key, value }) => `${key} = ${value}`)],
 ]
 

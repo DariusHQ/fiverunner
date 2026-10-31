@@ -570,7 +570,8 @@ AddEventHandler('bank:opened', function() end)
 RegisterCommand('open', function() end, false)
 SetResourceKvp('plan', 'gold')
 for i = 1, 1000000 do end`,
-      `RegisterNUICallback('close', function(_, cb) cb({}) end)`,
+      `RegisterNUICallback('close', function(_, cb) cb({}) end)
+RegisterKeyMapping('open', 'Opens the bank', 'keyboard', 'f5')`,
     )
     const client = await session.connect({ name: 'Ann' })
     session.advance(1000)
@@ -589,7 +590,10 @@ for i = 1, 1000000 do end`,
     expect(server.convars).toContainEqual({ name: 'onesync', value: 'on' })
     const player = session.inspect(client)!
     expect(player.process).toBe(client)
-    expect(player.resources.find(({ name }) => name === 'bank')?.nuiCallbacks).toEqual(['close'])
+    expect(player.resources.find(({ name }) => name === 'bank')).toMatchObject({
+      nuiCallbacks: ['close'],
+      keyMappings: ['F5: open, Opens the bank'],
+    })
     expect(session.inspect(9)).toBeUndefined()
   })
 
