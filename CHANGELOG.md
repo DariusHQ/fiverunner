@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.1.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.1.0) - 2026-11-01
+
+Tests report to the tools around them: coverage of Lua for lcov, JUnit for CI, and types for the Lua language server of editors. The inspector lists the keys that resources bind.
+
 ## [1.0.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.0.0) - 2026-11-01
 
 A [playground](https://dariushq.github.io/fiverunner/) that runs in the page, with nothing to install, and a small city to play in it, in Lua and JavaScript. The adaptive cards of deferrals are forms, which tests answer too.
