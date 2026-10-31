@@ -1,6 +1,6 @@
 -- Qbox's Stable recipe of txAdmin on FiveRunner: its resources start, and
--- players take a car out of a garage, pick clothes, and open their inventory
--- and the bank, as players do.
+-- players take a car out of a garage, pick clothes, and open their phone,
+-- their inventory and the bank, as players do.
 
 local CHARINFO = {
     firstname = 'Ann',
@@ -10,11 +10,11 @@ local CHARINFO = {
     nationality = 'Romania',
 }
 
---- The errors of scripts in `output`, but those of npwd, whose phone is JavaScript, which FiveRunner does not run.
+--- The errors of scripts in `output`.
 local function errors(output)
     local found = {}
     for _, line in ipairs(output) do
-        if line:find('SCRIPT ERROR', 1, true) and not line:find('npwd', 1, true) then found[#found + 1] = line end
+        if line:find('SCRIPT ERROR', 1, true) then found[#found + 1] = line end
     end
     return found
 end
@@ -32,12 +32,32 @@ local function shown(player, action)
     return (message(player, 'ox_lib', action) or {}).data
 end
 
+--- The last message of `method` that the client of `player` sent the page of npwd.
+local function phoneMessage(player, method)
+    local messages = player:nuiMessages('npwd')
+    for i = #messages, 1, -1 do
+        if messages[i].method == method then return messages[i] end
+    end
+end
+
 --- Clicks the option of the menu of ox_lib whose title is `title`, as its page does.
 local function choose(player, title)
     for i, option in ipairs(shown(player, 'showContext').options) do
         if option.title == title then return player:nuiCallback('ox_lib', 'clickContext', i - 1) end
     end
     error(('the menu has no option %s'):format(title))
+end
+
+--- A player who connected and logged in to a new character, with the inventory loaded.
+local function login()
+    local player = fiverunner.connect({ name = 'Ann', identifiers = { 'license:ann' } })
+    -- The client starts its resources, and shows the menu of characters, before the server logs its player in.
+    fiverunner.waitFor(function() return shown(player, 'showContext') end, 10000)
+    -- The page of ox_inventory tells its client that it loaded, as it does in a browser, which the client waits for.
+    player:nuiCallback('ox_inventory', 'uiLoaded', {})
+    expect(exports.qbx_core:Login(player.id, nil, { charinfo = CHARINFO })).toBe(true)
+    fiverunner.waitFor(function() return message(player, 'ox_inventory', 'init') end, 5000)
+    return player
 end
 
 it('starts its resources', function()
@@ -99,15 +119,29 @@ it('gives the appearance editor the clothes and the colours of freemode characte
     expect(errors(player:output())).toEqual({})
 end, 30000)
 
+it('lets a player open the phone of npwd, whose JavaScript keeps its contacts in the database', function()
+    while GetGameTimer() < 3000 do Wait(100) end
+    local player = login()
+    local charinfo = exports.qbx_core:GetPlayer(player.id).PlayerData.charinfo
+    -- The phone of this recipe is an item, and opens for who carries one.
+    expect(exports.ox_inventory:AddItem(player.id, 'phone', 1)).toBe(true)
+    fiverunner.waitFor(function() return player:run('return exports.qbx_npwd:HasPhone()') end, 3000)
+    player:press('M')
+    -- Its page gets the number of the character from the server of npwd.
+    local number = fiverunner.waitFor(function() return phoneMessage(player, 'npwd:setNumber') end, 3000)
+    expect(number.data).toBe(tostring(charinfo.phone))
+    expect(phoneMessage(player, 'npwd:setVisibility').data).toBe(true)
+    local added = player:nuiCallback('npwd', 'npwd-contact-add', { display = 'Bob', number = '5551234', avatar = '' })
+    expect(added.status).toBe('ok')
+    local saved = exports.oxmysql:single_async('SELECT number FROM npwd_phone_contacts WHERE display = ?', { 'Bob' })
+    expect(saved.number).toBe('5551234')
+    expect(errors(fiverunner.output())).toEqual({})
+    expect(errors(player:output())).toEqual({})
+end, 30000)
+
 it('lets a player open the inventory, on the key that binds it, and the bank', function()
     while GetGameTimer() < 3000 do Wait(100) end
-    local player = fiverunner.connect({ name = 'Ann', identifiers = { 'license:ann' } })
-    -- The client starts its resources, and shows the menu of characters, before the server logs its player in.
-    fiverunner.waitFor(function() return shown(player, 'showContext') end, 10000)
-    -- The page of ox_inventory tells its client that it loaded, as it does in a browser, which the client waits for.
-    player:nuiCallback('ox_inventory', 'uiLoaded', {})
-    expect(exports.qbx_core:Login(player.id, nil, { charinfo = CHARINFO })).toBe(true)
-    fiverunner.waitFor(function() return message(player, 'ox_inventory', 'init') end, 5000)
+    local player = login()
     Wait(500)
     -- The recipe's ox.cfg binds the inventory to a key of its own, and ox_inventory to F2 without it.
     local key = json.decode(GetConvar('inventory:keys', '["F2"]'))[1]

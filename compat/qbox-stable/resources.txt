@@ -1,7 +1,6 @@
-# The resources of the Stable recipe of Qbox for txAdmin, but those of npwd and
-# screencapture, which are JavaScript: their category, their release or the
-# archive of their commit, its SHA-256, and the path in the archive and the name
-# of the resource that a line names.
+# The resources of the Stable recipe of Qbox for txAdmin: their category, their
+# release or the archive of their commit, its SHA-256, and the path in the archive
+# and the name of the resource that a line names.
 [cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[managers]/mapmanager
 [cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[managers]/spawnmanager
 [cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[system]/baseevents
@@ -41,3 +40,8 @@
 [standalone] https://github.com/xT-Development/xt-prison/releases/download/v1.4.9/xt-prison.zip 2e0ecbf995023c853c2c8d7cbc0453a434861844a1cf2e1c21533218bacff616
 [standalone] https://github.com/QuantumMalice/vehiclehandler/releases/download/v1.4.7/vehiclehandler.zip 893562a206c0d87fcb7dc0c6e8c1f241025d9420e62c556f4d981e1bd2a21288
 [voice] https://github.com/AvarianKnight/pma-voice/archive/6c9d96ed7a02e30912f1a0ce92629bf9afbbca8c.zip 8d94ecb34bf98056050f6d14a20e4a72952b4d1de3854040a3974894cfebd257 pma-voice-6c9d96ed7a02e30912f1a0ce92629bf9afbbca8c pma-voice
+[standalone] https://github.com/itschip/screencapture/releases/download/v0.17.2/screencapture.zip ac2764970b5a6e45732a3750c95b741cbcca3d87aaf64d04ab07117e1ae984a3
+[npwd] https://github.com/project-error/npwd/releases/download/3.14.3/npwd.zip a707996757e5dfc9c1fa604b756a1e1a8022ea95aacf58ff8a3bfd70a61628ed
+[npwd] https://github.com/Qbox-project/qbx_npwd/archive/c0e54a8560b26256b55e010b6ea71dcf003192c7.zip 5ffddb1709d5c1993e2e77240de1e9c1a72470bc5939822720a4329b8807cd42 qbx_npwd-c0e54a8560b26256b55e010b6ea71dcf003192c7/config.json npwd/config.json
+[npwd] https://github.com/Qbox-project/qbx_npwd/archive/c0e54a8560b26256b55e010b6ea71dcf003192c7.zip 5ffddb1709d5c1993e2e77240de1e9c1a72470bc5939822720a4329b8807cd42 qbx_npwd-c0e54a8560b26256b55e010b6ea71dcf003192c7 qbx_npwd
+[npwd-apps] https://github.com/Qbox-project/npwd_qbx_mail/releases/download/v1.0.0/npwd_qbx_mail.zip 4be251509f6fdc35482fa0f82738043ea01e3ee953b043c2a54d7c9086da9017

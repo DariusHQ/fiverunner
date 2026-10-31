@@ -24,7 +24,7 @@ This page lists only what passes.
 
 ## Qbox Stable
 
-The Stable recipe of Qbox for txAdmin, as it deploys a server, but npwd and screencapture, which are JavaScript, and the items of ox_inventory that it writes over those of its release. ox_lib comes with cfxlua-require.
+The Stable recipe of Qbox for txAdmin, as it deploys a server, but the items of ox_inventory that it writes over those of its release. ox_lib comes with cfxlua-require.
 
 | Resource               | Version        |
 | ---------------------- | -------------- |
@@ -67,17 +67,22 @@ The Stable recipe of Qbox for txAdmin, as it deploys a server, but npwd and scre
 | xt-prison              | 1.4.9          |
 | vehiclehandler         | 1.4.7          |
 | pma-voice              | commit 6c9d96e |
+| screencapture          | 0.17.2         |
+| npwd                   | 3.14.3         |
+| qbx_npwd               | commit c0e54a8 |
+| npwd_qbx_mail          | 1.0.0          |
 
 [The tests](../compat/qbox-stable/tests/recipe.test.lua) check that:
 
 - the resources start without script errors;
 - a player who logs in walks up to the Motel Parking of qbx_garages, which ox_lib tells to press E, presses E, chooses the car of the character in the menu of ox_lib, and takes it out, which qbx_garages spawns where the garage has its cars come out;
 - the appearance editor of illenium-appearance gives a freemode character clothes and colours to pick from;
+- a player who carries a phone opens npwd on its key, whose server, which is JavaScript, gives its page the number of the character, and adds a contact, which mysql2, which npwd carries, saves in the database;
 - a player who logs in opens the inventory of ox_inventory on the key that binds it, and the bank of Renewed-Banking, with the accounts of the character.
 
 ## QBCore
 
-The recipe of QBCore for txAdmin, as it deploys a server, with its 72 resources, but its maps, which are only drawn, and screencapture, which is JavaScript. QBCore has no releases, so [its list](../compat/qbcore/resources.txt) pins them by their commits. [The tests](../compat/qbcore/tests/qbcore.test.lua) check that:
+The recipe of QBCore for txAdmin, as it deploys a server, with its 72 resources, but its maps, which are only drawn. QBCore has no releases, so [its list](../compat/qbcore/resources.txt) pins them by their commits. [The tests](../compat/qbcore/tests/qbcore.test.lua) check that:
 
 - the resources start without script errors, on the server and on the client of a player;
 - the character menu of qb-multicharacter shows, and players create characters in its page, which the database keeps;

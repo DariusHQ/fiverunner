@@ -1,7 +1,7 @@
 # The resources of QBCore's recipe for txAdmin, which has no releases, but its maps,
-# which are only drawn, and screencapture, which is JavaScript: their category, the
-# archive of their commit or their release, its SHA-256, and the path in the archive
-# and the name of the resource that a line names.
+# which are only drawn: their category, the archive of their commit or their release,
+# its SHA-256, and the path in the archive and the name of the resource that a line
+# names.
 [sql] https://github.com/qbcore-fivem/txAdminRecipe/archive/578898ca7a4273e15bc7515b2f653dd3d7bcd5ce.zip ba331b22594c52440105731f6e9283f9577dd8dab0c58bf7a5c849fb98bd1324 txAdminRecipe-578898ca7a4273e15bc7515b2f653dd3d7bcd5ce/qbcore.sql qbcore.sql
 [cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[managers]/mapmanager mapmanager
 [cfx-default] https://github.com/citizenfx/cfx-server-data/archive/c6afa3909c763e3327ed76825e78453286c99f05.zip c74f781c9f81ee19e20e4df68846eb11d2b4117dafce83dce97464118bf932d1 cfx-server-data-c6afa3909c763e3327ed76825e78453286c99f05/resources/[managers]/spawnmanager spawnmanager
@@ -75,3 +75,4 @@
 [qb] https://github.com/qbcore-fivem/qb-loading/archive/6b13442b9e7cd1bcbe0be8dd2b4604f07a999cb2.zip 939fbfeb585c3dc577d0ed7f6a1ec7d5aed2c3d86824ba21d167ed92d4495c31 qb-loading-6b13442b9e7cd1bcbe0be8dd2b4604f07a999cb2 qb-loading
 [standalone] https://github.com/overextended/oxmysql/releases/download/v2.14.1/oxmysql.zip 29fa0992174257f548dc1ef8dc9431fd1ce995696b5c58fbe98ca0cb6a0e6aba
 [standalone]/menuv https://github.com/ThymonA/menuv/releases/download/v1.4.1/menuv_v1.4.1.zip 846a52157f4f6e93854fc71cf5743a54f57fa0f4811c597a05bd2901fff7b06c
+[standalone] https://github.com/itschip/screencapture/releases/download/v0.17.2/screencapture.zip ac2764970b5a6e45732a3750c95b741cbcca3d87aaf64d04ab07117e1ae984a3

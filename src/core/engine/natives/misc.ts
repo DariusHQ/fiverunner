@@ -203,6 +203,11 @@ export function miscNatives(side: Side): NativeDefinition<NativeContext>[] {
       { name: 'GET_NETWORK_TIME', hash: 0x7a5487fe9faa6b48n, result: 'int', params: [] },
       (ctx: NativeContext) => Math.trunc(ctx.manager.time()) | 0,
     ),
+    // FiveRunner listens at no address, so it names the one of a server on the machine.
+    defineNative(
+      { name: 'GET_CURRENT_SERVER_ENDPOINT', result: 'char*', params: [] },
+      () => '127.0.0.1:30120',
+    ),
     defineNative(
       {
         name: 'GET_TIME_DIFFERENCE',

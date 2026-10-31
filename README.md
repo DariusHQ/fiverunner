@@ -23,8 +23,8 @@ npx fiverunner test
 npx fiverunner dev
 ```
 
-- **Real resources, as they are released.** The 43 resources of the Stable recipe of Qbox start on your machine in seconds: its core, its inventory, its garages, its bank.
-- **Real NUIs.** Your pages run in a browser, and talk to your callbacks as they do in FiveM: the appearance editor, the inventory and the bank of the recipe work as players use them.
+- **Real resources, as they are released.** The 43 resources of the Stable recipe of Qbox start on your machine in seconds: its core, its inventory, its garages, its bank, and its phone, which is JavaScript.
+- **Real NUIs.** Your pages run in a browser, and talk to your callbacks as they do in FiveM: the appearance editor, the inventory, the bank and the phone of the recipe work as players use them.
 - **Tests in CI.** Each test gets a server of its own, players, and a database in memory, and time moves as fast as it can.
 - **A world to look at.** Under the frames of NUI, the screen of each player shows the world round their ped, as a cartoon or in the style of GTA V, and the cartoon dresses them as your scripts do.
 
@@ -82,7 +82,7 @@ The whole recipe of QBCore for txAdmin runs too, with its 72 resources, without 
 
 ![The first clothes of a character in qb-clothing, with the HUD of qb-hud, on the screen of a player, over a cartoon meadow by the apartment that she picked](docs/media/qbcore.png)
 
-So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources: they start without errors but those of npwd, whose phone is JavaScript, which FiveRunner does not run. A player takes a car out of a garage of qbx_garages, picks clothes in illenium-appearance, and opens ox_inventory and the bank of Renewed-Banking, as [its tests](compat/qbox-stable/tests/recipe.test.lua) check, which CI runs on every change on all of its resources but npwd and screencapture.
+So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources, without errors. A player takes a car out of a garage of qbx_garages, picks clothes in illenium-appearance, opens ox_inventory and the bank of Renewed-Banking, and keeps a contact in the phone of npwd, whose server is JavaScript that talks to the database with its own mysql2, as [its tests](compat/qbox-stable/tests/recipe.test.lua) check, which CI runs on every change.
 
 ![The character registration of QBox, from the NUI of ox_lib, on the screen of a player in the dev UI](docs/media/qbox-registration.png)
 
@@ -92,6 +92,8 @@ So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources: they
 
 ![The bank of Renewed-Banking on the screen of a player, with her personal account and her balance](docs/media/bank.png)
 
+![The phone of npwd, with its apps, on the screen of a player, over a cartoon meadow where her little character stands](docs/media/phone.png)
+
 ## Planned
 
 - A playground in the browser, which runs resources without installing anything.
@@ -99,6 +101,8 @@ So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources: they
 ## How it works
 
 Your scripts run on CfxLua, the Lua 5.4 runtime FiveM ships, compiled to WebAssembly: the same syntax extensions, vectors and quaternions, `json` and `msgpack`. Each resource gets its own Lua state, one per side and per player, the same isolation FiveM gives you. On top of that, FiveRunner reimplements the Cfx scripting runtime: events with `source` and net-safety, exports, function references, state bags, threads and `Wait`, and the natives API.
+
+JavaScript runs on QuickJS, compiled to WebAssembly too, in a context for each resource on each side, with the globals of FiveM's runtime: `on`, `emit`, `exports`, `setTick` and the natives by their names. Servers also give it what bundles ask of Node, such as `require`, `Buffer` and `fs`, and the drivers of MySQL that resources carry reach FiveRunner's database on its port.
 
 Servers also get FiveM's own `io` and `os` libraries, its VFS and file permissions, its HTTP client and server, its server variables and its console, and oxmysql, whose exports run on SQLite, which FiveRunner teaches MariaDB's SQL.
 
@@ -108,7 +112,7 @@ FiveRunner follows FiveM's Windows server and its clients down to their error me
 
 ## Clean room
 
-FiveRunner's scripting runtime is a clean-room implementation and contains no code from the FiveM platform. CfxLua and its libraries are open source; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). FiveRunner is not affiliated with or endorsed by Cfx.re, Rockstar Games or Take-Two Interactive.
+FiveRunner's scripting runtime is a clean-room implementation and contains no code from the FiveM platform. CfxLua, QuickJS and their libraries are open source; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). FiveRunner is not affiliated with or endorsed by Cfx.re, Rockstar Games or Take-Two Interactive.
 
 ## Contributing
 

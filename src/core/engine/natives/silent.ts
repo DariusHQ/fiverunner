@@ -133,6 +133,7 @@ const NAMES: readonly string[] = [
   'RemovePickup',
   'HasPickupBeenCollected',
   'DeleteCheckpoint',
+  'SetObjectTextureVariation',
   // Shape tests, which hit nothing, as nothing has a shape.
   'StartShapeTestRay',
   'StartShapeTestLosProbe',

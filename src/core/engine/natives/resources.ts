@@ -78,6 +78,11 @@ export function resourceNatives(side: Side): NativeDefinition<NativeContext>[] {
   if (side === 'client') return natives
   return [
     ...natives,
+    // Every resource of FiveRunner ticks, asked to or not.
+    defineNative(
+      { name: 'SCHEDULE_RESOURCE_TICK', result: 'void', params: ['char* resourceName'] },
+      () => {},
+    ),
     defineNative(
       { name: 'GET_RESOURCE_PATH', result: 'char*', params: ['char* resourceName'] },
       (ctx: NativeContext, resourceName) =>
