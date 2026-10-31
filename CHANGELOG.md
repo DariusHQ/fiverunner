@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [0.12.0](https://github.com/DariusHQ/fiverunner/releases/tag/v0.12.0) - 2026-11-01
+
+The dev UI gets an inspector of the server and of each player: what each resource has, the time it takes each tick, the convars, and a box that runs code inside a resource.
+
 ## [0.11.0](https://github.com/DariusHQ/fiverunner/releases/tag/v0.11.0) - 2026-11-01
 
 Resources in JavaScript run, on QuickJS, in the browser and in CI, with what they ask of Node. The phone of npwd works in the Stable recipe of Qbox, and the drivers of MySQL that resources carry reach FiveRunner's database.
