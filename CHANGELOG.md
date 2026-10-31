@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [0.11.0](https://github.com/DariusHQ/fiverunner/releases/tag/v0.11.0) - 2026-11-01
+
+Resources in JavaScript run, on QuickJS, in the browser and in CI, with what they ask of Node. The phone of npwd works in the Stable recipe of Qbox, and the drivers of MySQL that resources carry reach FiveRunner's database.
+
 ## [0.10.0](https://github.com/DariusHQ/fiverunner/releases/tag/v0.10.0) - 2026-10-31
 
 The whole recipe of QBCore runs, 72 resources, and CI plays it. Players walk and drive with W, A, S and D on their screens. Vehicles keep their colours, mods and health, so they come out of garages as they went in. A contributing guide, this changelog and forms for issues.
