@@ -14,6 +14,7 @@ import type { BridgeToUi, FromWorker, ToWorker, UiToBridge } from '../protocol.t
 import { API } from '../remote.ts'
 import { DEV_PATH } from '../routes.ts'
 import type { DevPlayer, DevState, NuiEvent } from '../session.ts'
+import { cardForm } from './card.ts'
 import { Console, keepHistory } from './console.ts'
 import { Events, showBags } from './inspect.ts'
 import { Inspector } from './inspector.ts'
@@ -165,13 +166,18 @@ function playerView(client: number): PlayerView {
   return view
 }
 
-/** Shows the deferral card of a player, with a box for what its Action.Submit gives. */
+/** Shows the deferral card of a player as a form, or as JSON, with a box for what its Action.Submit gives, if it has what the dev UI does not know. */
 function showCard(client: number, view: PlayerView, player: DevPlayer): void {
   if (view.cardJson === player.card) return
   view.cardJson = player.card
   view.card.replaceChildren()
   view.card.hidden = player.card === undefined
   if (player.card === undefined) return
+  const adaptive = cardForm(player.card, (json) => send({ type: 'submitCard', client, json }))
+  if (adaptive !== undefined) {
+    view.card.append(adaptive)
+    return
+  }
   const shown = document.createElement('pre')
   shown.textContent = player.card
   const form = document.createElement('form')

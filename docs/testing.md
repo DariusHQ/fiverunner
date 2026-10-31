@@ -88,10 +88,11 @@ local ann = fiverunner.connect({
     tokens = { '3:abc' },
     endpoint = '127.0.0.2',
     guid = '1234',
+    card = { name = 'Ann Lee', rules = 'true' },
 })
 ```
 
-Every field is optional. Each player runs a client of its own, with the client scripts of your resources.
+Every field is optional. `card` is what the player answers the adaptive cards of deferrals with, which `presentCard` calls back with. Each player runs a client of its own, with the client scripts of your resources.
 
 | Field or method                            |                                                                                                                                                                                                                                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

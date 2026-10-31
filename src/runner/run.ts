@@ -217,6 +217,10 @@ interface Connection {
   client: ResourceManager | undefined
   /** The JSON of what the scripts of the client sent the frames of resources, by the resources. */
   readonly messages: { readonly resource: string; readonly json: string }[]
+  /** The JSON that the player answers the cards of deferrals with. */
+  readonly answer?: string
+  /** The JSON of the card that the player answered last. */
+  answered?: string
 }
 
 /** An event that the client of a player got from the network. */
@@ -390,7 +394,7 @@ class World<T> {
         this.#report = this.#parse(args)
         return pack(null)
       case 'connect':
-        return pack(this.#connect(identityOf(args)))
+        return pack(this.#connect(args))
       case 'connection':
         return pack(this.#state(this.#connections[count(args) - 1]))
       case 'received': {
@@ -479,12 +483,15 @@ class World<T> {
    * the runner starts before the next frame, and returns the number of the
    * connection, from 1.
    */
-  #connect(identity: PlayerIdentity): number {
+  #connect(args: unknown): number {
+    const { identity: given, answer } = fields(args)
+    const identity = identityOf(given ?? [])
     const connection: Connection = {
       process: `client ${this.#connections.length + 1}`,
       player: undefined,
       client: undefined,
       messages: [],
+      ...(answer === undefined ? {} : { answer: text(answer) }),
     }
     this.#connections.push(connection)
     this.#actions.push(async () => {
@@ -510,7 +517,12 @@ class World<T> {
     if (connection === undefined) throw new Error('Unknown connection')
     const { player } = connection
     if (player === undefined) return { state: 'connecting' }
-    const { state, netId: id, name, rejection } = player
+    const { state, netId: id, name, rejection, card } = player
+    // A card gets the answer once: one that the server presents anew is another one.
+    if (connection.answer !== undefined && card !== undefined && card !== connection.answered) {
+      connection.answered = card
+      player.submitCard(connection.answer)
+    }
     return rejection === undefined ? { state, id, name } : { state, id, name, reason: rejection }
   }
 

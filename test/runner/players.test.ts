@@ -80,6 +80,25 @@ end)`),
     expect(outcomes(result)).toEqual([['refuses', 'passed']])
   })
 
+  it('answer the adaptive cards of deferrals with what their identities say', async () => {
+    const result = await run(
+      `it('answers', function()
+    local ann = fiverunner.connect({ name = 'Ann', card = { name = 'Ann Lee', age = 30 } })
+    expect(ann.name).toBe('Ann')
+    expect(fiverunner.output()).toContain('[script:bank] Ann Lee\\t30')
+end)`,
+      bank(`AddEventHandler('playerConnecting', function(_, _, deferrals)
+    deferrals.defer()
+    Wait(0)
+    deferrals.presentCard('{}', function(answer)
+        print(answer.name, answer.age)
+        deferrals.done()
+    end)
+end)`),
+    )
+    expect(outcomes(result)).toEqual([['answers', 'passed']])
+  })
+
   it('come back without players when the server drops them before their clients are ready', async () => {
     const result = await run(
       `it('drops', function()
@@ -169,7 +188,7 @@ it('c', function() fiverunner.connect({ identifiers = { 1 } }) end)
 it('d', function() fiverunner.connect(1) end)
 it('e', function() fiverunner.connect({ tokens = 'x' }) end)`)
     expect(outcomes(result).map(([, , message]) => message)).toEqual([
-      '@fiverunner/tests/x.test.lua:1: players have a name, a guid, an endpoint, identifiers and tokens, not "nam"',
+      '@fiverunner/tests/x.test.lua:1: players have a name, a guid, an endpoint, identifiers, tokens and a card, not "nam"',
       '@fiverunner/tests/x.test.lua:2: the name of a player is a string, not a number',
       '@fiverunner/tests/x.test.lua:3: the identifiers of a player are strings, not number',
       "@fiverunner/tests/x.test.lua:4: bad argument #1 to 'fiverunner.connect' (table expected, got number)",

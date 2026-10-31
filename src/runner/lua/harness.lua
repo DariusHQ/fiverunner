@@ -482,28 +482,29 @@ RegisterNetEvent('fiverunner:result', function(request, ok, values)
 end)
 
 -- What players are, by the types of what the identities of players have.
-local IDENTITY = { name = 'string', guid = 'string', endpoint = 'string', identifiers = 'table', tokens = 'table' }
+local IDENTITY = { name = 'string', guid = 'string', endpoint = 'string', identifiers = 'table', tokens = 'table', card = 'table' }
 
 -- A player that connected, by its id on the server and its name.
 local Player = {}
 Player.__index = Player
 
 -- Connects a player, as its identity says: its name, its guid, the
--- endpoint it connects from, and its identifiers and tokens, which are
--- lists of strings. Returns the player once its client started the
--- resources of the server, or nil and why the server refused it.
+-- endpoint it connects from, its identifiers and tokens, which are lists
+-- of strings, and what it answers the cards of deferrals with. Returns the
+-- player once its client started the resources of the server, or nil and
+-- why the server refused it.
 function fiverunner.connect(identity)
     if identity ~= nil then
         checkArgument('fiverunner.connect', 1, identity, 'table')
         for key, value in next, identity do
             local expected = IDENTITY[key]
             if expected == nil then
-                raise(string_format('players have a name, a guid, an endpoint, identifiers and tokens, not %s', show(key)))
+                raise(string_format('players have a name, a guid, an endpoint, identifiers, tokens and a card, not %s', show(key)))
             end
             if type(value) ~= expected then
                 raise(string_format('the %s of a player is a %s, not a %s', key, expected, type(value)))
             end
-            if expected == 'table' then
+            if expected == 'table' and key ~= 'card' then
                 for _, item in next, value do
                     if type(item) ~= 'string' then
                         raise(string_format('the %s of a player are strings, not %s', key, type(item)))
@@ -512,7 +513,8 @@ function fiverunner.connect(identity)
             end
         end
     end
-    local connection = ask('connect', identity)
+    local answer = identity ~= nil and identity.card ~= nil and json.encode(identity.card) or nil
+    local connection = ask('connect', { identity = identity, answer = answer })
     while true do
         local state = ask('connection', connection)
         if state.state == 'rejected' then

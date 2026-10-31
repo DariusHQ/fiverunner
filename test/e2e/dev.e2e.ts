@@ -32,6 +32,23 @@ exports('balance', function() return 5 end)
 SetResourceKvp('plan', 'gold')
 Rate = 3
 RegisterNetEvent('bank:ping', function(value) print('ping', source, value) end)
+AddEventHandler('playerConnecting', function(_, _, deferrals)
+    if GetPlayerName(source) ~= 'Carded' then return end
+    deferrals.defer()
+    Wait(0)
+    deferrals.presentCard(json.encode({
+        type = 'AdaptiveCard',
+        body = {
+            { type = 'TextBlock', text = 'Who are you?' },
+            { type = 'Input.Text', id = 'name', placeholder = 'Your name' },
+            { type = 'Input.Toggle', id = 'agreed', title = 'I agree' },
+        },
+        actions = { { type = 'Action.Submit', title = 'Join', data = { from = 'card' } } },
+    }), function(answer)
+        print('card', answer.name, answer.agreed, answer.from)
+        deferrals.done()
+    end)
+end)
 RegisterCommand('open', function()
     TriggerClientEvent('bank:open', -1, 'Opened by the server')
 end, false)
@@ -446,6 +463,31 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
       `document.getElementById('inspected-details').innerText`,
     )
     expect(client).toContain('close')
+  })
+
+  it('shows the adaptive cards of deferrals as forms', async () => {
+    await page.evaluate(`(() => {
+      document.getElementById('player-name').value = 'Carded'
+      document.getElementById('connect').requestSubmit()
+    })()`)
+    await page.until(
+      `document.querySelector('.card form.adaptive')?.innerText.includes('Who are you?')`,
+    )
+    await page.evaluate(`(() => {
+      const form = document.querySelector('.card form.adaptive')
+      form.querySelector('input').value = 'Ann Lee'
+      form.querySelector('input[type=checkbox]').checked = true
+      form.querySelector('button').click()
+    })()`)
+    await page.until(
+      `document.getElementById('console').innerText.includes('card\\tAnn Lee\\ttrue\\tcard')`,
+    )
+    const last = `[...document.querySelectorAll('.player')].at(-1)`
+    await page.until(`${last}.querySelector('.info').textContent.includes('joined')`)
+    await page.evaluate(
+      `[...${last}.querySelectorAll('header button')].find((b) => b.textContent === 'Disconnect').click()`,
+    )
+    await page.until(`document.querySelectorAll('.viewport iframe').length === 2`)
   })
 
   it('restarts the resources whose files change, with the players they had, whose frames keep their storage', async () => {

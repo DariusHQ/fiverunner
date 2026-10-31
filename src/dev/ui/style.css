@@ -594,6 +594,30 @@ main {
   gap: 6px;
 }
 
+.card form.adaptive {
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 420px;
+}
+
+.card form.adaptive input:not([type='checkbox']),
+.card form.adaptive textarea,
+.card form.adaptive select {
+  width: 100%;
+}
+
+.card form.adaptive p {
+  margin: 0;
+}
+
+.card form.adaptive .large {
+  font-size: 18px;
+}
+
+.card form.adaptive .bold {
+  font-weight: 700;
+}
+
 .card textarea {
   flex: 1;
   height: 48px;
