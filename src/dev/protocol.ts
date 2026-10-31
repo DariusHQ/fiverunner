@@ -76,13 +76,27 @@ export type FromWorker =
   | { readonly type: 'inspection'; readonly inspection: DevInspection }
   | { readonly type: 'answer'; readonly id: number; readonly answer: Answer }
 
+/** The frame that asks, where the origin does not tell, as in the playground, whose frames share one. */
+export interface AskingFrame {
+  /** The tab of the page that shows the frame. */
+  readonly tab: string
+  readonly client: number
+  /** The host of FiveM's that the frame is at. */
+  readonly host: string
+}
+
 /**
  * What the service worker of the frames of an origin and the bridge of the
  * origin say to each other: the worker asks, the bridge tells that it took
  * the request, then gives the answer of the client.
  */
 export type BridgeMessage =
-  | { readonly type: 'ask'; readonly id: number; readonly ask: Ask }
+  | {
+      readonly type: 'ask'
+      readonly id: number
+      readonly ask: Ask
+      readonly frame?: AskingFrame
+    }
   | { readonly type: 'ack'; readonly id: number }
   | { readonly type: 'answer'; readonly id: number; readonly answer: Answer }
 

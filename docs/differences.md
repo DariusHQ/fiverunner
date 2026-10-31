@@ -114,6 +114,14 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 - There is no game view: `CfxGameViewRenderer` and `application/x-cfx-game-view` objects are not there.
 - As files change, the whole project runs anew, with its players, rather than the resources that changed restarting.
 
+## The playground
+
+The playground is the dev UI on a static site, so it differs from it as well:
+
+- Frames share the origin of the page, under `frames/`, as a static site has one origin, so their pages share their storage, and may reach the page and each other.
+- The project is in the memory of the page, where edits stay until it reloads, and nothing watches files: Run starts it anew.
+- The HTTP requests of scripts go out with `fetch` from the page, so sites must allow them with CORS.
+
 ## os and io (servers)
 
 - Names of local time zones come from `Intl`, which can differ from Windows' names for `%Z`.

@@ -1,0 +1,38 @@
+name: Playground
+
+# Publishes the playground with each release, as its page says what the tool does.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Publish the playground
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:playground
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist-playground
+      - id: deployment
+        uses: actions/deploy-pages@v5

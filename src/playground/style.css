@@ -1,0 +1,88 @@
+main {
+  grid-template-rows: 420px 340px 300px 680px 420px auto;
+}
+
+.editor {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.editor .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor .hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.editor .hint a {
+  color: var(--accent);
+}
+
+.editor #run {
+  color: var(--background);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.editor .columns {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 8px;
+  min-height: 0;
+}
+
+.editor nav {
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.editor nav button {
+  display: block;
+  width: 100%;
+  padding: 2px 6px;
+  text-align: left;
+  border-color: transparent;
+  overflow-wrap: anywhere;
+}
+
+.editor nav button.chosen {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.editor textarea {
+  resize: none;
+  padding: 8px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre;
+  background: var(--panel);
+}
+
+@media (max-width: 800px) {
+  main {
+    grid-template-rows: 420px 300px auto 300px auto 360px auto auto;
+  }
+
+  .editor .columns {
+    grid-template-columns: 1fr;
+    grid-template-rows: 120px 1fr;
+  }
+
+  .editor .hint {
+    display: none;
+  }
+}

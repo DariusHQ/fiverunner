@@ -18,6 +18,8 @@
 
 **[Watch the demo](https://github.com/DariusHQ/fiverunner/releases/download/v0.9.0/fiverunner.mp4)** (122 seconds, with sound): the whole Stable recipe of Qbox for txAdmin, tested, then in the dev UI, where a player registers a character, dresses her in illenium-appearance, opens ox_inventory and the bank of Renewed-Banking, and is dragged across the map to a garage, where she takes her car out.
 
+**[Try it in your browser](https://dariushq.github.io/fiverunner/)**: a small city, in Lua and JavaScript, that runs in the page, with nothing to install. Edit its files, press Run, and walk around it.
+
 ```bash
 npx fiverunner test
 npx fiverunner dev
@@ -95,10 +97,6 @@ So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources, with
 ![The bank of Renewed-Banking on the screen of a player, with her personal account and her balance](docs/media/bank.png)
 
 ![The phone of npwd, with its apps, on the screen of a player, over a cartoon meadow where her little character stands](docs/media/phone.png)
-
-## Planned
-
-- A playground in the browser, which runs resources without installing anything.
 
 ## How it works
 

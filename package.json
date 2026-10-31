@@ -40,6 +40,7 @@
     "build:wasm": "node scripts/build-wasm.ts",
     "build:natives": "node scripts/generate-natives.ts",
     "build:mime": "node scripts/generate-mime.ts",
+    "build:playground": "vite build -c vite.playground.config.ts && vite build -c vite.playground-sw.config.ts",
     "test": "vitest run",
     "test:e2e": "vitest run -c vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",

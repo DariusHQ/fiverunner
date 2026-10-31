@@ -33,6 +33,7 @@ npm test
 | `npm run build`               | Builds the command line tool and the dev UI       |
 | `npm run test:e2e`            | Runs the dev UI in headless Chrome, after a build |
 | `node dist/fiverunner.js dev` | Runs your build, from the project of a resource   |
+| `npm run build:playground`    | Builds the playground into `dist-playground`      |
 
 The compatibility suites run real frameworks. Each one is a directory of [compat](compat), whose `resources.txt` pins the releases that `compat/fetch.sh` downloads. It needs `curl`, `unzip` and `sha256sum`, which Git Bash has on Windows. None of those releases is in the repository.
 

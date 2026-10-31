@@ -133,18 +133,20 @@ export function startApp({ worker, frames, project: projectFiles, watch }: Platf
 
   /** Shows the deferral card of a player as a form, or as JSON, with a box for what its Action.Submit gives, if it has what the dev UI does not know. */
   function showCard(client: number, view: PlayerView, player: DevPlayer): void {
-    if (view.cardJson === player.card) return
-    view.cardJson = player.card
+    // Cards stay with players, but go as they join.
+    const card = player.state === 'connecting' ? player.card : undefined
+    if (view.cardJson === card) return
+    view.cardJson = card
     view.card.replaceChildren()
-    view.card.hidden = player.card === undefined
-    if (player.card === undefined) return
-    const adaptive = cardForm(player.card, (json) => send({ type: 'submitCard', client, json }))
+    view.card.hidden = card === undefined
+    if (card === undefined) return
+    const adaptive = cardForm(card, (json) => send({ type: 'submitCard', client, json }))
     if (adaptive !== undefined) {
       view.card.append(adaptive)
       return
     }
     const shown = document.createElement('pre')
-    shown.textContent = player.card
+    shown.textContent = card
     const form = document.createElement('form')
     const data = document.createElement('textarea')
     data.value = '{}'
@@ -187,7 +189,8 @@ export function startApp({ worker, frames, project: projectFiles, watch }: Platf
     for (const player of state.players) {
       const view = playerView(player.client)
       const gone = player.state === 'dropped' || player.state === 'rejected'
-      const reason = player.rejection ?? player.message?.trim()
+      const said = player.state === 'connecting' ? player.message?.trim() : undefined
+      const reason = player.rejection ?? said
       view.info.textContent = `${player.name} (id ${player.id}) ${player.state}${reason ? `: ${reason}` : ''}`
       view.element.classList.toggle('gone', gone)
       view.screen.world.show(state.map, state.players)
