@@ -76,7 +76,11 @@ The dev UI has the console of your server, where you run commands, its resources
 
 ## Frameworks
 
-QBox and ESX run on FiveRunner: CI runs qbx_core, ox_lib, ox_inventory, qbx_vehicles and es_extended, as they are released, on every change, with players who log in, earn money, carry items, get jobs and are saved as they leave. [docs/compatibility.md](docs/compatibility.md) lists what passes.
+QBCore, QBox and ESX run on FiveRunner: CI runs them, as they are released, on every change, with players who log in, earn money, carry items, get jobs and are saved as they leave. [docs/compatibility.md](docs/compatibility.md) lists what passes.
+
+The whole recipe of QBCore for txAdmin runs too, with its 72 resources, without errors. A player creates a character in qb-multicharacter, picks where to start in qb-spawn, gets dressed in qb-clothing, opens qb-inventory and qb-banking, and takes a car out of qb-garages, with what the database keeps of it, as [its tests](compat/qbcore/tests/qbcore.test.lua) check.
+
+![The first clothes of a character in qb-clothing, with the HUD of qb-hud, on the screen of a player, over a cartoon meadow by the apartment that she picked](docs/media/qbcore.png)
 
 So does the whole Stable recipe of Qbox for txAdmin, with its 43 resources: they start without errors but those of npwd, whose phone is JavaScript, which FiveRunner does not run. A player takes a car out of a garage of qbx_garages, picks clothes in illenium-appearance, and opens ox_inventory and the bank of Renewed-Banking, as [its tests](compat/qbox-stable/tests/recipe.test.lua) check, which CI runs on every change on all of its resources but npwd and screencapture.
 

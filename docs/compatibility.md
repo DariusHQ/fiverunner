@@ -75,6 +75,20 @@ The Stable recipe of Qbox for txAdmin, as it deploys a server, but npwd and scre
 - the appearance editor of illenium-appearance gives a freemode character clothes and colours to pick from;
 - a player who logs in opens the inventory of ox_inventory on the key that binds it, and the bank of Renewed-Banking, with the accounts of the character.
 
+## QBCore
+
+The recipe of QBCore for txAdmin, as it deploys a server, with its 72 resources, but its maps, which are only drawn, and screencapture, which is JavaScript. QBCore has no releases, so [its list](../compat/qbcore/resources.txt) pins them by their commits. [The tests](../compat/qbcore/tests/qbcore.test.lua) check that:
+
+- the resources start without script errors, on the server and on the client of a player;
+- the character menu of qb-multicharacter shows, and players create characters in its page, which the database keeps;
+- new characters pick where to start in the page of qb-spawn, and get their first clothes in qb-clothing;
+- money is given and taken, in cash and in the bank;
+- items are given and taken in qb-inventory, which its key opens;
+- players open qb-banking at its counter, on `E`;
+- players take cars out of qb-garages, on `E`, with the colours, the mods, the health and the fuel that the database keeps of them;
+- players get jobs;
+- the characters of players that leave are saved.
+
 ## ESX
 
 | Resource                                         | Version |

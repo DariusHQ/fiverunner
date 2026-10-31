@@ -50,6 +50,17 @@ const CLIENT = `RegisterCommand('fuel', function(_, args)
 end, false)
 RegisterCommand('walk', function(_, args) SetEntityCoords(PlayerPedId(), tonumber(args[1]) + 0.0, 0.0, 1.0, false, false, false, false) end, false)`
 
+describe('The names of the state bags of entities', () => {
+  it('find the entities of clients, by their net ids or their handles', async () => {
+    const { run, client } = await clientOf()
+    expect(
+      run(`local ped = PlayerPedId()
+print(GetEntityFromStateBagName('entity:' .. PedToNet(ped)) == ped, GetEntityFromStateBagName('localEntity:' .. ped) == ped, GetEntityFromStateBagName('entity:9'), GetEntityFromStateBagName('player:1'))`),
+    ).toEqual(['true\ttrue\t0\t0'])
+    expect(client.diagnostics).toEqual([])
+  })
+})
+
 describe('State bags of entities', () => {
   it('reach the clients that have the entities, as the servers set them', async () => {
     const test = await session(SERVER, CLIENT)

@@ -117,7 +117,22 @@ export function stateBagNatives(side: Side): NativeDefinition<NativeContext>[] {
       },
     ),
   ]
-  if (side === 'client') return natives
+  if (side === 'client') {
+    return [
+      ...natives,
+      // Clients find the entities of their networks by their net ids, and their own by their handles.
+      defineNative(
+        { name: 'GET_ENTITY_FROM_STATE_BAG_NAME', result: 'int', params: ['char* bagName'] },
+        (ctx: NativeContext, bagName) => {
+          const name = checkArgument(bagName, 0)
+          const world = ctx.manager.world!
+          if (name.startsWith('entity:')) return world.byObjectId(atoi(name.slice(7)))?.handle ?? 0
+          if (!name.startsWith('localEntity:')) return 0
+          return world.byHandle(atoi(name.slice(12)))?.handle ?? 0
+        },
+      ),
+    ]
+  }
   return [
     ...natives,
     defineNative(

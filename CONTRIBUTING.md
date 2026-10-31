@@ -57,7 +57,7 @@ FiveRunner has to stay free of code that it has no right to. These rules cover c
 
 - Never copy code from the FiveM platform. [citizenfx/fivem](https://github.com/citizenfx/fivem) is "all rights reserved", and its `citizen-*` components are LGPL. Read it to learn what FiveM does, then write your own code, with your own names, structure and comments. Only the names that show in errors and stack traces match FiveM's.
 - The documentation of natives (citizenfx/natives, alloc8or's nativedb, DurtyFree's dumps, fivem-docs) has no license, so never copy its databases. The hash or the declaration of a single native is a fact, which you may look up. The typings of `@citizenfx/client` and `@citizenfx/server` are ISC, and feed `src/core/natives/catalog`.
-- oxmysql and ox_lib are LGPL-3.0, and ESX and Qbox are GPL. Read them to learn how they behave, and never put them in the repository. Tests have SQL of their own.
+- oxmysql and ox_lib are LGPL-3.0, and ESX, Qbox and QBCore are GPL. Read them to learn how they behave, and never put them in the repository. Tests have SQL of their own.
 - Nothing of Rockstar's ships: no map art, no blip icons, no models.
 
 ## Sending a change
