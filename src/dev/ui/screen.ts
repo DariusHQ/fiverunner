@@ -1,5 +1,4 @@
 import type { NuiFrame } from '../../core/engine/index.ts'
-import { devFrameUrl } from '../hosts.ts'
 import { WorldMap } from './map.ts'
 
 /** The size of the game window that the screens of players stand for, in pixels, which pages are laid out in. */
@@ -51,8 +50,10 @@ export function keyName(code: string): string | undefined {
 
 /** What a screen needs of the dev UI. */
 export interface ScreenHost {
-  /** Loads the bridge of the origin of the frame at `url`, if the dev UI has the origin, and resolves once it is ready. */
-  bridge(url: string): Promise<void>
+  /** Where a frame shows the page that FiveM has at `url`. */
+  frame(url: string): string
+  /** Resolves once a frame can load `url`, which `frame` gave. */
+  ready(url: string): Promise<void>
   /** Tells the client where the cursor is in its game window. */
   cursor(x: number, y: number): void
   /** Tells the game of the client that a key of its keyboard went down or up, by the name of FiveM's keyboard mapper. */
@@ -74,9 +75,6 @@ export class Screen {
   readonly world: WorldMap
   readonly #fade: HTMLElement
   readonly #viewport: HTMLElement
-  readonly #client: number
-  readonly #tab: string
-  readonly #port: string
   readonly #host: ScreenHost
   readonly #frames = new Map<string, HTMLIFrameElement>()
   /**
@@ -95,10 +93,7 @@ export class Screen {
   /** The keys that went down to the game, which go up as the screen loses the focus. */
   readonly #held = new Set<string>()
 
-  constructor(client: number, tab: string, port: string, host: ScreenHost) {
-    this.#client = client
-    this.#tab = tab
-    this.#port = port
+  constructor(client: number, host: ScreenHost) {
     this.#host = host
     this.element = document.createElement('div')
     this.element.className = 'screen'
@@ -166,8 +161,8 @@ export class Screen {
     const wait = ++this.#waits
     this.#waiting.set(resource, wait)
     this.#early.set(resource, [])
-    const src = devFrameUrl(url, this.#client, this.#tab, this.#port)
-    await this.#host.bridge(src)
+    const src = this.#host.frame(url)
+    await this.#host.ready(src)
     if (this.#waiting.get(resource) !== wait) return
     this.#waiting.delete(resource)
     const frame = document.createElement('iframe')

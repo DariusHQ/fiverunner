@@ -17,8 +17,8 @@ export interface ProjectInfo {
 
 /** What the dev UI asks of the worker that runs its engine. */
 export type ToWorker =
-  /** Starts a session of the project, or starts it anew with the players it had, if one runs. */
-  | { readonly type: 'start' }
+  /** Starts a session of the project, or starts it anew with the players it had, if one runs, with these files, if the UI has them. */
+  | { readonly type: 'start'; readonly files?: Readonly<Record<string, string>> }
   | { readonly type: 'command'; readonly line: string }
   /** Files of the project changed, at these paths in it, or at paths that the dev server could not tell. */
   | { readonly type: 'change'; readonly paths: readonly string[] | null }
