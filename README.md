@@ -70,6 +70,8 @@ The dev UI has the console of your server, where you run commands, its resources
 
 ![The Stable recipe of Qbox in the dev UI: the console of its server, the events that its player sent, its resources and state bags, and the map of its world](docs/media/dev-ui.png)
 
+![The inspector of the dev UI: the resources of the server, with the time that each takes, the exports, events and commands of Renewed-Banking, and the convars of the server](docs/media/inspector.png)
+
 ![The map of the dev UI in the style of the pause menu of GTA V: the blips that the resources of Qbox put on the map of a player, with its header, a legend and its buttons](docs/media/map-gta.png)
 
 ![The map of the dev UI as a cartoon: the blips of Qbox as the tokens of a board game, on a meadow with trees](docs/media/map-cartoon.png)
