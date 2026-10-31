@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [0.10.0](https://github.com/DariusHQ/fiverunner/releases/tag/v0.10.0) - 2026-10-31
+
+The whole recipe of QBCore runs, 72 resources, and CI plays it. Players walk and drive with W, A, S and D on their screens. Vehicles keep their colours, mods and health, so they come out of garages as they went in. A contributing guide, this changelog and forms for issues.
+
 ## [0.9.0](https://github.com/DariusHQ/fiverunner/releases/tag/v0.9.0) - 2026-10-31
 
 The first version on npm. The big NUIs of Qbox's Stable recipe work as players use them: illenium-appearance, ox_inventory and Renewed-Banking. The screen of each player shows the world round their ped, and the demo is a film of 2 minutes, with sound.
