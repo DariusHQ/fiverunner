@@ -4,6 +4,18 @@ import { defineConfig } from 'vite'
 
 const path = (file: string) => fileURLToPath(new URL(file, import.meta.url))
 
+const DESCRIPTION =
+  'A small FiveM city, in Lua and JavaScript, that runs in this page: edit its files, press Run, and walk around it. No GTA V, no FXServer.'
+
+/** What sites that show links read of the page. */
+const CARD = `
+    <meta name="description" content="${DESCRIPTION}" />
+    <meta property="og:title" content="FiveRunner playground" />
+    <meta property="og:description" content="${DESCRIPTION}" />
+    <meta property="og:url" content="https://dariushq.github.io/fiverunner/" />
+    <meta property="og:image" content="https://raw.githubusercontent.com/DariusHQ/fiverunner/main/docs/media/banner.png" />
+    <meta name="twitter:card" content="summary_large_image" />`
+
 /**
  * Builds the playground: dist-playground, a static site with the page of
  * the dev UI, on src/playground in place of the dev server, at any path.
@@ -27,7 +39,7 @@ export default defineConfig({
         handler: (html) =>
           html
             .replace('./ui/main.ts', '../playground/main.ts')
-            .replace('<title>FiveRunner</title>', '<title>FiveRunner playground</title>'),
+            .replace('<title>FiveRunner</title>', `<title>FiveRunner playground</title>${CARD}`),
       },
     },
   ],

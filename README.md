@@ -25,6 +25,8 @@ npx fiverunner test
 npx fiverunner dev
 ```
 
+Run them with Node 22 or later, in the folder of a resource or of a server, the one with `server.cfg` and `resources`. A script that needs a framework runs in the folder of its server, next to the framework.
+
 - **Real resources, as they are released.** The 43 resources of the Stable recipe of Qbox start on your machine in seconds: its core, its inventory, its garages, its bank, and its phone, which is JavaScript.
 - **Real NUIs.** Your pages run in a browser, and talk to your callbacks as they do in FiveM: the appearance editor, the inventory, the bank and the phone of the recipe work as players use them.
 - **Tests in CI.** Each test gets a server of its own, players, and a database in memory, and time moves as fast as it can.
