@@ -626,16 +626,24 @@ main {
 
 @media (max-width: 800px) {
   main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 300px auto 300px auto 360px auto auto;
   }
 
+  #emit {
+    flex-wrap: wrap;
+  }
+
+  input {
+    min-width: 0;
+  }
+
   .inspector .columns {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-auto-rows: 240px;
   }
 
   #player-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
