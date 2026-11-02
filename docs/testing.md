@@ -96,7 +96,7 @@ local ann = fiverunner.connect({
 })
 ```
 
-Every field is optional. `card` is what the player answers the adaptive cards of deferrals with, which `presentCard` calls back with. Each player runs a client of its own, with the client scripts of your resources.
+Every field is optional. Players without `identifiers` get a `license:` of their name, as frameworks turn away those without one. `card` is what the player answers the adaptive cards of deferrals with, which `presentCard` calls back with. Each player runs a client of its own, with the client scripts of your resources.
 
 | Field or method                            |                                                                                                                                                                                                                                                                       |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

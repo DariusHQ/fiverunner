@@ -58,6 +58,7 @@ describe('Players of tests', () => {
     expect(ann:output()).toContain('[script:bank] the client started')
     local bob = fiverunner.connect()
     expect({ bob.id, bob.name, GetNumPlayerIndices() }).toEqual({ 2, 'player', 2 })
+    expect(GetPlayerIdentifierByType(bob.id, 'license')).toMatch('^license:%x+$')
 end)`,
       bank('', `print('the client started')`),
     )

@@ -1,5 +1,6 @@
 import {
   Engine,
+  licenseOf,
   SERVER_FRAME_TIME,
   sqliteDatabase,
   type FileSystem,
@@ -698,7 +699,10 @@ function identityOf(value: unknown): PlayerIdentity {
     ...(name === undefined ? {} : { name: text(name) }),
     ...(guid === undefined ? {} : { guid: text(guid) }),
     ...(endpoint === undefined ? {} : { endpoint: text(endpoint) }),
-    ...(identifiers === undefined ? {} : { identifiers: list(identifiers).map(text) }),
+    identifiers:
+      identifiers === undefined
+        ? [licenseOf(name === undefined ? undefined : text(name))]
+        : list(identifiers).map(text),
     ...(tokens === undefined ? {} : { tokens: list(tokens).map(text) }),
   }
 }

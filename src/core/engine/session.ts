@@ -1,3 +1,4 @@
+import { sha1 } from '../db/hash.ts'
 import { Deferral } from './deferrals.ts'
 import type { ResourceManager } from './manager.ts'
 import { ManifestError } from './manifest.ts'
@@ -7,6 +8,15 @@ import type { RpcCall } from './rpc.ts'
 import { bindEntityBag } from './world/bags.ts'
 import type { ClientWorld } from './world/client.ts'
 import type { ServerClone } from './world/server.ts'
+
+/**
+ * The identifier of a player whom nothing gives one: players of FiveM have
+ * the license of their Rockstar account, which frameworks turn players away
+ * without. Here, one of their names.
+ */
+export function licenseOf(name = 'player'): string {
+  return `license:${sha1(new TextEncoder().encode(name))}`
+}
 
 /** The net id of what FiveM's servers send clients, which is the source of the events that clients get. */
 export const SERVER_NET_ID = 0xffff

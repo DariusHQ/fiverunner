@@ -1,5 +1,6 @@
 import {
   Engine,
+  licenseOf,
   MemoryFileSystem,
   type HttpClient,
   type Nui,
@@ -12,7 +13,6 @@ import {
   SERVER_NET_ID,
   sqliteDatabase,
 } from '../core/engine/index.ts'
-import { sha1 } from '../core/db/hash.ts'
 import { normalizePath } from '../core/engine/glob.ts'
 import { pack, type PackedValue } from '../core/engine/msgpack.ts'
 import { LuaFatalError, type WatchdogOptions } from '../core/lua/index.ts'
@@ -27,8 +27,6 @@ const WATCHDOG: WatchdogOptions = { timeoutMs: 5000 }
 
 /** How long servers run before players reach them, in ms: scripts take frames to set what clients read as they load. */
 const STARTUP = 3000
-
-const encoder = new TextEncoder()
 
 /** What the NUI of a client tells as it happens. */
 export type NuiEvent =
@@ -232,10 +230,7 @@ export class DevSession {
     const { now } = this.#engine.clock
     if (now < STARTUP) this.advance(STARTUP - now)
     const watchdog = this.#options.watchdog ?? WATCHDOG
-    // Players of FiveM have the license of their Rockstar account, which frameworks turn players away without: here, one of their names.
-    const identifiers = identity.identifiers ?? [
-      `license:${sha1(encoder.encode(identity.name ?? 'player'))}`,
-    ]
+    const identifiers = identity.identifiers ?? [licenseOf(identity.name)]
     const { client, player } = await this.#engine.connect(
       { ...identity, identifiers },
       { watchdog },

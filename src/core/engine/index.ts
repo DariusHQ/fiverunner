@@ -61,4 +61,5 @@ export {
   TEMPORARY_NET_IDS,
   type PlayerIdentity,
   type PlayerState,
+  licenseOf,
 } from './session.ts'
