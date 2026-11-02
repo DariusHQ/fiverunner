@@ -21,7 +21,9 @@ end
 local function errors(output)
     local found = {}
     for _, line in ipairs(output) do
-        if line:find('SCRIPT ERROR', 1, true) then found[#found + 1] = line end
+        if line:find('SCRIPT ERROR', 1, true) or line:find('Failed to load script', 1, true) then
+            found[#found + 1] = line
+        end
     end
     return found
 end

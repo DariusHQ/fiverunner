@@ -45,19 +45,30 @@ const SETTINGS = `${JSON.stringify(
   2,
 )}\n`
 
-/** A test file of `subject`, a Lua expression of the name of the tests, whose test checks the start of the project and what `checks` says. */
+/** A test file of `subject`, a Lua expression of the name of the tests, whose test checks the start of the project, on the server and on the client of a player, and what `checks` says. */
 function testFile(subject: string, checks: string): string {
   return `-- The tests of the project, which \`npx fiverunner test\` runs:
 -- https://github.com/DariusHQ/fiverunner/blob/main/docs/testing.md
 
+local function errors(output)
+    local found = {}
+    for _, line in ipairs(output) do
+        if line:find('SCRIPT ERROR', 1, true) or line:find('Failed to load script', 1, true) then
+            found[#found + 1] = line
+        end
+    end
+    return found
+end
+
 describe(${subject}, function()
     it('starts without script errors', function()
-${checks}        local errors = {}
-        for _, line in ipairs(fiverunner.output()) do
-            if line:find('SCRIPT ERROR', 1, true) then errors[#errors + 1] = line end
-        end
-        expect(errors).toEqual({})
-    end)
+${checks}        -- Players reach servers once they started, which takes the big ones seconds.
+        while GetGameTimer() < 3000 do Wait(100) end
+        local player, refused = fiverunner.connect({ name = 'Ann' })
+        expect(refused).toBeNil()
+        expect(errors(fiverunner.output())).toEqual({})
+        expect(errors(player:output())).toEqual({})
+    end, 120000)
 end)
 `
 }

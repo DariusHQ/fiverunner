@@ -273,7 +273,8 @@ Duration: 0.63 s
       {
         code: 1,
         stdout: '',
-        stderr: 'fiverunner: there are no test files, whose names end in .test.lua\n',
+        stderr:
+          'fiverunner: there are no test files, whose names end in .test.lua: fiverunner init adds one\n',
       },
       {
         code: 1,
@@ -494,5 +495,17 @@ describe('fiverunner init', () => {
       1,
       2,
     ])
+  })
+
+  it('adds a test that fails on scripts that do not load, and on the client scripts of players', async () => {
+    const syntax = write('syntax', { 'fxmanifest.lua': MANIFEST, 'server.lua': 'local = 1' })
+    const client = write('client', {
+      'fxmanifest.lua': `${MANIFEST}\nclient_script 'client.lua'`,
+      'server.lua': `print('server')`,
+      'client.lua': `error('broken')`,
+    })
+    await init(syntax)
+    await init(client)
+    expect([(await test(syntax)).code, (await test(client)).code]).toEqual([1, 1])
   })
 })

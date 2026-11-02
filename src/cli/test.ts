@@ -107,7 +107,9 @@ async function runTests(
     return 2
   }
   if (paths.length === 0) {
-    host.stderr('fiverunner: there are no test files, whose names end in .test.lua\n')
+    host.stderr(
+      'fiverunner: there are no test files, whose names end in .test.lua: fiverunner init adds one\n',
+    )
     return 1
   }
   const start = host.now()
