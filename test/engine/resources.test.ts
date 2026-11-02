@@ -276,6 +276,24 @@ files { 'html/*', 'stream/**' }`,
     ])
   })
 
+  it('skip the scripts that asset escrow encrypted, and run the rest', async () => {
+    const proc = await createProcess()
+    proc
+      .add('a', { 'paid.lua': 'FXAP\x01\x00encrypted', 'config.lua': `print('config')` }, [
+        ['server_script', 'paid.lua'],
+        ['server_script', 'config.lua'],
+      ])
+      .start()
+    expect(proc.take()).toEqual([
+      '[citizen-scripting-core] Creating script environments for a',
+      '[script:a] config',
+      '[resources] Started resource a',
+    ])
+    expect(proc.diagnostics).toEqual([
+      'a: FiveRunner skips paid.lua, which asset escrow encrypted: only FiveM opens it.',
+    ])
+  })
+
   it('say which entries of their manifest have plural names, which FiveM does not read', async () => {
     const proc = await createProcess()
     proc.add('a', {

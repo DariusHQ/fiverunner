@@ -412,6 +412,13 @@ export class Resource {
       if (this.runtimes.length !== runtimes.length) break
       const runtime = path.includes('.lua') ? this.#runtime! : this.#javascript!
       const source = this.#openScript(path)
+      if (source !== undefined && isEscrowed(source)) {
+        this.manager.output.diagnose(
+          this.name,
+          `FiveRunner skips ${path}, which asset escrow encrypted: only FiveM opens it.`,
+        )
+        continue
+      }
       const loaded =
         source !== undefined && this.enter(() => runtime.runFile(path, source), runtime)
       if (!loaded) this.manager.trace('citizen-scripting-core', `Failed to load script ${path}.\n`)
@@ -580,4 +587,10 @@ function isStreamed(file: string): boolean {
   if (!file.startsWith('stream/') || dot === -1) return false
   const extension = file.slice(dot)
   return extension[1] === 'y' && extension !== '.ytyp'
+}
+
+/** Whether a script is what asset escrow leaves of one, which starts with these bytes. */
+function isEscrowed(source: string | Uint8Array): boolean {
+  const start = typeof source === 'string' ? source : String.fromCharCode(...source.subarray(0, 5))
+  return start.startsWith('FXAP\x01')
 }

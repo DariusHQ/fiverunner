@@ -14,7 +14,7 @@ FiveRunner follows FiveM's Windows server and its clients as closely as it can, 
 - `console` writes objects as JSON, as `util.format` and `util.inspect` do, where Node writes them in its own way.
 - Servers get of Node what resources ask of it, on FiveRunner's files and clock, and nothing of the machine: `require`, which reads the `main` of a `package.json` but not its `exports`, `process`, whose `platform` is `win32`, `Buffer`, `URL`, and modules such as `fs`, `path`, `events`, `stream`, `util` and `crypto`, which hashes and signs with MD5, SHA-1 and SHA-2 and encrypts nothing. Streams pass on what they get at once, with no buffers. What reaches the machine, such as `http.request`, `dns.lookup` or `child_process.spawn`, throws, and there is no `fetch`.
 - `net.connect` reaches only the port of the database of the server, 3306 or the one that `mysql_connection_string` names, whatever its host, where FiveRunner's database speaks the protocol of MariaDB to the drivers that resources carry, such as mysql2 and mysql, and takes any password. Other ports fail with `ECONNREFUSED`. All connections of drivers share one of the database, so their transactions are one, and packets of 16 MiB or more do not go through.
-- Scripts in C# do not run: FiveRunner skips them, with a diagnosis.
+- Scripts in C# do not run: FiveRunner skips them, with a diagnosis. So it does with the scripts that asset escrow encrypted, which only FiveM opens, so that the rest of their resources start, and the resources that need them go without.
 
 ## Console
 
