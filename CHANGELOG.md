@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.1.1](https://github.com/DariusHQ/fiverunner/releases/tag/v1.1.1) - 2026-11-02
+
+The first minutes of new users. The test that `fiverunner init` writes fails on scripts that do not load and on client scripts, and passes on QBCore, Qbox and ESX as they come. Players of tests get a license, as those of the dev UI do. Scripts under asset escrow are skipped with a clear word, and the dev UI and the playground fit on phones.
+
 ## [1.1.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.1.0) - 2026-11-01
 
 Tests report to the tools around them: coverage of Lua for lcov, JUnit for CI, and types for the Lua language server of editors. The inspector lists the keys that resources bind.
