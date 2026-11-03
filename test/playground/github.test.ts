@@ -366,6 +366,25 @@ exports.ox_target:addGlobalPed({})
     expect((await load('overextended/ox_lib')).loaded).toEqual(['overextended/ox_lib'])
   })
 
+  it('run ox_inventory with the framework of Qbox when nothing brings one', async () => {
+    const project = await loadProject(
+      parseRepository('overextended/ox_inventory')!,
+      [],
+      () => {},
+      github({
+        'overextended/ox_inventory': { 'fxmanifest.lua': MANIFEST },
+        'Qbox-project/qbx_core': { 'fxmanifest.lua': `${MANIFEST}provide 'qb-core'\n` },
+        'Qbox-project/qbx_vehicles': { 'fxmanifest.lua': MANIFEST },
+      }),
+    )
+    expect(project.loaded).toEqual([
+      'overextended/ox_inventory',
+      'Qbox-project/qbx_core',
+      'Qbox-project/qbx_vehicles',
+    ])
+    expect(project.files['server.cfg']).toContain('setr inventory:framework "qbx"\n')
+  })
+
   it('read no sources of the pages that repositories do not have built', async () => {
     const asked: string[] = []
     const read = await readRepository(

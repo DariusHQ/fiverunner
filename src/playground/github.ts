@@ -539,17 +539,28 @@ export async function loadProject(
     if (extra !== undefined) await load(parseRepository(extra)!)
   }
 
+  /** The repositories of what the resources loaded need, which the playground knows of and has not loaded. */
+  const stillNeeded = () =>
+    [...needs]
+      .sort()
+      .filter((need) => !names.has(need) && KNOWN[need] !== undefined)
+      .map((need) => parseRepository(KNOWN[need]!)!)
+      .filter((repository) => !loaded.includes(formatRepository(repository)))
   let pending: readonly Repository[] = [main, ...also]
   while (pending.length > 0) {
     for (const repository of pending) await load(repository)
     // A server brings what it needs; what other links need comes in rounds, as the resources loaded need more.
-    pending = own
-      ? []
-      : [...needs]
-          .sort()
-          .filter((need) => !names.has(need) && KNOWN[need] !== undefined)
-          .map((need) => parseRepository(KNOWN[need]!)!)
-          .filter((repository) => !loaded.includes(formatRepository(repository)))
+    pending = own ? [] : stillNeeded()
+    if (
+      pending.length === 0 &&
+      !own &&
+      names.has('ox_inventory') &&
+      !FRAMEWORKS.some((name) => names.has(name) || needs.has(name))
+    ) {
+      // With no framework, ox_inventory takes ESX's bridge and fails on its tables: it runs with Qbox's, as in Qbox's recipe.
+      needs.add('qbx_core')
+      pending = stillNeeded()
+    }
   }
   if (!own) {
     const ensured = startOrder(started, providers)
