@@ -314,6 +314,58 @@ ensure "shop"
     expect(project.files['server.cfg']).toContain('setr inventory:framework "qbx"\n')
   })
 
+  it('load the framework and the target that scripts use without saying so, but for bridges', async () => {
+    const load = (name: string) =>
+      loadProject(
+        parseRepository(name)!,
+        [],
+        () => {},
+        github({
+          'someone/job': {
+            'fxmanifest.lua': `${MANIFEST}client_scripts { 'client/*.lua' }\n`,
+            'client/main.lua': `local QBCore = exports['qb-core']:GetCoreObject()
+exports.ox_target:addGlobalPed({})
+-- exports['qb-target']:AddBoxZone()
+`,
+            // Nothing runs it.
+            'examples/esx.lua': `local ESX = exports.es_extended:getSharedObject()`,
+          },
+          'someone/bridge': {
+            'fxmanifest.lua': `${MANIFEST}server_scripts { 'bridge/**/*.lua' }\n`,
+            'bridge/qb.lua': `return exports["qb-core"]:GetCoreObject()`,
+            'bridge/esx/server.lua': `return exports.es_extended:getSharedObject()`,
+          },
+          'someone/qbox': {
+            'fxmanifest.lua': `${MANIFEST}dependency 'qbx_core'\nserver_script 'server.lua'\n`,
+            'server.lua': `local QBCore = exports['qb-core']:GetCoreObject()`,
+          },
+          // What the playground knows needs what it says, whatever the exports that its scripts use.
+          'overextended/ox_lib': {
+            'fxmanifest.lua': `${MANIFEST}client_script 'init.lua'\n`,
+            'init.lua': `exports.ox_target:addModel({})`,
+          },
+          'qbcore-fivem/qb-core': { 'fxmanifest.lua': MANIFEST },
+          'overextended/ox_target': { 'fxmanifest.lua': MANIFEST },
+          'Qbox-project/qbx_core': { 'fxmanifest.lua': `${MANIFEST}provide 'qb-core'\n` },
+          'overextended/ox_inventory': { 'fxmanifest.lua': MANIFEST },
+          'Qbox-project/qbx_vehicles': { 'fxmanifest.lua': MANIFEST },
+        }),
+      )
+    const job = await load('someone/job')
+    expect(job.loaded).toEqual(['someone/job', 'overextended/ox_target', 'qbcore-fivem/qb-core'])
+    expect(job.files['server.cfg']).toContain(
+      'ensure "qb-core"\nensure "ox_target"\nensure "job"\n',
+    )
+    expect((await load('someone/bridge')).loaded).toEqual(['someone/bridge'])
+    expect((await load('someone/qbox')).loaded).toEqual([
+      'someone/qbox',
+      'Qbox-project/qbx_core',
+      'overextended/ox_inventory',
+      'Qbox-project/qbx_vehicles',
+    ])
+    expect((await load('overextended/ox_lib')).loaded).toEqual(['overextended/ox_lib'])
+  })
+
   it('read no sources of the pages that repositories do not have built', async () => {
     const asked: string[] = []
     const read = await readRepository(

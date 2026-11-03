@@ -81,10 +81,26 @@ const INVENTORY_FRAMEWORKS: Readonly<Record<string, string>> = {
   es_extended: 'esx',
 }
 
-/** What resources need that their manifests do not say, such as the modules of others that their scripts require. */
+/** What the known resources need that their manifests do not say, such as the modules of others that their scripts require. */
 const IMPLIED: Readonly<Record<string, readonly string[]>> = {
   qbx_core: ['ox_inventory', 'qbx_vehicles'],
+  'qb-target': ['qb-core'],
+  'qb-menu': ['qb-core'],
 }
+
+/** The frameworks of servers, by the names of their resources. */
+const FRAMEWORKS: readonly string[] = ['qb-core', 'qbx_core', 'es_extended', 'ox_core', 'ND_Core']
+
+/**
+ * What scripts use through exports without their manifests saying so, in
+ * groups of resources that do the same: a resource of a repository that the
+ * playground does not know needs the one of a group that it uses. One that
+ * uses several is a bridge, whose config picks one, so it needs none of them.
+ */
+const ALTERNATIVES: readonly (readonly string[])[] = [FRAMEWORKS, ['ox_target', 'qb-target']]
+
+/** A use of the exports of a resource, exports['name'] or exports.name, with its name in the second or third group. */
+const EXPORTS = /\bexports\s*(?:\[\s*(['"])([\w-]+)\1\s*\]|\.\s*([A-Za-z_]\w*))/g
 
 /** What FiveRunner gives servers itself, which no repository needs to bring. */
 const BUILT_IN: readonly string[] = ['oxmysql']
@@ -186,6 +202,11 @@ function entriesOf(manifest: string, key: string): string[] {
   return found
 }
 
+/** Lua without its comments. */
+// shortcut: a string with -- in it loses the rest of its line, which costs at most an entry or an export unseen.
+const withoutComments = (lua: string) =>
+  lua.replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, '').replace(/--[^\n]*/g, '')
+
 /**
  * What a manifest says of its resource: the resources that it needs, by its
  * dependencies and the scripts of others that it loads, @name/file, the
@@ -197,8 +218,7 @@ export function readManifest(manifest: string): {
   provides: string[]
   page?: string
 } {
-  // shortcut: a string with -- in it loses the rest of its line, which the entries read here never have.
-  const text = manifest.replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, '').replace(/--[^\n]*/g, '')
+  const text = withoutComments(manifest)
   const needs = [...entriesOf(text, 'dependency'), ...entriesOf(text, 'dependencies')]
     .filter((need) => !need.startsWith('/'))
     .map((need) => need.split(/[\s:]/)[0]!)
@@ -209,6 +229,56 @@ export function readManifest(manifest: string): {
     provides: entriesOf(text, 'provide'),
     ...(page === undefined || page === '' || /^[a-z]+:/i.test(page) ? {} : { page }),
   }
+}
+
+/** The entries of manifests that name the files of their resources that run, or that their scripts load. */
+const RUN = ['client_script', 'server_script', 'shared_script', 'file'].flatMap((key) => [
+  key,
+  `${key}s`,
+])
+
+/** What the paths that a glob of a manifest names match: * in a directory, ** across them. */
+function globPattern(glob: string): RegExp {
+  const source = glob
+    .replace(/^(\.?\/)+/, '')
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*\*\/|\*\*|\*|\?/g, (wild) =>
+      wild === '**/' ? '(?:.*/)?' : wild === '**' ? '.*' : wild === '*' ? '[^/]*' : '[^/]',
+    )
+  return new RegExp(`^${source}$`)
+}
+
+/**
+ * What of ALTERNATIVES a resource needs, by what its manifest says that it
+ * needs, `needs`, and the exports that the Lua files that it names use, which
+ * leaves out examples and addons that nothing runs.
+ */
+function alternativesNeeded(
+  files: RepositoryFiles,
+  directory: string,
+  manifest: string,
+  needs: readonly string[],
+): string[] {
+  const text = withoutComments(manifest)
+  const runs = RUN.flatMap((key) => entriesOf(text, key))
+    .filter((entry) => !entry.startsWith('@'))
+    .map(globPattern)
+  const prefix = directory === '' ? '' : `${directory}/`
+  const used = new Set(needs)
+  for (const [path, data] of files) {
+    if (typeof data !== 'string' || !path.startsWith(prefix) || !/\.lua$/i.test(path)) continue
+    const own = path.slice(prefix.length)
+    if (!runs.some((pattern) => pattern.test(own))) continue
+    for (const [, , quoted, dotted] of withoutComments(data).matchAll(EXPORTS)) {
+      used.add(quoted ?? dotted!)
+    }
+  }
+  // qbx_core provides qb-core, whose exports the scripts of Qbox use too.
+  if (used.has('qbx_core')) used.delete('qb-core')
+  return ALTERNATIVES.flatMap((group) => {
+    const members = group.filter((name) => used.has(name))
+    return members.length === 1 ? members : []
+  })
 }
 
 /**
@@ -428,6 +498,7 @@ export async function loadProject(
       )
     }
     const read = await readRepository(repository, (done, of) => progress(label, done, of), request)
+    const known = Object.values(KNOWN).includes(formatRepository({ ...repository, ref: 'HEAD' }))
     loaded.push(label)
     left += read.left
     const placed = placeRepository(repository, read.files)
@@ -447,7 +518,11 @@ export async function loadProject(
     const place = (path: string) => (placed.at === '' ? path : `${placed.at}/${path}`)
     for (const [name, { directory, manifest }] of placed.resources) {
       const { needs: needed, provides, page } = readManifest(manifest)
-      const all = [...needed, ...(IMPLIED[name] ?? [])]
+      const all = [
+        ...needed,
+        ...(IMPLIED[name] ?? []),
+        ...(known ? [] : alternativesNeeded(read.files, directory, manifest, needed)),
+      ]
       for (const need of all) needs.add(need)
       started.set(name, all)
       for (const provided of [name, ...provides]) {
