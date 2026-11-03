@@ -1,12 +1,11 @@
 <p align="center">
-  <img src="src/dev/public/logo.svg" alt="" width="96" height="96">
+  <a href="https://dariushq.github.io/fiverunner/"><img src="docs/media/banner.gif" alt="FiveRunner, your FiveM server in a browser tab: npx fiverunner dev starts a city in a browser, where the cash of a player goes to her bank and back, her phone tells her of it, and a car leaves the garage" width="100%"></a>
 </p>
-
-<h1 align="center">FiveRunner</h1>
 
 <p align="center">Run FiveM resources in your browser and in CI.<br>No GTA V, no FXServer, no restarts.</p>
 
 <p align="center">
+  <a href="https://dariushq.github.io/fiverunner/"><img src="https://dariushq.github.io/fiverunner/badge.svg" alt="Run in FiveRunner"></a>
   <a href="https://www.npmjs.com/package/fiverunner"><img src="https://img.shields.io/npm/v/fiverunner" alt="Version on npm"></a>
   <a href="https://github.com/DariusHQ/fiverunner/actions/workflows/ci.yml"><img src="https://github.com/DariusHQ/fiverunner/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/DariusHQ/fiverunner/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/fiverunner" alt="License"></a>
@@ -14,23 +13,45 @@
 
 > Where a resource behaves differently than in FiveM, [tell us](https://github.com/DariusHQ/fiverunner/issues/new/choose).
 
-![The appearance editor of illenium-appearance on the screen of a player, over a cartoon meadow where her little character wears what the editor picks](docs/media/appearance.png)
+## Quick start
 
-**[Watch the demo](https://github.com/DariusHQ/fiverunner/releases/download/v0.9.0/fiverunner.mp4)** (122 seconds, with sound): the whole Stable recipe of Qbox for txAdmin, tested, then in the dev UI, where a player registers a character, dresses her in illenium-appearance, opens ox_inventory and the bank of Renewed-Banking, and is dragged across the map to a garage, where she takes her car out.
+**[Try it in your browser](https://dariushq.github.io/fiverunner/)**, with nothing to install: a small city, in Lua and JavaScript, that runs in the page. Edit its files, press Run, and walk around it. Or run [a resource of GitHub](#resources-of-github-in-your-browser) in it.
 
-**[Try it in your browser](https://dariushq.github.io/fiverunner/)**: a small city, in Lua and JavaScript, that runs in the page, with nothing to install. Edit its files, press Run, and walk around it.
+On your machine, with Node 22 or later, in the folder of a resource or of a server, the one with `server.cfg` and `resources`:
 
 ```bash
-npx fiverunner test
 npx fiverunner dev
 ```
 
-Run them with Node 22 or later, in the folder of a resource or of a server, the one with `server.cfg` and `resources`. A script that needs a framework runs in the folder of its server, next to the framework.
+Open the address that it prints, connect a player, and click through your NUI, as your files change. A script that needs a framework runs in the folder of its server, next to the framework. To test it on every push, add a test and a GitHub workflow, then run it:
+
+```bash
+npx fiverunner init
+npx fiverunner test
+```
+
+**[Watch the demo](https://github.com/DariusHQ/fiverunner/releases/download/v0.9.0/fiverunner.mp4)** (122 seconds, with sound): the whole Stable recipe of Qbox for txAdmin, tested, then in the dev UI, where a player registers a character, dresses her in illenium-appearance, opens ox_inventory and the bank of Renewed-Banking, and is dragged across the map to a garage, where she takes her car out.
+
+![The appearance editor of illenium-appearance on the screen of a player, over a cartoon meadow where her little character wears what the editor picks](docs/media/appearance.png)
 
 - **Real resources, as they are released.** The 43 resources of the Stable recipe of Qbox start on your machine in seconds: its core, its inventory, its garages, its bank, and its phone, which is JavaScript.
 - **Real NUIs.** Your pages run in a browser, and talk to your callbacks as they do in FiveM: the appearance editor, the inventory, the bank and the phone of the recipe work as players use them.
 - **Tests in CI.** Each test gets a server of its own, players, and a database in memory, and time moves as fast as it can.
 - **A world to look at.** Under the frames of NUI, the screen of each player shows the world round their ped, as a cartoon or in the style of GTA V, and the cartoon dresses them as your scripts do.
+
+## Resources of GitHub, in your browser
+
+The playground runs the resources and servers of GitHub too, which `?gh=` and the name of a repository after its address name, such as [overextended/ox_target](https://dariushq.github.io/fiverunner/?gh=overextended/ox_target), [qbcore-fivem/qb-core](https://dariushq.github.io/fiverunner/?gh=qbcore-fivem/qb-core) or [Qbox-project/qbx_core](https://dariushq.github.io/fiverunner/?gh=Qbox-project/qbx_core), with `@` and a branch or a tag after the name, and the directory of a resource after a slash. It reads them from GitHub with the resources that they need, as far as it knows where those are: ox_lib, ox_target and ox_inventory, qb-core, qb-target, qb-weapons, qb-menu and qb-input, qbx_core and qbx_vehicles, es_extended and the tables of ESX, and PolyZone. A link brings others with `&with=owner/repo`.
+
+Put its button in the README of your resource, and people run it with a click:
+
+[![Run in FiveRunner](https://dariushq.github.io/fiverunner/badge.svg)](https://dariushq.github.io/fiverunner/?gh=overextended/ox_target)
+
+```markdown
+[![Run in FiveRunner](https://dariushq.github.io/fiverunner/badge.svg)](https://dariushq.github.io/fiverunner/?gh=owner/repo)
+```
+
+The playground gives the Markdown of the button of each repository that it runs. [docs/differences.md](docs/differences.md#the-playground) tells what it leaves out.
 
 ## Testing resources
 
@@ -119,6 +140,10 @@ FiveRunner's scripting runtime is a clean-room implementation and contains no co
 ## Contributing
 
 Resources that behave differently than in FiveM help most. [CONTRIBUTING.md](CONTRIBUTING.md) tells how to report them, how to run FiveRunner from its source, and the rules of its clean room. [CHANGELOG.md](CHANGELOG.md) tells what each version brought.
+
+## Spread the word
+
+If FiveRunner saves you a restart, star it on GitHub: the stars of a project are how other FiveM developers find it.
 
 ## License
 
