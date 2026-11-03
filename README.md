@@ -5,7 +5,7 @@
 <p align="center">Run FiveM resources in your browser and in CI.<br>No GTA V, no FXServer, no restarts.</p>
 
 <p align="center">
-  <a href="https://dariushq.github.io/fiverunner/"><img src="https://dariushq.github.io/fiverunner/badge.svg" alt="Run in FiveRunner"></a>
+  <a href="https://dariushq.github.io/fiverunner/"><img src="docs/media/playground.svg" alt="Playground: try it online"></a>
   <a href="https://www.npmjs.com/package/fiverunner"><img src="https://img.shields.io/npm/v/fiverunner" alt="Version on npm"></a>
   <a href="https://github.com/DariusHQ/fiverunner/actions/workflows/ci.yml"><img src="https://github.com/DariusHQ/fiverunner/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/DariusHQ/fiverunner/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/fiverunner" alt="License"></a>
