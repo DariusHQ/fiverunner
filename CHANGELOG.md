@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.2.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.2.0) - 2026-11-03
+
+The playground runs repositories of GitHub from links, `?gh=owner/repo`, with the frameworks that they need, such as ox_lib, QBCore, Qbox and ESX, and gives the button of a README that opens them. `fiverunner init` writes a workflow that runs the new [action](https://github.com/DariusHQ/fiverunner-action) of FiveRunner. Players of the dev UI reach servers once their databases are open.
+
 ## [1.1.1](https://github.com/DariusHQ/fiverunner/releases/tag/v1.1.1) - 2026-11-02
 
 The first minutes of new users. The test that `fiverunner init` writes fails on scripts that do not load and on client scripts, and passes on QBCore, Qbox and ESX as they come. Players of tests get a license, as those of the dev UI do. Scripts under asset escrow are skipped with a clear word, and the dev UI and the playground fit on phones.
