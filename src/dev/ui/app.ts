@@ -26,7 +26,7 @@ function byId<T extends HTMLElement>(id: string): T {
 }
 
 /** Starts the dev UI on `platform`, in the page that has the elements of index.html. */
-export function startApp({ worker, frames, project: projectFiles, watch }: Platform): void {
+export function startApp({ worker, frames, project: given, watch }: Platform): void {
   const send = (message: ToWorker) => worker.postMessage(message)
 
   const status = byId<HTMLElement>('status')
@@ -239,8 +239,8 @@ export function startApp({ worker, frames, project: projectFiles, watch }: Platf
     events.note(why)
     for (const view of players.values()) view.element.remove()
     players.clear()
-    const files = projectFiles()
-    send({ type: 'start', ...(files === undefined ? {} : { files }) })
+    const next = given()
+    send({ type: 'start', ...(next === undefined ? {} : { project: next }) })
   }
 
   worker.addEventListener('message', (event: MessageEvent<FromWorker>) => {

@@ -271,6 +271,37 @@ export class Page {
       })
   }
 
+  /**
+   * Answers the requests of the page to the URLs that `patterns` match, as
+   * Chrome's patterns of the Fetch domain have them, with what `answer`
+   * gives for each, which any origin may read, in place of the network.
+   */
+  async intercept(
+    patterns: readonly string[],
+    answer: (url: string) => { readonly status: number; readonly body: string | Uint8Array },
+  ): Promise<void> {
+    this.#chrome.on('Fetch.requestPaused', (params, session) => {
+      if (session !== this.#session) return
+      const { requestId, request } = params as { requestId: string; request: { url: string } }
+      const { status, body } = answer(request.url)
+      void this.#chrome.send(
+        'Fetch.fulfillRequest',
+        {
+          requestId,
+          responseCode: status,
+          responseHeaders: [{ name: 'Access-Control-Allow-Origin', value: '*' }],
+          body: Buffer.from(body).toString('base64'),
+        },
+        this.#session,
+      )
+    })
+    await this.#chrome.send(
+      'Fetch.enable',
+      { patterns: patterns.map((urlPattern) => ({ urlPattern })) },
+      this.#session,
+    )
+  }
+
   /** Waits until `expression` is truthy in the page, or in its frames at `origin`, and returns what it was. */
   async until<T>(expression: string, origin?: string, timeout = 15000): Promise<T> {
     const start = Date.now()

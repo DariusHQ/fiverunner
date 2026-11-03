@@ -7,6 +7,10 @@ const path = (file: string) => fileURLToPath(new URL(file, import.meta.url))
 const DESCRIPTION =
   'A small FiveM city, in Lua and JavaScript, that runs in this page: edit its files, press Run, and walk around it. No GTA V, no FXServer.'
 
+/** Where visitors who like what they see go. */
+const STAR =
+  '<a class="star" href="https://github.com/DariusHQ/fiverunner" target="_blank" rel="noopener">&#9733; Star on GitHub</a>'
+
 /** What sites that show links read of the page. */
 const CARD = `
     <meta name="description" content="${DESCRIPTION}" />
@@ -39,7 +43,8 @@ export default defineConfig({
         handler: (html) =>
           html
             .replace('./ui/main.ts', '../playground/main.ts')
-            .replace('<title>FiveRunner</title>', `<title>FiveRunner playground</title>${CARD}`),
+            .replace('<title>FiveRunner</title>', `<title>FiveRunner playground</title>${CARD}`)
+            .replace('</button>\n    </header>', `</button>\n      ${STAR}\n    </header>`),
       },
     },
   ],

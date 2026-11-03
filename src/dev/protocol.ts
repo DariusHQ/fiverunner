@@ -15,10 +15,16 @@ export interface ProjectInfo {
   readonly commands: readonly string[]
 }
 
+/** A project that the dev UI has, which it gives its worker: its name, and its files by their paths, as text or bytes. */
+export interface GivenProject {
+  readonly name: string
+  readonly files: Readonly<Record<string, string | Uint8Array>>
+}
+
 /** What the dev UI asks of the worker that runs its engine. */
 export type ToWorker =
-  /** Starts a session of the project, or starts it anew with the players it had, if one runs, with these files, if the UI has them. */
-  | { readonly type: 'start'; readonly files?: Readonly<Record<string, string>> }
+  /** Starts a session of the project, or starts it anew with the players it had, if one runs, with this project, if the UI has one. */
+  | { readonly type: 'start'; readonly project?: GivenProject }
   | { readonly type: 'command'; readonly line: string }
   /** Files of the project changed, at these paths in it, or at paths that the dev server could not tell. */
   | { readonly type: 'change'; readonly paths: readonly string[] | null }

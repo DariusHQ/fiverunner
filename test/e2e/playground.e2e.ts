@@ -51,13 +51,15 @@ describe.skipIf(chromePath === undefined && process.env.CI === undefined)(
     let server: Server
     let chrome: Chrome
     let page: Page
+    let site: string
 
     beforeAll(async () => {
-      const site = await serve()
-      server = site.server
+      const served = await serve()
+      server = served.server
+      site = served.url
       chrome = await Chrome.launch(chromePath!)
       page = await chrome.open('about:blank')
-      await page.goto(site.url)
+      await page.goto(site)
     }, 60000)
 
     afterAll(() => {
@@ -123,6 +125,88 @@ describe.skipIf(chromePath === undefined && process.env.CI === undefined)(
         60000,
       )
     }, 90000)
+
+    it('runs the repository of GitHub that its link names, once its visitor says so', async () => {
+      const shop: Record<string, string> = {
+        'fxmanifest.lua': `fx_version 'cerulean'
+game 'gta5'
+server_script 'server.lua'
+client_script 'client.lua'
+ui_page 'html/index.html'
+file 'html/index.html'
+`,
+        'server.lua': `print('the shop opened')`,
+        'client.lua': `CreateThread(function() Wait(500) SendNUIMessage({ action = 'open' }) end)`,
+        'html/index.html': `<p id="shop">The shop</p><script>addEventListener('message', (event) => { document.getElementById('shop').textContent = event.data.action })</script>`,
+        'stream/sign.ytd': 'only the game reads this',
+      }
+      // A visitor who comes for the first time, whose page reads GitHub before the service worker of frames is there.
+      const fresh = await Chrome.launch(chromePath!)
+      try {
+        const repository = await fresh.open('about:blank')
+        await repository.intercept(
+          ['https://api.github.com/*', 'https://raw.githubusercontent.com/*'],
+          (url) => {
+            if (url === 'https://api.github.com/repos/someone/shop/git/trees/HEAD?recursive=1') {
+              const tree = Object.entries(shop).map(([path, text]) => ({
+                path,
+                type: 'blob',
+                size: text.length,
+              }))
+              return { status: 200, body: JSON.stringify({ tree, truncated: false }) }
+            }
+            const file = /^https:\/\/raw\.githubusercontent\.com\/someone\/shop\/HEAD\/(.+)$/.exec(
+              url,
+            )?.[1]
+            const text = file === undefined ? undefined : shop[file]
+            return text === undefined
+              ? { status: 404, body: 'Not Found' }
+              : { status: 200, body: text }
+          },
+        )
+        await repository.goto(`${site}?gh=someone/shop`)
+        expect(
+          await repository.until<string>(`document.querySelector('.gate h2')?.textContent`),
+        ).toBe('Run someone/shop')
+        expect(await repository.evaluate(`document.getElementById('status').textContent`)).toBe(
+          'Waiting',
+        )
+        await repository.evaluate(`document.querySelector('.gate button').click()`)
+        await repository.until(
+          `document.getElementById('status').textContent === 'Running'`,
+          undefined,
+          60000,
+        )
+        await repository.until(
+          `document.getElementById('console').innerText.includes('the shop opened')`,
+        )
+        expect(
+          await repository.evaluate(
+            `[...document.querySelectorAll('.editor nav button')].map((button) => button.textContent)`,
+          ),
+        ).toEqual([
+          'shop/client.lua',
+          'shop/fxmanifest.lua',
+          'shop/html/index.html',
+          'shop/server.lua',
+          'server.cfg',
+        ])
+        expect(
+          await repository.evaluate(`document.querySelector('.editor .hint').textContent`),
+        ).toContain('someone/shop from GitHub. It left out 1 file that')
+        expect(await repository.evaluate(`document.getElementById('project').textContent`)).toBe(
+          'shop',
+        )
+        await repository.evaluate(`(() => {
+        document.getElementById('player-name').value = 'Ann'
+        document.getElementById('connect').requestSubmit()
+      })()`)
+        await repository.until(`${inFrame('shop', 'shop')} === 'open'`, undefined, 30000)
+        expect(fresh.logged.filter(({ text }) => /^(error|exception)/.test(text))).toEqual([])
+      } finally {
+        fresh.close()
+      }
+    }, 120000)
 
     it('logs no errors', () => {
       const errors = chrome.logged.filter(({ text }) => /^(error|exception)/.test(text))

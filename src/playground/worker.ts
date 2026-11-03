@@ -6,8 +6,13 @@ import { runWorker } from '../dev/engine-worker.ts'
 runWorker({
   cfxlua: () => WebAssembly.compileStreaming(fetch(cfxluaUrl)),
   project: (given) => ({
-    info: { name: 'playground', kind: 'server', mount: '', commands: ['exec server.cfg'] },
-    files: () => new MemoryFileSystem(given ?? {}),
+    info: {
+      name: given?.name ?? 'playground',
+      kind: 'server',
+      mount: '',
+      commands: ['exec server.cfg'],
+    },
+    files: () => new MemoryFileSystem(given?.files ?? {}),
   }),
   http: fetchHttpClient,
 })

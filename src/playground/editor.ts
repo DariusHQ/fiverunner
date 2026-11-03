@@ -1,19 +1,36 @@
 /**
  * The editor of the playground: the files of its project, which the next
- * run takes as they are, with a box that shows the one picked.
+ * run takes as they are, with a box that shows the one picked. Files that
+ * are bytes, such as the pictures of pages, go with the rest, unshown.
  */
 export class Editor {
   readonly #original: Readonly<Record<string, string>>
+  readonly #bytes: Readonly<Record<string, Uint8Array>>
   #files: Record<string, string>
   #open: string
   readonly #list = document.createElement('nav')
   readonly #text = document.createElement('textarea')
 
-  /** Shows the editor at the start of `parent`, with `files`, the first of them open, and has `run` run them. */
-  constructor(parent: HTMLElement, files: Readonly<Record<string, string>>, run: () => void) {
-    this.#original = files
-    this.#files = { ...files }
-    this.#open = Object.keys(files)[0] ?? ''
+  /**
+   * Shows the editor at the start of `parent`, with `files`, the first that
+   * is text open, `tools` in its toolbar after its buttons, and has `run`
+   * run them.
+   */
+  constructor(
+    parent: HTMLElement,
+    files: Readonly<Record<string, string | Uint8Array>>,
+    tools: readonly Node[],
+    run: () => void,
+  ) {
+    const entries = Object.entries(files)
+    this.#original = Object.fromEntries(
+      entries.filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+    )
+    this.#bytes = Object.fromEntries(
+      entries.filter((entry): entry is [string, Uint8Array] => typeof entry[1] !== 'string'),
+    )
+    this.#files = { ...this.#original }
+    this.#open = Object.keys(this.#original)[0] ?? ''
     const section = document.createElement('section')
     section.className = 'editor'
     const toolbar = document.createElement('div')
@@ -31,15 +48,7 @@ export class Editor {
       this.#show(this.#open)
       run()
     })
-    const hint = document.createElement('span')
-    hint.className = 'hint'
-    hint.textContent =
-      'A small city, running in this page: connect a player, answer the card, and walk with W, A, S and D. Edit its files, then press Run. '
-    const link = document.createElement('a')
-    link.href = 'https://github.com/DariusHQ/fiverunner'
-    link.textContent = 'FiveRunner on GitHub'
-    hint.append(link)
-    toolbar.append(title, runButton, reset, hint)
+    toolbar.append(title, runButton, reset, ...tools)
     this.#text.spellcheck = false
     this.#text.ariaLabel = 'The file'
     this.#text.addEventListener('input', () => {
@@ -50,13 +59,13 @@ export class Editor {
     columns.append(this.#list, this.#text)
     section.append(toolbar, columns)
     parent.prepend(section)
-    this.#list.replaceChildren(...Object.keys(files).map((path) => this.#entry(path)))
+    this.#list.replaceChildren(...Object.keys(this.#original).map((path) => this.#entry(path)))
     this.#show(this.#open)
   }
 
-  /** The files as they are now. */
-  get files(): Readonly<Record<string, string>> {
-    return this.#files
+  /** The files as they are now, those of bytes too. */
+  get files(): Readonly<Record<string, string | Uint8Array>> {
+    return { ...this.#bytes, ...this.#files }
   }
 
   #entry(path: string): HTMLButtonElement {

@@ -121,6 +121,8 @@ The [playground](https://dariushq.github.io/fiverunner/) is the dev UI on a stat
 - Frames share the origin of the page, under `frames/`, as a static site has one origin, so their pages share their storage, and may reach the page and each other.
 - The project is in the memory of the page, where edits stay until it reloads, and nothing watches files: Run starts it anew.
 - The HTTP requests of scripts go out with `fetch` from the page, so sites must allow them with CORS.
+- Links to repositories of GitHub, `?gh=owner/repo`, run their sources as GitHub has them, which the page reads through GitHub's API, which lets a visitor list 60 repositories an hour without signing in. What only the game reads, in `stream/` directories, what is hidden, such as `.git` and the keys of asset escrow, `node_modules` and files over 8 MB stay out. So do the sources of pages that repositories build but do not have built: a page that shows nothing takes the place of each, as scripts such as ox_lib's wait for theirs.
+- A link to a resource, or to a directory of resources, runs in a server whose `server.cfg` the playground writes: it starts the resources after those that they need, by their manifests, the scripts of others that they load and what the playground knows of frameworks, with the name of a database for oxmysql, and the framework for ox_inventory. A link to a server runs its own `server.cfg`, with nothing besides.
 
 ## os and io (servers)
 

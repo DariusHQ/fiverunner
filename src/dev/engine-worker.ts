@@ -8,7 +8,7 @@ import sqliteUrl from '@sqlite.org/sqlite-wasm/sqlite3.wasm?url'
 
 import type { HttpClient, MemoryFileSystem } from '../core/engine/index.ts'
 import { answer } from './answers.ts'
-import type { FromWorker, ProjectInfo, ToWorker } from './protocol.ts'
+import type { FromWorker, GivenProject, ProjectInfo, ToWorker } from './protocol.ts'
 import { DevSession, type DevState } from './session.ts'
 
 /** How often the worker moves the clock of its session on: 60 times a second, as clients run their frames. */
@@ -21,8 +21,8 @@ const MAX_STEP = 1000
 export interface WorkerHost {
   /** Compiles cfxlua.wasm. */
   cfxlua(): Promise<WebAssembly.Module>
-  /** The project of a session, with `given`, the files that the UI has, if it has them, and what makes the files of its server. */
-  project(given: Readonly<Record<string, string>> | undefined): {
+  /** The project of a session, with `given`, the project that the UI has, if it has one, and what makes the files of its server. */
+  project(given: GivenProject | undefined): {
     readonly info: ProjectInfo
     readonly files: () => MemoryFileSystem
   }
@@ -47,7 +47,7 @@ let last = performance.now()
 /** Runs the worker on `host`. */
 export function runWorker(host: WorkerHost): void {
   /** Starts a session of a project, which takes the place of the one before it. */
-  async function start(given: Readonly<Record<string, string>> | undefined): Promise<void> {
+  async function start(given: GivenProject | undefined): Promise<void> {
     const id = ++generation
     const players = (state?.players ?? []).filter(
       (player) => player.state === 'connecting' || player.state === 'joined',
@@ -100,7 +100,7 @@ export function runWorker(host: WorkerHost): void {
     const message = event.data
     switch (message.type) {
       case 'start':
-        void start(message.files)
+        void start(message.project)
         break
       case 'command':
         session?.command(message.line)

@@ -1,4 +1,5 @@
 import type { Answer, Ask } from '../answers.ts'
+import type { GivenProject } from '../protocol.ts'
 
 /** How the frames of the screens of players are served. */
 export interface Frames {
@@ -17,8 +18,8 @@ export interface Platform {
   /** The worker that runs the engine. */
   readonly worker: Worker
   readonly frames: Frames
-  /** The files of the project that the next session runs, or undefined for those of the worker. */
-  project(): Readonly<Record<string, string>> | undefined
+  /** The project that the next session runs, or undefined for that of the worker. */
+  project(): GivenProject | undefined
   /** Calls `changed` as files of the project change, with their paths, or null if it cannot tell them. */
   watch(changed: (paths: readonly string[] | null) => void): void
 }
