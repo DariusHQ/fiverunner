@@ -141,6 +141,7 @@ describe('the files that the playground loads', () => {
             '[core]/es_extended/fxmanifest.lua': MANIFEST,
             '[core]/es_extended/stream/a.ytd': 'x',
             '[core]/es_extended/html/logo.png': new Uint8Array([1, 2]),
+            '[core]/es_extended/empty.lua': '',
           },
         },
         asked,
@@ -149,11 +150,14 @@ describe('the files that the playground loads', () => {
     expect([...read.files]).toEqual([
       ['fxmanifest.lua', MANIFEST],
       ['html/logo.png', new Uint8Array([1, 2])],
+      ['empty.lua', ''],
     ])
     expect(read.left).toBe(1)
     expect(asked).toContain(
       'https://raw.githubusercontent.com/esx-framework/esx_core/main/%5Bcore%5D/es_extended/html/logo.png',
     )
+    // The tree says what is empty, which needs no request.
+    expect(asked.filter((url) => url.endsWith('/empty.lua'))).toEqual([])
   })
 
   it('stop reading once a file fails, and tell nothing after it', async () => {

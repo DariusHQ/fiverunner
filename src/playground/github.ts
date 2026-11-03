@@ -398,6 +398,8 @@ export async function readRepository(
   }
   const prefix = path === '' ? '' : `${path}/`
   const wanted: string[] = []
+  /** The files that the tree says are empty, which need no request. */
+  const empty = new Set<string>()
   let left = 0
   let bytes = 0
   for (const entry of tree.tree) {
@@ -408,6 +410,7 @@ export async function readRepository(
       continue
     }
     wanted.push(relative)
+    if (entry.size === 0) empty.add(relative)
     bytes += entry.size ?? 0
   }
   if (wanted.length === 0)
@@ -425,6 +428,11 @@ export async function readRepository(
     const reader = async () => {
       while (next < list.length && !failed) {
         const file = list[next++]!
+        if (empty.has(file)) {
+          files.set(file, decodeFile(file, new Uint8Array()))
+          progress(files.size, total)
+          continue
+        }
         const url = `https://raw.githubusercontent.com/${owner}/${name}/${encodeURIComponent(ref)}/${encodePath(prefix + file)}`
         let got: Response
         try {
