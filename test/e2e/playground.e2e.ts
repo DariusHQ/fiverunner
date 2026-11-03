@@ -171,6 +171,14 @@ file 'html/index.html'
         expect(await repository.evaluate(`document.getElementById('status').textContent`)).toBe(
           'Waiting',
         )
+        // The forms of the dev UI under the card submit nothing before it starts, which would leave the link.
+        await repository.evaluate(`document.getElementById('connect').requestSubmit()`)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        expect(
+          await repository.evaluate(
+            `[location.search, document.querySelector('.gate h2')?.textContent]`,
+          ),
+        ).toEqual(['?gh=someone/shop', 'Run someone/shop'])
         await repository.evaluate(`document.querySelector('.gate button').click()`)
         await repository.until(
           `document.getElementById('status').textContent === 'Running'`,

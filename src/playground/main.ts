@@ -28,6 +28,8 @@ const city = Object.fromEntries(
 
 /** Runs the project of the link of the page, once its visitor says so, or the city. */
 async function run(): Promise<void> {
+  // The forms of the dev UI have no handlers until it starts, once a link is loaded, and would submit the page, which leaves the link.
+  document.addEventListener('submit', (event) => event.preventDefault())
   const main = document.querySelector('main')!
   const link = readLink(new URLSearchParams(location.search))
   if (link !== undefined && 'problem' in link) return showProblem(main, link.problem)
