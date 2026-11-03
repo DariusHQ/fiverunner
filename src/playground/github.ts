@@ -83,16 +83,22 @@ const INVENTORY_FRAMEWORKS: Readonly<Record<string, string>> = {
 
 /**
  * What server.cfg says for the resources that it starts, by their names:
- * the commands that frameworks run, which the recipes of txAdmin let them
- * run, and that ox_lib keeps its advice to servers that let clients change
- * state bags, which a server in a page has no use for.
+ * the commands that frameworks and ox_lib run, which the recipes of
+ * txAdmin let them run, and that ox_lib keeps its advice to servers that
+ * let clients change state bags, which a server in a page has no use for.
  */
 const SETTINGS: Readonly<Record<string, readonly string[]>> = {
   'qb-core': ['add_ace resource.qb-core command allow'],
+  qbx_core: ['add_ace resource.qbx_core command allow'],
   es_extended: ['add_ace', 'add_principal', 'remove_principal', 'stop'].map(
     (command) => `add_ace resource.es_extended command.${command} allow`,
   ),
-  ox_lib: ['set ox:ignoreSecurityAdvisory ["stateBagStrictMode"]'],
+  ox_lib: [
+    ...['add_ace', 'remove_ace', 'add_principal', 'remove_principal'].map(
+      (command) => `add_ace resource.ox_lib command.${command} allow`,
+    ),
+    'set ox:ignoreSecurityAdvisory ["stateBagStrictMode"]',
+  ],
 }
 
 /** What the known resources need that their manifests do not say, such as the modules of others that their scripts require. */

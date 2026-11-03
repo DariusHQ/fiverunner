@@ -319,6 +319,10 @@ describe('repositories laid out as servers', () => {
       .toBe(`# Written by the playground for someone/shop: it starts what it loaded, what the rest needs first.
 set mysql_connection_string "mysql://root@localhost/fiverunner"
 ensure oxmysql
+add_ace resource.ox_lib command.add_ace allow
+add_ace resource.ox_lib command.remove_ace allow
+add_ace resource.ox_lib command.add_principal allow
+add_ace resource.ox_lib command.remove_principal allow
 set ox:ignoreSecurityAdvisory ["stateBagStrictMode"]
 ensure "cfxlua-require"
 ensure "ox_lib"
@@ -343,6 +347,8 @@ ensure "shop"
       'Qbox-project/qbx_vehicles',
     ])
     expect(project.files['server.cfg']).toContain('setr inventory:framework "qbx"\n')
+    // The commands that Qbox runs, which its recipe for txAdmin lets it run.
+    expect(project.files['server.cfg']).toContain('add_ace resource.qbx_core command allow\n')
   })
 
   it('load the framework and the target that scripts use without saying so, but for bridges', async () => {
