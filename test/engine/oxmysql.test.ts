@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
+import { VariableFlags } from '../../src/core/console/variables.ts'
 import { format } from '../../src/core/db/sqlstring.ts'
 import type { JsValue } from '../../src/core/engine/javascript.ts'
 import {
@@ -159,6 +160,13 @@ async function server(): Promise<
   }
   let time = 0
   const proc = await createProcess({ database, timeZone: UTC, wallClock: () => NOW + time })
+  // Queries take the time of the machine, which a busy one stretches past the 200 ms of oxmysql's warning.
+  proc.manager.console.variables.define(
+    'mysql_slow_query_warning',
+    VariableFlags.none,
+    'int',
+    60000,
+  )
   return Object.assign(proc, {
     /** Ticks every 50 ms until a line has `until`, and gives the lines of the console but those of starts. */
     async run(until: string, ticks = 200): Promise<string[]> {
