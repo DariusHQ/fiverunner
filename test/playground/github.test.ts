@@ -156,6 +156,32 @@ describe('the files that the playground loads', () => {
     )
   })
 
+  it('stop reading once a file fails, and tell nothing after it', async () => {
+    const asked: string[] = []
+    const told: number[] = []
+    let release = () => {}
+    const later = new Promise<void>((resolve) => (release = resolve))
+    const paths = ['fxmanifest.lua', 'bad.lua', ...Array.from({ length: 30 }, (_, i) => `${i}.lua`)]
+    const slow: Fetcher = async (url) => {
+      asked.push(url)
+      if (url.includes('/git/trees/')) {
+        return Response.json({ tree: paths.map((path) => ({ path, type: 'blob', size: 1 })) })
+      }
+      if (url.endsWith('/fxmanifest.lua')) return new Response(MANIFEST)
+      if (url.endsWith('/bad.lua')) return new Response('', { status: 500 })
+      await later
+      return new Response('x')
+    }
+    await expect(
+      readRepository(parseRepository('a/b')!, (read) => told.push(read), slow),
+    ).rejects.toThrow(new RepositoryError('GitHub answered 500 for bad.lua of a/b.'))
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(told).toEqual([0, 1])
+    // The tree, the manifest, and the files that the readers had asked for when bad.lua failed.
+    expect(asked.length).toBeLessThan(2 + 12 + 1)
+  })
+
   it('say why GitHub gave none', async () => {
     const progress = () => {}
     await expect(readRepository(parseRepository('a/none')!, progress, github({}))).rejects.toThrow(

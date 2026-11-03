@@ -419,10 +419,11 @@ export async function readRepository(
   }
   const files = new Map<string, string | Uint8Array>()
   let total = wanted.length
+  let failed = false
   const readAll = async (list: readonly string[]) => {
     let next = 0
     const reader = async () => {
-      while (next < list.length) {
+      while (next < list.length && !failed) {
         const file = list[next++]!
         const url = `https://raw.githubusercontent.com/${owner}/${name}/${encodeURIComponent(ref)}/${encodePath(prefix + file)}`
         let got: Response
@@ -435,10 +436,16 @@ export async function readRepository(
           throw new RepositoryError(`GitHub answered ${got.status} for ${file} of ${label}.`)
         }
         files.set(file, decodeFile(file, new Uint8Array(await got.arrayBuffer())))
-        progress(files.size, total)
+        if (!failed) progress(files.size, total)
       }
     }
-    await Promise.all(Array.from({ length: Math.min(READERS, list.length) }, reader))
+    await Promise.all(Array.from({ length: Math.min(READERS, list.length) }, reader)).catch(
+      (error: unknown) => {
+        // The reads still under way take no more files, and tell nothing that would hide why this failed.
+        failed = true
+        throw error
+      },
+    )
   }
   progress(0, total)
   const manifests = wanted.filter((file) => /(^|\/)(fxmanifest|__resource)\.lua$/.test(file))
