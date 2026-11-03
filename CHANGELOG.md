@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.2.1](https://github.com/DariusHQ/fiverunner/releases/tag/v1.2.1) - 2026-11-03
+
+Links of the playground run more of the popular scripts of GitHub: those that use the exports of QBCore, Qbox, ESX, ox_target or qb-target without their manifests naming them get them, and ox_inventory alone runs with Qbox. Laid out as their links lay them out, 5 more of the 80 most starred FiveM repositories pass the test that `fiverunner init` writes.
+
 ## [1.2.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.2.0) - 2026-11-03
 
 The playground runs repositories of GitHub from links, `?gh=owner/repo`, with the frameworks that they need, such as ox_lib, QBCore, Qbox and ESX, and gives the button of a README that opens them. `fiverunner init` writes a workflow that runs the new [action](https://github.com/DariusHQ/fiverunner-action) of FiveRunner. Players of the dev UI reach servers once their databases are open.
