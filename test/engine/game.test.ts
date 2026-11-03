@@ -71,14 +71,17 @@ DisablePlayerFiring(PlayerId(), true)
 SetPlayerHealthRechargeMultiplier(PlayerId(), 0.0)
 SetPlayerHealthRechargeLimit(PlayerId(), 0.5)
 print(IsPauseMenuActive(), GetAspectRatio(false), StartAudioScene('x'), RequestScriptAudioBank('x', false, -1), IsPedBeingStunned(PlayerPedId(), 0))
-print(CreateAudioSubmix('a'), CreateAudioSubmix('b'), GetGameBuildNumber(), PrepareAlarm('x'), GetDisplayNameFromVehicleModel(GetHashKey('adder')))
+print(CreateAudioSubmix('a'), CreateAudioSubmix('b'), GetGameBuildNumber(), PrepareAlarm('x'), GetDisplayNameFromVehicleModel(GetHashKey('adder')), GetDisplayNameFromVehicleModel(0), GetDisplayNameFromVehicleModel(GetHashKey('mp_m_freemode_01')))
 print(GetPedParachuteState(PlayerPedId()), IsEntityInWater(PlayerPedId()), GetPlayerSprintStaminaRemaining(PlayerId()), IsPlayerSwitchInProgress(), IsPlayerTeleportActive())
-print(IsPedSwimming(PlayerPedId()), TriggerScreenblurFadeIn(50.0), IsScreenblurFadeRunning(), TriggerScreenblurFadeOut(50.0))`),
+print(IsPedSwimming(PlayerPedId()), TriggerScreenblurFadeIn(50.0), IsScreenblurFadeRunning(), TriggerScreenblurFadeOut(50.0))
+AddTextEntryByHash(joaat(GetDisplayNameFromVehicleModel(\`adder\`)), 'Adder')
+print(GetLabelText(GetDisplayNameFromVehicleModel(\`adder\`)))`),
     ).toEqual([
       'false\t1.7777777910233\t1\t1\tfalse',
-      '0\t1\t2944\t1\tCARNOTFOUND',
+      '0\t1\t2944\t1\tB779A091\tCARNOTFOUND\tCARNOTFOUND',
       '-1\tfalse\t0.0\tfalse\tfalse',
       'false\t1\tfalse\t1',
+      'Adder',
     ])
     expect(test.client.diagnostics).toEqual([])
   })

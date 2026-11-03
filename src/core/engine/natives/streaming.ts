@@ -153,7 +153,8 @@ export function streamingNatives(side: Side): NativeDefinition<NativeContext>[] 
     ),
     isOfType('IS_MODEL_A_VEHICLE', 0x19aac8f07bfec53en, EntityType.vehicle, 'IsModelAVehicle'),
     isOfType('_IS_MODEL_A_PED', 0x75816577fea6dad5n, EntityType.ped, 'IsModelAPed'),
-    // FiveRunner has no vehicles.meta, so it finds the name of no model, as GTA V finds none of those it does not have.
+    // FiveRunner has no vehicles.meta, so the models of its CD image are named by their hashes, which scripts such as
+    // qbx_core give labels to, and those that are no vehicles, 0 and peds, are not found, as GTA V finds none.
     defineNative(
       {
         name: 'GET_DISPLAY_NAME_FROM_VEHICLE_MODEL',
@@ -161,7 +162,10 @@ export function streamingNatives(side: Side): NativeDefinition<NativeContext>[] 
         result: 'char*',
         params: ['Hash modelHash'],
       },
-      () => 'CARNOTFOUND',
+      (ctx: NativeContext, model) =>
+        model === 0 || ctx.manager.world!.kindOf(model) === EntityType.ped
+          ? 'CARNOTFOUND'
+          : (model >>> 0).toString(16).toUpperCase().padStart(8, '0'),
     ),
     // GTA V keeps the models it no longer needs until it wants their memory, which FiveRunner never does.
     defineNative(
