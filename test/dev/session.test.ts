@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem, type HttpClient } from '../../src/core/engine/index.ts'
 import type { WatchdogOptions } from '../../src/core/lua/index.ts'
 import { DevSession, type DevEvent, type DevState } from '../../src/dev/session.ts'
+import { sqlite } from '../db/helpers.ts'
 import { cfxlua } from '../lua/helpers.ts'
 
 const offline: HttpClient = async () => ({ code: 7, message: 'offline' })
@@ -199,6 +200,34 @@ describe('Dev sessions', () => {
     await session.connect({ name: 'Ann' })
     session.advance(1000)
     expect(printed(told())).toContain('client 1: [script:bank] sunny')
+  })
+
+  it('connect players once the databases of their servers are open, which takes the time of the host', async () => {
+    const files = {
+      'resources/bank/fxmanifest.lua': `fx_version 'cerulean'
+game 'gta5'
+server_scripts { '@oxmysql/lib/MySQL.lua', 'server.lua' }
+`,
+      'resources/bank/server.lua': `local open = false
+MySQL.ready(function() open = true end)
+AddEventHandler('playerConnecting', function() print('open', open) end)`,
+    }
+    const events: DevEvent[] = []
+    const session = await DevSession.start({
+      cfxlua: await cfxlua(),
+      sqlite: await sqlite(),
+      project: {
+        files: () => new MemoryFileSystem(files),
+        commands: ['ensure oxmysql', 'ensure bank'],
+      },
+      http: offline,
+      onEvent: (event) => events.push(event),
+    })
+    await session.connect({ name: 'Ann' })
+    session.advance(100)
+    expect(printed(events).filter((line) => line.includes('open'))).toEqual([
+      'server: [script:bank] open\ttrue',
+    ])
   })
 
   it('connect players, whose NUI they tell of, and quit them', async () => {

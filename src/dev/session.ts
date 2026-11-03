@@ -10,6 +10,7 @@ import {
   type PlayerState,
   type ResourceManager,
   type ResourceState,
+  SERVER_FRAME_TIME,
   SERVER_NET_ID,
   sqliteDatabase,
 } from '../core/engine/index.ts'
@@ -132,16 +133,21 @@ export class DevSession {
   #told = ''
   /** The descriptions of the values of the keys of state bags, by the bytes that bags keep, which they replace as keys change. */
   readonly #values = new WeakMap<Uint8Array, string>()
+  /** What the server opens as it runs, such as its database, which takes the time of the host. */
+  readonly #opening: Promise<unknown>[]
   #crash: string | undefined
 
-  private constructor(engine: Engine, options: DevSessionOptions) {
+  private constructor(engine: Engine, options: DevSessionOptions, opening: Promise<unknown>[]) {
     this.#engine = engine
     this.#options = options
+    this.#opening = opening
   }
 
   /** Starts the server of a session: it scans the resources of the project, then runs its commands. */
   static async start(options: DevSessionOptions): Promise<DevSession> {
     const output = new LineOutput((line) => options.onEvent({ type: 'output', line }))
+    const opening: Promise<unknown>[] = []
+    const sqlite = options.sqlite === undefined ? undefined : sqliteDatabase(options.sqlite)
     const engine = await Engine.create({
       cfxlua: options.cfxlua,
       ...(options.quickjs === undefined ? {} : { quickjs: options.quickjs }),
@@ -150,10 +156,18 @@ export class DevSession {
         files: options.project.files(),
         http: options.http,
         watchdog: options.watchdog ?? WATCHDOG,
-        ...(options.sqlite === undefined ? {} : { database: sqliteDatabase(options.sqlite) }),
+        ...(sqlite === undefined
+          ? {}
+          : {
+              database: (database) => {
+                const opened = sqlite(database)
+                opening.push(opened)
+                return opened
+              },
+            }),
       },
     })
-    const session = new DevSession(engine, options)
+    const session = new DevSession(engine, options, opening)
     engine.server.events.onTrigger.connect((name, payload, source) => {
       // The events of clients come from net: and the net ids of their players.
       const id = /^net:(\d+)$/.exec(source)?.[1]
@@ -227,8 +241,12 @@ export class DevSession {
    * process is named by: client 1, client 2 and on.
    */
   async connect(identity: PlayerIdentity = {}): Promise<number> {
-    const { now } = this.#engine.clock
-    if (now < STARTUP) this.advance(STARTUP - now)
+    // Frame by frame, as what the server opens meanwhile, such as its database, opens by the next frame.
+    while (this.#engine.clock.now < STARTUP && this.#crash === undefined) {
+      await Promise.allSettled(this.#opening.splice(0))
+      this.advance(Math.min(SERVER_FRAME_TIME, STARTUP - this.#engine.clock.now))
+    }
+    await Promise.allSettled(this.#opening.splice(0))
     const watchdog = this.#options.watchdog ?? WATCHDOG
     const identifiers = identity.identifiers ?? [licenseOf(identity.name)]
     const { client, player } = await this.#engine.connect(
