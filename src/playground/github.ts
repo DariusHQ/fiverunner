@@ -81,6 +81,20 @@ const INVENTORY_FRAMEWORKS: Readonly<Record<string, string>> = {
   es_extended: 'esx',
 }
 
+/**
+ * What server.cfg says for the resources that it starts, by their names:
+ * the commands that frameworks run, which the recipes of txAdmin let them
+ * run, and that ox_lib keeps its advice to servers that let clients change
+ * state bags, which a server in a page has no use for.
+ */
+const SETTINGS: Readonly<Record<string, readonly string[]>> = {
+  'qb-core': ['add_ace resource.qb-core command allow'],
+  es_extended: ['add_ace', 'add_principal', 'remove_principal', 'stop'].map(
+    (command) => `add_ace resource.es_extended command.${command} allow`,
+  ),
+  ox_lib: ['set ox:ignoreSecurityAdvisory ["stateBagStrictMode"]'],
+}
+
 /** What the known resources need that their manifests do not say, such as the modules of others that their scripts require. */
 const IMPLIED: Readonly<Record<string, readonly string[]>> = {
   qbx_core: ['ox_inventory', 'qbx_vehicles'],
@@ -589,6 +603,7 @@ export async function loadProject(
       ...(names.has('ox_inventory') && framework !== undefined
         ? [`setr inventory:framework "${INVENTORY_FRAMEWORKS[framework]}"`]
         : []),
+      ...ensured.flatMap((name) => SETTINGS[name] ?? []),
       ...ensured.map((name) => `ensure "${name}"`),
       '',
     ].join('\n')

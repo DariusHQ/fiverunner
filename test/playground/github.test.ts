@@ -319,6 +319,7 @@ describe('repositories laid out as servers', () => {
       .toBe(`# Written by the playground for someone/shop: it starts what it loaded, what the rest needs first.
 set mysql_connection_string "mysql://root@localhost/fiverunner"
 ensure oxmysql
+set ox:ignoreSecurityAdvisory ["stateBagStrictMode"]
 ensure "cfxlua-require"
 ensure "ox_lib"
 ensure "shop"
@@ -384,7 +385,7 @@ exports.ox_target:addGlobalPed({})
     const job = await load('someone/job')
     expect(job.loaded).toEqual(['someone/job', 'overextended/ox_target', 'qbcore-fivem/qb-core'])
     expect(job.files['server.cfg']).toContain(
-      'ensure "qb-core"\nensure "ox_target"\nensure "job"\n',
+      'add_ace resource.qb-core command allow\nensure "qb-core"\nensure "ox_target"\nensure "job"\n',
     )
     expect((await load('someone/bridge')).loaded).toEqual(['someone/bridge'])
     expect((await load('someone/qbox')).loaded).toEqual([
@@ -455,6 +456,12 @@ exports.ox_target:addGlobalPed({})
       'esx-framework/esx_core/[SQL]',
     ])
     expect(Object.keys(esx.files)).toContain('resources/legacy.sql')
+    // The commands that ESX runs, which its recipe for txAdmin lets it run.
+    expect(esx.files['server.cfg']).toContain(`add_ace resource.es_extended command.add_ace allow
+add_ace resource.es_extended command.add_principal allow
+add_ace resource.es_extended command.remove_principal allow
+add_ace resource.es_extended command.stop allow
+`)
     const server = await loadProject(
       parseRepository('someone/server')!,
       [],
