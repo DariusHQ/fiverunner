@@ -667,6 +667,12 @@ function fiverunner.output()
     return ask('output')
 end
 
+-- The events that the resources of the server handle, as { name, resources },
+-- in the order they first registered for them, those of tests left out.
+function fiverunner.events()
+    return ask('events')
+end
+
 -- Calls `check` at each tick until it returns something truthy, and
 -- returns that, or fails the test once `timeout` milliseconds went by.
 function fiverunner.waitFor(check, timeout)

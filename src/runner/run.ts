@@ -423,6 +423,16 @@ class World<T> {
           .map((received) => unpackObject(received.payload))
         return packObject({ type: 'array', items })
       }
+      case 'events':
+        return pack(
+          this.engine.server.events
+            .registered()
+            .map(([name, resources]) => ({
+              name,
+              resources: resources.filter((resource) => resource !== TEST_RESOURCE),
+            }))
+            .filter(({ resources }) => resources.length > 0),
+        )
       case 'output': {
         const { id } = fields(args)
         const process = id === undefined ? 'server' : this.#connectionOf(count(id)).process

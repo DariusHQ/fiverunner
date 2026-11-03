@@ -76,6 +76,11 @@ export class EventManager {
     else if (!resources.includes(resource)) resources.unshift(resource)
   }
 
+  /** The events that resources registered for, in the order they first did, with those resources, newest first. */
+  registered(): [event: string, resources: string[]][] {
+    return [...this.#resources].map(([event, resources]) => [event, [...resources]])
+  }
+
   /**
    * Triggers an event now and returns whether it was not canceled. `source`
    * is "" for events of the process itself, and `target`, when given, is the

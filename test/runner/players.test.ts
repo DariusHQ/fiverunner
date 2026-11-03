@@ -220,6 +220,23 @@ warn('careful')`,
     expect(outcomes(result)).toEqual([['prints', 'passed']])
   })
 
+  it('list the events that the resources of the server handle, but those of tests', async () => {
+    const result = await run(
+      `it('lists', function()
+    AddEventHandler('mine', function() end)
+    AddEventHandler('bank:deposit', function() end)
+    local events = {}
+    for _, event in ipairs(fiverunner.events()) do events[event.name] = table.concat(event.resources, ',') end
+    expect(events['bank:deposit']).toBe('bank')
+    expect(events['bank:audit']).toBe('bank')
+    expect(events.mine).toBe(nil)
+end)`,
+      bank(`RegisterNetEvent('bank:deposit', function() end)
+AddEventHandler('bank:audit', function() end)`),
+    )
+    expect(outcomes(result)).toEqual([['lists', 'passed']])
+  })
+
   it('waits for checks to come true', async () => {
     const result = await run(`it('waits', function()
     local runs = 0

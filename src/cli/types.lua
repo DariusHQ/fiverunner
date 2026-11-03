@@ -106,6 +106,10 @@ function fiverunner.connect(identity) end
 ---@return string[]
 function fiverunner.output() end
 
+--- The events that the resources of the server handle, in the order they first registered for them, those of tests left out.
+---@return { name: string, resources: string[] }[]
+function fiverunner.events() end
+
 --- Calls `check` at each tick until it returns something truthy, and returns that.
 ---@generic T
 ---@param check fun(): T

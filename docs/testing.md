@@ -123,6 +123,7 @@ local x, y = ann:run('local a, b = ... return a + b, GetCurrentResourceName()', 
 ## Helpers
 
 - `fiverunner.output()` gives what the server printed, line by line, as `[channel] text`, without colors.
+- `fiverunner.events()` gives the events that the resources of the server handle, as `{ name, resources }`, in the order they first registered for them, without those of tests. Those that `RegisterNetEvent` marked are the ones that clients can trigger.
 - `fiverunner.waitFor(check, timeout)` calls `check` at each tick until it returns something truthy, and returns that. With a `timeout`, in milliseconds, it fails the test once that much time went by.
 
 ```lua
