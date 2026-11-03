@@ -17,7 +17,7 @@ const CARD = `
     <meta property="og:title" content="FiveRunner playground" />
     <meta property="og:description" content="${DESCRIPTION}" />
     <meta property="og:url" content="https://dariushq.github.io/fiverunner/" />
-    <meta property="og:image" content="https://raw.githubusercontent.com/DariusHQ/fiverunner/main/docs/media/banner.png" />
+    <meta property="og:image" content="https://raw.githubusercontent.com/DariusHQ/fiverunner/main/docs/media/social.png" />
     <meta name="twitter:card" content="summary_large_image" />`
 
 /**
