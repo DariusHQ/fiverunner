@@ -177,7 +177,7 @@ It exits with 0 when the tests passed, 1 when any failed, a test file did not lo
 
 ## GitHub Actions
 
-On GitHub Actions, `fiverunner test` also annotates each failure at its line. A workflow that runs the tests of a resource on each push:
+On GitHub Actions, `fiverunner test` also annotates each failure at its line. A workflow that runs the tests of a resource on each push, with [FiveRunner's action](https://github.com/DariusHQ/fiverunner-action), which `fiverunner init` writes:
 
 ```yaml
 name: Tests
@@ -189,10 +189,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - run: npx fiverunner test
+      - uses: DariusHQ/fiverunner-action@v1
 ```
 
-FiveRunner needs Node 22 or later.
+The action takes the folder of the project as `path`, and what `fiverunner test` gets as `args`, such as `--junit report.xml`. Elsewhere, run `npx fiverunner test` with Node 22 or later.

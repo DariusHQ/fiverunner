@@ -27,10 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - run: npx fiverunner test
+      - uses: DariusHQ/fiverunner-action@v1
 `
 
 /** Where the types of tests go, which the settings of the Lua language server name. */

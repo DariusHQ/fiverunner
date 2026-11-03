@@ -470,7 +470,7 @@ describe('fiverunner init', () => {
       (await init(server)).stdout,
       (await init(broken)).code,
       readFileSync(join(resource, '.github/workflows/fiverunner.yml'), 'utf8').includes(
-        'npx fiverunner test',
+        'uses: DariusHQ/fiverunner-action@v1',
       ),
       readFileSync(join(resource, '.fiverunner/fiverunner.lua'), 'utf8').startsWith('---@meta'),
       JSON.parse(readFileSync(join(resource, '.luarc.json'), 'utf8'))['workspace.library'],
