@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.2.2](https://github.com/DariusHQ/fiverunner/releases/tag/v1.2.2) - 2026-11-04
+
+Players of Qbox join without a warning for each of its 901 vehicles, as FiveRunner names vehicle models by their hashes, which Qbox gives labels to. Links of the playground run ESX with the tables of its recipe, give QBCore, Qbox, ESX and ox_lib the commands that their recipes give them, keep the link when the forms under its card are used, and tell why reading a repository failed.
+
 ## [1.2.1](https://github.com/DariusHQ/fiverunner/releases/tag/v1.2.1) - 2026-11-03
 
 Links of the playground run more of the popular scripts of GitHub: those that use the exports of QBCore, Qbox, ESX, ox_target or qb-target without their manifests naming them get them, and ox_inventory alone runs with Qbox. Laid out as their links lay them out, 5 more of the 80 most starred FiveM repositories pass the test that `fiverunner init` writes.
