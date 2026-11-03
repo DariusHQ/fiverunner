@@ -158,6 +158,7 @@ export function aboutProject(project: Project, link: Link, base: string): Node[]
       `Nothing here has ${project.missing.join(', ')}, which its resources need: add them to the link with &with=owner/repo. `,
     )
   }
+  hint.append('Connect a player to run its client scripts and their pages. ')
   const copy = element('button', 'Copy a badge for its README')
   copy.type = 'button'
   copy.addEventListener('click', async () => {

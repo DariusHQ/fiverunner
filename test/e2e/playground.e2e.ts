@@ -202,6 +202,9 @@ file 'html/index.html'
         expect(
           await repository.evaluate(`document.querySelector('.editor .hint').textContent`),
         ).toContain('someone/shop from GitHub. It left out 1 file that')
+        expect(
+          await repository.evaluate(`document.querySelector('.editor .hint').textContent`),
+        ).toContain('Connect a player to run its client scripts and their pages.')
         expect(await repository.evaluate(`document.getElementById('project').textContent`)).toBe(
           'shop',
         )
