@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://dariushq.github.io/fiverunner/"><img src="docs/media/banner.gif" alt="FiveRunner, your FiveM server in a browser tab: npx fiverunner dev starts a city in a browser, where the cash of a player goes to her bank and back, her phone tells her of it, and a car leaves the garage" width="100%"></a>
+  <a href="https://dariushq.github.io/fiverunner/"><picture><source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/DariusHQ/fiverunner/main/docs/media/banner.png"><img src="docs/media/banner.gif" alt="FiveRunner, your FiveM server in a browser tab: npx fiverunner dev starts a city in a browser, where the cash of a player goes to her bank and back, her phone tells her of it, and a car leaves the garage" width="100%"></picture></a>
 </p>
 
 <p align="center">Run FiveM resources in your browser and in CI.<br>No GTA V, no FXServer, no restarts.</p>
