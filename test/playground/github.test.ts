@@ -452,7 +452,8 @@ exports.ox_target:addGlobalPed({})
         'someone/job': { 'fxmanifest.lua': `${MANIFEST}dependency 'es_extended'\n` },
         'esx-framework/esx_core': {
           '[core]/es_extended/fxmanifest.lua': MANIFEST,
-          '[SQL]/legacy.sql': 'CREATE TABLE users (identifier VARCHAR(60));',
+          '[core]/es_extended/es_extended.sql': 'CREATE TABLE users (identifier VARCHAR(60));',
+          '[SQL]/legacy.sql': 'CREATE TABLE users (identifier VARCHAR(60), skin LONGTEXT);',
         },
       }),
     )
@@ -461,7 +462,11 @@ exports.ox_target:addGlobalPed({})
       'esx-framework/esx_core/[core]/es_extended',
       'esx-framework/esx_core/[SQL]',
     ])
-    expect(Object.keys(esx.files)).toContain('resources/legacy.sql')
+    // The tables of the recipe take the place of those of es_extended, as the recipe runs only its own.
+    expect(Object.keys(esx.files).filter((path) => path.endsWith('.sql'))).toEqual([
+      'resources/legacy.sql',
+    ])
+    expect(esx.left).toBe(1)
     // The commands that ESX runs, which its recipe for txAdmin lets it run.
     expect(esx.files['server.cfg']).toContain(`add_ace resource.es_extended command.add_ace allow
 add_ace resource.es_extended command.add_principal allow

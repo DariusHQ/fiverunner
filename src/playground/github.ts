@@ -58,9 +58,16 @@ export const KNOWN: Readonly<Record<string, string>> = {
   PolyZone: 'mkafrin/PolyZone',
 }
 
-/** What comes with a known repository that is no resource, such as the tables of ESX. */
-const WITH: Readonly<Record<string, string>> = {
-  'esx-framework/esx_core/[core]/es_extended': 'esx-framework/esx_core/[SQL]',
+/**
+ * What comes with a known repository that is no resource, such as the
+ * tables of ESX's recipe for txAdmin, and the file of its own that this
+ * takes the place of, which the recipe runs in place of es_extended's.
+ */
+const WITH: Readonly<Record<string, { readonly repository: string; readonly replaces: string }>> = {
+  'esx-framework/esx_core/[core]/es_extended': {
+    repository: 'esx-framework/esx_core/[SQL]',
+    replaces: 'es_extended.sql',
+  },
 }
 
 /**
@@ -543,7 +550,12 @@ export async function loadProject(
         `${label} has no FiveM resource: no fxmanifest.lua or __resource.lua, and no resources directory.`,
       )
     }
+    const extra = WITH[label]
     for (const [path, data] of read.files) {
+      if (path === extra?.replaces) {
+        left++
+        continue
+      }
       const target = placed.at === '' ? path : `${placed.at}/${path}`
       if (Object.hasOwn(files, target)) {
         throw new RepositoryError(`${label} has ${target}, which another repository has too.`)
@@ -570,8 +582,7 @@ export async function loadProject(
         unbuilt.push(name)
       }
     }
-    const extra = WITH[label]
-    if (extra !== undefined) await load(parseRepository(extra)!)
+    if (extra !== undefined) await load(parseRepository(extra.repository)!)
   }
 
   /** The repositories of what the resources loaded need, which the playground knows of and has not loaded. */
