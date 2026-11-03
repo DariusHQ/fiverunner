@@ -153,6 +153,49 @@ The clock of the server of a test moves only as FiveRunner moves it, frame by fr
 
 The rest is FiveRunner's engine, which follows FiveM's server and clients as [docs/differences.md](differences.md) says. Natives that FiveRunner does not implement do nothing and return zero values, and tests say so in their output when they fail.
 
+## Frameworks
+
+Test resources that need a framework in the folder of a server that has it, as the recipe of txAdmin lays it out. Players join as they join servers, so a framework knows them, but they have a character only once its character menu, or the test, logs them in. Connect them once the server started, as players join started servers, then:
+
+- **Qbox**: `exports.qbx_core:Login` creates a character and logs the player in with it.
+- **QBCore**: the page of qb-multicharacter creates characters, which a test reaches with `player:nuiCallback`.
+- **ESX**: without esx_multicharacter, ESX logs players in as they join, and marks them as spawned.
+
+```lua
+-- Qbox
+local function login(name)
+    while GetGameTimer() < 1000 do Wait(100) end
+    local player = fiverunner.connect({ name = name })
+    expect(exports.qbx_core:Login(player.id, nil, {
+        charinfo = { firstname = 'Ann', lastname = 'Lee', birthdate = '1990-01-01', gender = 0, nationality = 'Romania' },
+    })).toBe(true)
+    return player
+end
+
+-- QBCore, with qb-multicharacter
+local function login(name)
+    while GetGameTimer() < 3000 do Wait(100) end
+    local player = fiverunner.connect({ name = name })
+    player:nuiCallback('qb-multicharacter', 'createNewCharacter', {
+        firstname = 'Ann', lastname = 'Lee', nationality = 'Romania', birthdate = '1990-01-01', gender = 'Female', cid = 1,
+    })
+    fiverunner.waitFor(function() return exports['qb-core']:GetCoreObject().Functions.GetPlayer(player.id) end, 10000)
+    return player
+end
+
+-- ESX
+local function login(name)
+    local player = fiverunner.connect({ name = name })
+    fiverunner.waitFor(function()
+        local xPlayer = exports.es_extended:getSharedObject().GetPlayerFromId(player.id)
+        return xPlayer and xPlayer.spawned
+    end, 3000)
+    return player
+end
+```
+
+The suites of [compat](../compat) run these on the recipes of Qbox, QBCore and ESX on every change of FiveRunner, with tests of money, items, jobs and saves to read.
+
 ## Output
 
 `fiverunner test` writes a line for each test file, then each failure, with where it failed and what the server and the clients printed, but for the lines that tell that resources start and stop:
