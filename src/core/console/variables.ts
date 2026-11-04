@@ -58,6 +58,8 @@ export interface VariablesHost {
 
 interface Entry {
   readonly name: string
+  /** The name as _stricmp compares it. */
+  readonly key: string
   flags: number
   readonly defaultFlags: number
   readonly variable: Variable
@@ -89,6 +91,8 @@ export class Variables {
   suppressReadOnlyWarning = false
   /** The entries, ordered by name as _stricmp orders names. */
   readonly #entries: Entry[] = []
+  /** The entries by their keys, one for each, as registering a name drops the entry of its key. */
+  readonly #byKey = new Map<string, Entry>()
   #firstListener: Listener | undefined
   #nextToken = 0
   #nextCookie = 0
@@ -129,8 +133,10 @@ export class Variables {
     const token = this.#nextToken++
     const key = stricmpKey(name)
     let index = this.#entries.length
-    while (index > 0 && compareUtf8(key, stricmpKey(this.#entries[index - 1]!.name)) < 0) index--
-    this.#entries.splice(index, 0, { name, flags, defaultFlags: flags, variable, token })
+    while (index > 0 && compareUtf8(key, this.#entries[index - 1]!.key) < 0) index--
+    const entry = { name, key, flags, defaultFlags: flags, variable, token }
+    this.#entries.splice(index, 0, entry)
+    this.#byKey.set(key, entry)
     return token
   }
 
@@ -254,8 +260,7 @@ export class Variables {
   }
 
   #find(name: string): Entry | undefined {
-    const key = stricmpKey(name)
-    return this.#entries.find((entry) => stricmpKey(entry.name) === key)
+    return this.#byKey.get(stricmpKey(name))
   }
 
   /**
@@ -265,6 +270,7 @@ export class Variables {
    */
   #drop(entry: Entry, kept?: Variable): void {
     this.#entries.splice(this.#entries.indexOf(entry), 1)
+    this.#byKey.delete(entry.key)
     if (entry.variable !== kept) entry.variable.dispose()
   }
 

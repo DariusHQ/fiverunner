@@ -145,12 +145,14 @@ function bitLength(value: bigint): number {
  * orders keys as _stricmp orders their strings.
  */
 export function stricmpKey(text: string): string {
-  return lowerAscii(text.split('\0', 1)[0]!)
+  const end = text.indexOf('\0')
+  return lowerAscii(end === -1 ? text : text.slice(0, end))
 }
 
 /** A string lowercased as C's tolower lowercases characters, which is only ASCII letters. */
 export function lowerAscii(text: string): string {
-  return text.replace(/[A-Z]+/g, (letters) => letters.toLowerCase())
+  // Most names are lower case already, which the test finds without building a string.
+  return /[A-Z]/.test(text) ? text.replace(/[A-Z]+/g, (letters) => letters.toLowerCase()) : text
 }
 
 /** Orders strings as C++ orders their UTF-8 bytes, which is by code point. */
