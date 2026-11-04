@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.5.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.0) - 2026-11-04
+
+The tests that `fiverunner init` writes log a player in with a character on servers of Qbox, QBCore and ESX, and fail on the scripts that break as it loads. Links of the playground spawn the players of ESX, give Qbox the table of skins that its character menu reads, bring each repository of `&with=`, and ask GitHub for the tree of a repository once. The audit counts what an event gives after it waited for that event. The repository tells how to report vulnerabilities, answers what people ask first, and has a form for scripts that do not run.
+
 ## [1.4.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.4.0) - 2026-11-04
 
 `fiverunner mcp` serves the Model Context Protocol, so AI assistants such as Claude Code, Cursor and VS Code run your FiveM project in FiveRunner while they work on it: they describe what its server started, run its tests, run Lua against a fresh server of it with players that join and trigger events, and audit its events.
