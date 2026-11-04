@@ -543,6 +543,7 @@ function Player:run(code, ...)
         Wait(0)
     end
     local result = results[request]
+    results[request] = nil
     if not result.ok then
         raise(string_format('the client of player %d raised: %s', self.id, result.values))
     end
