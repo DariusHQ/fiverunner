@@ -30,7 +30,7 @@ npx fiverunner init
 npx fiverunner test
 ```
 
-**[Watch it in 27 seconds](https://github.com/DariusHQ/fiverunner/releases/download/v1.5.1/fiverunner-promo.mp4)**, or **[the whole demo](https://github.com/DariusHQ/fiverunner/releases/download/v1.5.1/fiverunner.mp4)** (113 seconds, with sound): the whole Stable recipe of Qbox for txAdmin, tested, then in the dev UI, where a player registers a character, dresses her in illenium-appearance, opens ox_inventory and the bank of Renewed-Banking, and is dragged across the map to a garage, where she takes her car out.
+**[Watch it in 30 seconds](https://github.com/DariusHQ/fiverunner/releases/download/v1.5.1/fiverunner-promo.mp4)**, or **[the whole demo](https://github.com/DariusHQ/fiverunner/releases/download/v1.5.1/fiverunner.mp4)** (113 seconds, with sound): the whole Stable recipe of Qbox for txAdmin, tested, then in the dev UI, where a player registers a character, dresses her in illenium-appearance, opens ox_inventory and the bank of Renewed-Banking, and is dragged across the map to a garage, where she takes her car out.
 
 ![The appearance editor of illenium-appearance on the screen of a player, over a cartoon meadow where her little character wears what the editor picks](docs/media/appearance.png)
 
