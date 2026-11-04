@@ -462,25 +462,34 @@ exports.ox_target:addGlobalPed({})
   })
 
   it('load the tables that come with ESX, and nothing for a server that has its own server.cfg', async () => {
+    const asked: string[] = []
     const esx = await loadProject(
       parseRepository('someone/job')!,
       [],
       () => {},
-      github({
-        'someone/job': { 'fxmanifest.lua': `${MANIFEST}dependency 'es_extended'\n` },
-        'esx-framework/esx_core': {
-          '[core]/es_extended/fxmanifest.lua': MANIFEST,
-          '[core]/es_extended/es_extended.sql': 'CREATE TABLE users (identifier VARCHAR(60));',
-          '[core]/skinchanger/fxmanifest.lua': `${MANIFEST}client_script '@es_extended/locale.lua'\n`,
-          '[SQL]/legacy.sql': 'CREATE TABLE users (identifier VARCHAR(60), skin LONGTEXT);',
+      github(
+        {
+          'someone/job': { 'fxmanifest.lua': `${MANIFEST}dependency 'es_extended'\n` },
+          'esx-framework/esx_core': {
+            '[core]/es_extended/fxmanifest.lua': MANIFEST,
+            '[core]/es_extended/es_extended.sql': 'CREATE TABLE users (identifier VARCHAR(60));',
+            '[core]/skinchanger/fxmanifest.lua': `${MANIFEST}client_script '@es_extended/locale.lua'\n`,
+            '[SQL]/legacy.sql': 'CREATE TABLE users (identifier VARCHAR(60), skin LONGTEXT);',
+          },
         },
-      }),
+        asked,
+      ),
     )
     expect(esx.loaded).toEqual([
       'someone/job',
       'esx-framework/esx_core/[core]/es_extended',
       'esx-framework/esx_core/[SQL]',
       'esx-framework/esx_core/[core]/skinchanger',
+    ])
+    // The directories of esx_core share its tree, which GitHub counts once.
+    expect(asked.filter((url) => url.includes('/git/trees/'))).toEqual([
+      'https://api.github.com/repos/someone/job/git/trees/HEAD?recursive=1',
+      'https://api.github.com/repos/esx-framework/esx_core/git/trees/HEAD?recursive=1',
     ])
     // ESX spawns players once skinchanger has loaded their skins.
     expect(esx.files['server.cfg']).toContain(

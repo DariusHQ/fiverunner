@@ -548,6 +548,13 @@ export async function loadProject(
   const unbuilt: string[] = []
   let own = false
   let left = 0
+  // The directories of a repository, such as those of esx_core, share its tree, which GitHub counts against the hour once.
+  const trees = new Map<string, Promise<Response>>()
+  const shared: Fetcher = (url, init) => {
+    if (!url.startsWith('https://api.github.com/')) return request(url, init)
+    if (!trees.has(url)) trees.set(url, request(url, init))
+    return trees.get(url)!.then((response) => response.clone())
+  }
 
   const load = async (repository: Repository): Promise<void> => {
     const label = formatRepository(repository)
@@ -557,7 +564,7 @@ export async function loadProject(
         `The playground loads ${MAX_REPOSITORIES} repositories at most for a link.`,
       )
     }
-    const read = await readRepository(repository, (done, of) => progress(label, done, of), request)
+    const read = await readRepository(repository, (done, of) => progress(label, done, of), shared)
     const known = Object.values(KNOWN).includes(formatRepository({ ...repository, ref: 'HEAD' }))
     loaded.push(label)
     left += read.left
