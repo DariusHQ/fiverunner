@@ -151,7 +151,7 @@ Servers also get FiveM's own `io` and `os` libraries, its VFS and file permissio
 
 ## Differences from FiveM
 
-FiveRunner follows FiveM's Windows server and its clients down to their error messages and their quirks. Where it differs, on purpose or for now, [docs/differences.md](docs/differences.md) says so.
+FiveRunner follows FiveM's Windows server and its clients down to their error messages and their quirks. Where it differs, on purpose or for now, [docs/differences.md](docs/differences.md) says so. [docs/faq.md](docs/faq.md) answers what people ask first, such as whether it is a way to play without GTA V, which it is not.
 
 ## Clean room
 
