@@ -13,7 +13,7 @@ It runs the tests of the project in the directory it runs in:
 
 Test files are the files whose names end in `.test.lua`, anywhere in the project but in `node_modules` and hidden directories. They are not part of your resources: their resources do not see them, so a manifest that globs `**/*.lua` does not load them as scripts.
 
-`fiverunner init` adds a first test file to the project, `tests/<name of the resource>.test.lua` or `tests/server.test.lua`, whose test checks that the project starts without script errors, on the server and on the client of a player, `.fiverunner/fiverunner.lua` and `.luarc.json`, which tell the Lua language server of your editor the functions of tests, and, at the root of a git repository, the workflow of [GitHub Actions](#github-actions) as `.github/workflows/fiverunner.yml`. It writes over nothing that is there.
+`fiverunner init` adds a first test file to the project, `tests/<name of the resource>.test.lua` or `tests/server.test.lua`, whose test checks that the project starts without script errors, on the server and on the client of a player. On a server of Qbox, of QBCore, or of ESX without esx_multicharacter, a second test logs the player in with a character, as [Frameworks](#frameworks) shows, and checks that no script breaks as the character loads. It also adds `.fiverunner/fiverunner.lua` and `.luarc.json`, which tell the Lua language server of your editor the functions of tests, and, at the root of a git repository, the workflow of [GitHub Actions](#github-actions) as `.github/workflows/fiverunner.yml`. It writes over nothing that is there.
 
 With `--watch`, it runs them again as files of the project change, until Ctrl+C.
 
@@ -159,7 +159,7 @@ The rest is FiveRunner's engine, which follows FiveM's server and clients as [do
 Test resources that need a framework in the folder of a server that has it, as the recipe of txAdmin lays it out. Players join as they join servers, so a framework knows them, but they have a character only once its character menu, or the test, logs them in. Connect them once the server started, as players join started servers, then:
 
 - **Qbox**: `exports.qbx_core:Login` creates a character and logs the player in with it.
-- **QBCore**: the page of qb-multicharacter creates characters, which a test reaches with `player:nuiCallback`.
+- **QBCore**: the page of qb-multicharacter creates characters, which a test reaches with `player:nuiCallback` once its menu shows. Without qb-multicharacter, `QBCore.Player.Login(player.id, false, { charinfo = ... })` creates one and logs the player in with it.
 - **ESX**: without esx_multicharacter, ESX logs players in as they join, and marks them as spawned.
 
 ```lua
@@ -177,6 +177,11 @@ end
 local function login(name)
     while GetGameTimer() < 3000 do Wait(100) end
     local player = fiverunner.connect({ name = name })
+    fiverunner.waitFor(function()
+        for _, message in ipairs(player:nuiMessages('qb-multicharacter')) do
+            if message.action == 'ui' then return true end
+        end
+    end, 10000)
     player:nuiCallback('qb-multicharacter', 'createNewCharacter', {
         firstname = 'Ann', lastname = 'Lee', nationality = 'Romania', birthdate = '1990-01-01', gender = 'Female', cid = 1,
     })

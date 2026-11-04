@@ -508,4 +508,88 @@ describe('fiverunner init', () => {
     await init(client)
     expect([(await test(syntax)).code, (await test(client)).code]).toEqual([1, 1])
   })
+
+  it('adds a test that logs a player in with a character on servers of Qbox, QBCore and ESX', async () => {
+    // Stand-ins of the frameworks, with as much as the logins use, in the categories of their recipes.
+    const qbox = {
+      'resources/[qbx]/qbx_core/fxmanifest.lua': MANIFEST,
+      'resources/[qbx]/qbx_core/server.lua': `exports('Login', function(id, citizenid, data)
+    TriggerClientEvent('QBCore:Client:OnPlayerLoaded', id)
+    return citizenid == nil and data.charinfo.firstname == 'Ann'
+end)`,
+    }
+    const qbcore = {
+      'resources/[qb]/qb-core/fxmanifest.lua': MANIFEST,
+      'resources/[qb]/qb-core/server.lua': `local players = {}
+local QBCore = { Functions = {}, Player = {} }
+function QBCore.Functions.GetPlayer(id) return players[id] end
+function QBCore.Player.Login(id, citizenid, data)
+    players[id] = { PlayerData = { charinfo = data.charinfo } }
+    return true
+end
+exports('GetCoreObject', function() return QBCore end)`,
+    }
+    const multicharacter = {
+      'resources/[qb]/qb-multicharacter/fxmanifest.lua': `${MANIFEST}\nclient_script 'client.lua'\nui_page 'index.html'`,
+      'resources/[qb]/qb-multicharacter/index.html': '<!doctype html>',
+      'resources/[qb]/qb-multicharacter/client.lua': `CreateThread(function()
+    Wait(0)
+    SendNUIMessage({ action = 'ui', toggle = true })
+end)
+RegisterNUICallback('createNewCharacter', function(data, cb)
+    TriggerServerEvent('qb-multicharacter:server:createCharacter', data)
+    cb('ok')
+end)`,
+      'resources/[qb]/qb-multicharacter/server.lua': `RegisterNetEvent('qb-multicharacter:server:createCharacter', function(data)
+    exports['qb-core']:GetCoreObject().Player.Login(source, false, { charinfo = data })
+end)`,
+    }
+    const esx = {
+      'resources/[core]/es_extended/fxmanifest.lua': MANIFEST,
+      'resources/[core]/es_extended/server.lua': `exports('getSharedObject', function()
+    return { GetPlayerFromId = function(id) return GetPlayerName(id) and { spawned = true } end }
+end)`,
+    }
+    // A HUD that breaks once a character loads, which only the test that logs in finds.
+    const hud = {
+      'resources/hud/fxmanifest.lua': `fx_version 'cerulean'\ngame 'gta5'\nclient_script 'client.lua'`,
+      'resources/hud/client.lua': `RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function() error('no job') end)`,
+    }
+    const servers: Record<string, Record<string, string>> = {
+      qbox,
+      qbcore: { ...qbcore, ...multicharacter },
+      'qbcore without qb-multicharacter': qbcore,
+      esx,
+      'esx with esx_multicharacter': {
+        ...esx,
+        'resources/[core]/esx_multicharacter/fxmanifest.lua': MANIFEST,
+        'resources/[core]/esx_multicharacter/server.lua': '',
+      },
+      'qbox with a broken hud': { ...qbox, ...hud },
+    }
+    const results = []
+    for (const [name, files] of Object.entries(servers)) {
+      const resources = Object.keys(files).flatMap((path) =>
+        path.endsWith('/fxmanifest.lua') ? [`ensure ${path.split('/').at(-2)}`] : [],
+      )
+      const directory = write(name, { ...files, 'server.cfg': resources.join('\n') })
+      await init(directory)
+      const tests = readFileSync(join(directory, 'tests/server.test.lua'), 'utf8')
+      results.push([
+        name,
+        /logs a player in with a character of (\w+)/.exec(tests)?.[1],
+        tests.includes("nuiCallback('qb-multicharacter'"),
+        (await test(directory)).stdout.split('\n')[0],
+      ])
+    }
+    const passed = '✓ tests/server.test.lua (2 tests)'
+    expect(results).toEqual([
+      ['qbox', 'Qbox', false, passed],
+      ['qbcore', 'QBCore', true, passed],
+      ['qbcore without qb-multicharacter', 'QBCore', false, passed],
+      ['esx', 'ESX', false, passed],
+      ['esx with esx_multicharacter', undefined, false, '✓ tests/server.test.lua (1 test)'],
+      ['qbox with a broken hud', 'Qbox', false, '× tests/server.test.lua (2 tests, 1 failed)'],
+    ])
+  }, 60000)
 })

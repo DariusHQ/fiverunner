@@ -55,7 +55,7 @@ The playground gives the Markdown of the button of each repository that it runs.
 
 ## Testing resources
 
-Start with a test that your resource or server starts without script errors, and a GitHub workflow that runs it on each push:
+Start with a test that your resource or server starts without script errors, and that a player logs in with a character on servers of Qbox, QBCore and ESX, and a GitHub workflow that runs it on each push:
 
 ```bash
 npx fiverunner init
