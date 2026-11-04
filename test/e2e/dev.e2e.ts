@@ -144,6 +144,15 @@ function pixelsOf([r, g, b]: readonly [number, number, number]): string {
   })()`
 }
 
+/** Picks a style of the map, as the user does in its menu. */
+function chooseStyle(style: string): Promise<unknown> {
+  return page.evaluate(`(() => {
+    const select = [...document.querySelectorAll('#map select')].find((s) => [...s.options].some((o) => o.value === 'GTA'))
+    select.value = '${style}'
+    select.dispatchEvent(new Event('change'))
+  })()`)
+}
+
 /** Has the mouse do `type` at `x`, `y` of the page, on the canvas of the map. */
 function mouse(type: string, x: number, y: number): Promise<unknown> {
   return page.evaluate(
@@ -292,6 +301,13 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     const GREEN = [0x6f, 0xcf, 0x6f] as const
     const ORANGE = [0xf0, 0xa0, 0x30] as const
     const CYAN = [0x4f, 0xd6, 0xe0] as const
+    // The map starts as the cartoon; the dots of Classic tell where players are by their colours.
+    expect(
+      await page.evaluate(
+        `[...document.querySelectorAll('#map select')].find((s) => [...s.options].some((o) => o.value === 'GTA')).value`,
+      ),
+    ).toBe('Cartoon')
+    await chooseStyle('Classic')
     await page.evaluate(`document.getElementById('map').scrollIntoView()`)
     // The blips of the players are green, and their peds, at the start of the world, orange and cyan, the second over the first, whose name makes way for that of the second, under them.
     const [x, y] = await page.until<[number, number]>(pixelsOf(CYAN))
@@ -341,12 +357,6 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
   })
 
   it('draws the map as a cartoon or as GTA V does, which it keeps for the next time', async () => {
-    const choose = (style: string) =>
-      page.evaluate(`(() => {
-      const select = [...document.querySelectorAll('#map select')].find((s) => [...s.options].some((o) => o.value === 'GTA'))
-      select.value = '${style}'
-      select.dispatchEvent(new Event('change'))
-    })()`)
     /** The colour of the map on average, as red, green and blue, which what it scatters on its ground leaves as it is. */
     const average = () =>
       page.evaluate<[number, number, number]>(`(() => {
@@ -356,16 +366,16 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
       for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c] += data[i + c]
       return sum.map((total) => total / (data.length / 4))
     })()`)
-    await choose('Cartoon')
+    await chooseStyle('Cartoon')
     // The grass of the cartoon, then the dark blue of the sea of GTA V.
     expect(await page.evaluate(`localStorage.getItem('fiverunner:map-style')`)).toBe('Cartoon')
     const [r, g, b] = await average()
     expect(g - Math.max(r, b)).toBeGreaterThan(40)
-    await choose('GTA')
+    await chooseStyle('GTA')
     const [sr, sg, sb] = await average()
     expect(sb).toBeGreaterThan(sr)
     expect(sr + sg + sb).toBeLessThan(200)
-    await choose('Classic')
+    await chooseStyle('Classic')
     expect(await page.evaluate(`localStorage.getItem('fiverunner:map-style')`)).toBe('Classic')
   })
 

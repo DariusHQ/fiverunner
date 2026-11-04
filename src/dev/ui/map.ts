@@ -134,8 +134,10 @@ export class WorldMap {
     this.element = element
     this.#actions = actions
     this.#follow = follow
-    this.#styles = [CLASSIC, cartoonStyle(), gtaStyle(() => this.#image)]
-    this.#style = this.#styles.find(({ name }) => name === stored(STYLE_KEY)) ?? CLASSIC
+    const cartoon = cartoonStyle()
+    this.#styles = [CLASSIC, cartoon, gtaStyle(() => this.#image)]
+    // The cartoon until the user picks a style: the world as the README and the demo show it.
+    this.#style = this.#styles.find(({ name }) => name === stored(STYLE_KEY)) ?? cartoon
     const toolbar = document.createElement('div')
     toolbar.className = 'toolbar'
     const title = document.createElement('h2')

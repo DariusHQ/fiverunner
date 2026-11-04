@@ -50,7 +50,7 @@ The map shows the world of the server on a grid of metres, with the north up: th
 - Dragging the ped of a player puts it where it is dropped, at the height it had, with the vehicle it is in, as a script of the client would with `SetPedCoordsKeepVehicle`, which its client syncs to the server. Dropped on a blip, it goes where the blip is, at its height, as the blips of garages, shops and jobs are where players use them.
 - A double click sets the waypoint of a player there, as the map of the game does: that of the player whose blips the map shows, or of the first that joined.
 
-The map has three styles, which the dev UI keeps for the next time:
+The map has three styles, of which it starts with the cartoon, and the dev UI keeps the one that you pick for the next time:
 
 - **Classic**: dots, arrows and a grid, on the dark of the dev UI.
 - **Cartoon**: a meadow with trees, bushes and flowers under drifting clouds, where little people face the way they go, walk there, breathe and blink, cars seen from above puff as they drive, blips are the tokens of a board game, on sand, and the waypoint is a flag that waves. Players stand in rings of their colours, dressed as their peds are: their skins are those of the parents of their heads, their hair has the colour that `SetPedHairColor` gives it, and their tops, legs and shoes the colours that FiveRunner gives the drawables and textures of components 11, 4 and 6, as it has none of the clothes of GTA V to see. The cursor lifts the player that it drags, and a compass and a scale stand in a corner.
