@@ -37,6 +37,7 @@ npx fiverunner test
 - **Real resources, as they are released.** The 43 resources of the Stable recipe of Qbox start on your machine in seconds: its core, its inventory, its garages, its bank, and its phone, which is JavaScript.
 - **Real NUIs.** Your pages run in a browser, and talk to your callbacks as they do in FiveM: the appearance editor, the inventory, the bank and the phone of the recipe work as players use them.
 - **Tests in CI.** Each test gets a server of its own, players, and a database in memory, and time moves as fast as it can.
+- **AI assistants that check their own code.** Claude Code, Codex and Cursor run your server through [`fiverunner mcp`](#ai-assistants): they connect players, trigger events, run your tests and read what broke, in place of guessing.
 - **A world to look at.** Under the frames of NUI, the screen of each player shows the world round their ped, as a cartoon or in the style of GTA V, and the cartoon dresses them as your scripts do.
 
 ## Resources of GitHub, in your browser
@@ -95,10 +96,11 @@ A player logs in, triggers each event that clients may trigger with the argument
 
 ## AI assistants
 
-Let Claude Code, Cursor or VS Code run your resources as they write them, so they check what your scripts do in place of guessing:
+Let Claude Code, Codex, Cursor or VS Code run your resources as they write them, so they check what your scripts do in place of guessing. In Claude Code or in Codex, in the folder of the project:
 
 ```bash
 claude mcp add fiverunner -- npx -y fiverunner mcp
+codex mcp add fiverunner -- npx -y fiverunner mcp
 ```
 
 On Windows, give `cmd /c npx` in place of `npx`. `fiverunner mcp` serves the Model Context Protocol. Its tools describe what the server started, run your tests, run Lua against a fresh server of your project, with players that join and trigger events, and audit its events. [docs/mcp.md](docs/mcp.md) tells how to set it up in each assistant.

@@ -9,9 +9,9 @@ import { test } from './test.ts'
 const USAGE = `Usage: fiverunner mcp
 
 Serves the Model Context Protocol on stdin and stdout, for AI assistants
-such as Claude Code, Cursor and VS Code: its tools run the FiveM project in
-the directory that the assistant starts it in, with no GTA V. It runs until
-stdin ends.
+such as Claude Code, Codex, Cursor and VS Code: its tools run the FiveM
+project in the directory that the assistant starts it in, with no GTA V.
+It runs until stdin ends.
 
 Options:
   -h, --help  Show this help

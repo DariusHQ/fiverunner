@@ -47,7 +47,7 @@ No. It finds the events of your server that trust what clients send, so you can 
 
 ## Can AI assistants use it?
 
-Yes. `fiverunner mcp` lets Claude Code, Cursor and VS Code run your resources while they work on them, as [docs/mcp.md](mcp.md) tells.
+Yes, and it is what they lack: they cannot run FiveM, so they guess what the code they write does. `fiverunner mcp` lets Claude Code, Codex, Cursor and VS Code run your server while they work on it: they connect players, trigger events, run your tests and read what broke, then fix it and check again. [docs/mcp.md](mcp.md) tells how to set it up in each.
 
 ## How can I help?
 

@@ -1,6 +1,6 @@
 # AI assistants
 
-`fiverunner mcp` serves the [Model Context Protocol](https://modelcontextprotocol.io), so AI assistants such as Claude Code, Cursor and VS Code can run your FiveM project in FiveRunner while they work on it. They can run its tests, try Lua against a fresh server of it, see what started and what failed, and audit its events. They see what your scripts really do, with no GTA V, no FXServer and nothing for you to click.
+`fiverunner mcp` serves the [Model Context Protocol](https://modelcontextprotocol.io), so AI assistants such as Claude Code, Codex, Cursor and VS Code can run your FiveM project in FiveRunner while they work on it. They can run its tests, try Lua against a fresh server of it, see what started and what failed, and audit its events. They see what your scripts really do, with no GTA V, no FXServer and nothing for you to click.
 
 ## Setting it up
 
@@ -37,6 +37,24 @@ VS Code, in `.vscode/mcp.json` of the project:
   }
 }
 ```
+
+Codex, started in the folder of the project:
+
+```bash
+codex mcp add fiverunner -- npx -y fiverunner mcp
+```
+
+Codex waits 10 seconds for a server to start and 60 for a tool, which the first download of FiveRunner, the tests of a big server or an audit can take longer than. Give it more in `~/.codex/config.toml`, or in `.codex/config.toml` of a project that Codex trusts:
+
+```toml
+[mcp_servers.fiverunner]
+command = "npx"
+args = ["-y", "fiverunner", "mcp"]
+startup_timeout_sec = 60
+tool_timeout_sec = 600
+```
+
+It runs the project of the folder that Codex starts in, or of the folder that `cwd` names. On Windows, if Codex cannot start `npx`, start it through `cmd`: `command = "cmd"` and `args = ["/c", "npx", "-y", "fiverunner", "mcp"]`.
 
 ## Its tools
 
