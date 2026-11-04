@@ -13,7 +13,7 @@ import {
   type Repository,
 } from './github.ts'
 
-/** The repositories that a link names: gh, and with, a list split by commas. */
+/** The repositories that a link names: gh, and each with, which may be a list split by commas. */
 export interface Link {
   readonly main: Repository
   readonly also: readonly Repository[]
@@ -47,7 +47,9 @@ export function readLink(params: URLSearchParams): Link | { readonly problem: st
   const main = parseRepository(spec)
   if (main === undefined) return { problem: `This link names no repository of GitHub: ${spec}.` }
   const also: Repository[] = []
-  for (const other of (params.get('with') ?? '').split(',').filter((part) => part.trim() !== '')) {
+  // Links bring each with its own &with=, as the hint of what is missing says, or several with commas between them.
+  const others = params.getAll('with').flatMap((value) => value.split(','))
+  for (const other of others.filter((part) => part.trim() !== '')) {
     const repository = parseRepository(other)
     if (repository === undefined)
       return { problem: `This link names no repository of GitHub: ${other}.` }
