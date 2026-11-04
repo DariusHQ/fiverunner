@@ -83,6 +83,16 @@ npx fiverunner test
 
 Each test gets a server of its own, with your resources started, and players whose clients run your client scripts. Resources that use oxmysql get a database of their own, in memory, that speaks MariaDB's SQL and starts with the tables of your `.sql` files. Time moves as fast as it can, so tests that wait take no time. `--coverage` writes the lines of Lua that they ran, for lcov, and `--junit` a report for your CI. [docs/testing.md](docs/testing.md) tells all that tests can do, and [examples/bank](examples/bank) is a resource with tests.
 
+## Auditing servers
+
+Find the events of your server that trust their clients, before cheaters do:
+
+```bash
+npx fiverunner audit
+```
+
+A player logs in, triggers each event that clients may trigger with the arguments that cheaters give, and the audit tells what any client gains, such as money, items or a job, what it changes in the database, and what breaks. It exits with 1 when any client gains something, so CI can fail on it. [docs/audit.md](docs/audit.md) tells how it works and what it cannot see.
+
 ## Developing resources
 
 Run your project in your browser:
