@@ -155,7 +155,7 @@ function lineIn(message: string, path: string): number | undefined {
  * Whether a line only tells what servers and clients do with resources as
  * they start: scan for them, download, start and stop them.
  */
-function routine({ kind, channel, text }: OutputLine): boolean {
+export function routine({ kind, channel, text }: OutputLine): boolean {
   if (kind !== 'console') return false
   switch (channel) {
     case 'citizen-scripting-core':
@@ -170,7 +170,7 @@ function routine({ kind, channel, text }: OutputLine): boolean {
 }
 
 /** A line of output as the report shows it: without colors, and with the client that wrote it. */
-function showLine({ process, kind, channel, text }: OutputLine): string {
+export function showLine({ process, kind, channel, text }: OutputLine): string {
   const by = process === 'server' ? '' : `${process} `
   const what = kind === 'warning' ? 'Lua warning: ' : kind === 'diagnostic' ? 'FiveRunner: ' : ''
   return `${by}[${channel}] ${what}${text.replace(/\^\d/g, '')}`

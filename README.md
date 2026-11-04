@@ -93,6 +93,16 @@ npx fiverunner audit
 
 A player logs in, triggers each event that clients may trigger with the arguments that cheaters give, and the audit tells what any client gains, such as money, items or a job, what it changes in the database, and what breaks. It exits with 1 when any client gains something, so CI can fail on it. [docs/audit.md](docs/audit.md) tells how it works and what it cannot see.
 
+## AI assistants
+
+Let Claude Code, Cursor or VS Code run your resources as they write them, so they check what your scripts do in place of guessing:
+
+```bash
+claude mcp add fiverunner -- npx -y fiverunner mcp
+```
+
+On Windows, give `cmd /c npx` in place of `npx`. `fiverunner mcp` serves the Model Context Protocol. Its tools describe what the server started, run your tests, run Lua against a fresh server of your project, with players that join and trigger events, and audit its events. [docs/mcp.md](docs/mcp.md) tells how to set it up in each assistant.
+
 ## Developing resources
 
 Run your project in your browser:

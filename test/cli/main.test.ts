@@ -36,6 +36,7 @@ Commands:
   dev              Run the project in this directory in the dev UI, in the browser
   init             Add a test file and a GitHub workflow to the project in this directory
   audit            Trigger the events of the server as cheaters would, and tell what they change
+  mcp              Serve the Model Context Protocol on stdio, for AI assistants
 
 Options:
   -h, --help       Show this help

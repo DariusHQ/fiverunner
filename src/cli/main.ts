@@ -2,6 +2,7 @@ import packageJson from '../../package.json' with { type: 'json' }
 import { audit } from './audit.ts'
 import { dev } from './dev.ts'
 import { init } from './init.ts'
+import { mcp } from './mcp.ts'
 import { test } from './test.ts'
 
 /** What the command line tool runs with: where it runs, what it writes to, and cfxlua.wasm. */
@@ -12,6 +13,8 @@ export interface CliHost {
   readonly env: Readonly<Record<string, string | undefined>>
   readonly stdout: (text: string) => void
   readonly stderr: (text: string) => void
+  /** What the tool reads from stdin, for the commands that read it, such as mcp. */
+  readonly input?: AsyncIterable<string | Uint8Array>
   /** Whether what it writes to stdout may have colors. */
   readonly color: boolean
   /** Compiles cfxlua.wasm. */
@@ -37,6 +40,7 @@ Commands:
   dev              Run the project in this directory in the dev UI, in the browser
   init             Add a test file and a GitHub workflow to the project in this directory
   audit            Trigger the events of the server as cheaters would, and tell what they change
+  mcp              Serve the Model Context Protocol on stdio, for AI assistants
 
 Options:
   -h, --help       Show this help
@@ -54,6 +58,7 @@ export async function main(args: readonly string[], host: CliHost): Promise<numb
   if (first === 'dev') return dev(rest, host)
   if (first === 'init') return init(rest, host)
   if (first === 'audit') return audit(rest, host)
+  if (first === 'mcp') return mcp(rest, host)
   if (rest.length === 0 && (first === undefined || first === '-h' || first === '--help')) {
     host.stdout(`FiveRunner ${packageJson.version}\n\n${USAGE}`)
     return 0
