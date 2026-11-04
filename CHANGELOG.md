@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.5.2](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.2) - 2026-11-04
+
+Servers with hundreds of convars, as the recipes of txAdmin set, start faster: a test of the Stable recipe of Qbox starts 20% sooner. `fiverunner mcp` names Codex among the assistants that it serves, and [docs/mcp.md](docs/mcp.md) sets it up in Codex, with the time that its first start, big servers and audits need.
+
 ## [1.5.1](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.1) - 2026-11-04
 
 The characters of the cartoon draw their heads whole whichever way they face: those that faced left had a hole in their hair and a dark band by their ear, and long hair, which looked like headphones, falls behind their heads. The demo and the pictures of the README are recorded again with them.
