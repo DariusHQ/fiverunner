@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.5.1](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.1) - 2026-11-04
+
+The characters of the cartoon draw their heads whole whichever way they face: those that faced left had a hole in their hair and a dark band by their ear, and long hair, which looked like headphones, falls behind their heads. The demo and the pictures of the README are recorded again with them.
+
 ## [1.5.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.0) - 2026-11-04
 
 The tests that `fiverunner init` writes log a player in with a character on servers of Qbox, QBCore and ESX, and fail on the scripts that break as it loads. Links of the playground spawn the players of ESX, give Qbox the table of skins that its character menu reads, bring each repository of `&with=`, and ask GitHub for the tree of a repository once. The audit counts what an event gives after it waited for that event. The repository tells how to report vulnerabilities, answers what people ask first, and has a form for scripts that do not run.
