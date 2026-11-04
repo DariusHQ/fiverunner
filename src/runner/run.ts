@@ -122,6 +122,8 @@ export interface RunOptions {
   readonly coverage?: Coverage
   /** What interrupts the scripts of tests that run too long without returning: 5 seconds by default. */
   readonly watchdog?: WatchdogOptions
+  /** Called with each line that the processes of a server print, as they print it. */
+  readonly onLine?: (line: OutputLine) => void
 }
 
 /** A test as the harness collected it. */
@@ -286,7 +288,7 @@ class World<T> {
     test: number | undefined,
     parse: (report: unknown) => T,
   ): Promise<World<T>> {
-    const output = new Output()
+    const output = new Output(options.onLine)
     const pending: Promise<unknown>[] = []
     let world: World<T> | undefined
     const call = defineNative(
@@ -434,12 +436,18 @@ class World<T> {
             .filter(({ resources }) => resources.length > 0),
         )
       case 'output': {
-        const { id } = fields(args)
+        const { id, from } = fields(args)
         const process = id === undefined ? 'server' : this.#connectionOf(count(id)).process
         const lines = this.output.lines.filter(
           (line) => line.process === process && line.kind === 'console',
         )
-        return pack(lines.map(({ channel, text }) => `[${channel}] ${text.replace(/\^\d/g, '')}`))
+        // Lua counts lines from 1, and a line before the first is the first.
+        const first = from === undefined ? 0 : Math.max(0, Math.trunc(Number(from)) - 1)
+        return pack(
+          lines
+            .slice(first)
+            .map(({ channel, text }) => `[${channel}] ${text.replace(/\^\d/g, '')}`),
+        )
       }
       case 'nuiMessages': {
         const { id, resource } = fields(args)
@@ -578,7 +586,14 @@ class World<T> {
 /** What the processes of a server printed and reported, line by line. */
 class Output {
   readonly #lines: OutputLine[] = []
-  readonly #writer = new LineOutput((line) => this.#lines.push(line))
+  readonly #writer: LineOutput
+
+  constructor(onLine?: (line: OutputLine) => void) {
+    this.#writer = new LineOutput((line) => {
+      this.#lines.push(line)
+      onLine?.(line)
+    })
+  }
 
   /** Where the process `process` writes. */
   of(process: string): ProcessOutput {

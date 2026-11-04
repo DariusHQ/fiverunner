@@ -564,9 +564,13 @@ function Player:received(event)
     return ask('received', { id = self.id, event = event })
 end
 
--- What the client of the player printed on its console, line by line.
-function Player:output()
-    return ask('output', { id = self.id })
+-- What the client of the player printed on its console, line by line, from
+-- line `from` on, when given.
+function Player:output(from)
+    if from ~= nil then
+        checkArgument('output', 1, from, 'number')
+    end
+    return ask('output', { id = self.id, from = from })
 end
 
 -- Disconnects the client of the player, as players quit, for `reason`,
@@ -663,9 +667,13 @@ function Player:press(key)
     self:keyUp(key)
 end
 
--- What the server printed on its console, line by line.
-function fiverunner.output()
-    return ask('output')
+-- What the server printed on its console, line by line, from line `from` on,
+-- when given.
+function fiverunner.output(from)
+    if from ~= nil then
+        checkArgument('fiverunner.output', 1, from, 'number')
+    end
+    return ask('output', { from = from })
 end
 
 -- The events that the resources of the server handle, as { name, resources },

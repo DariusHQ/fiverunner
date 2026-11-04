@@ -32,9 +32,10 @@ function Player:emit(event, ...) end
 ---@return any[][]
 function Player:received(event) end
 
---- What the client printed, line by line, as `[channel] text`, without colors.
+--- What the client printed, line by line, as `[channel] text`, without colors, from line `from` on, when given.
+---@param from? integer
 ---@return string[]
-function Player:output() end
+function Player:output(from) end
 
 --- Disconnects the player, and returns once the server dropped it.
 ---@param reason? string
@@ -102,9 +103,10 @@ fiverunner = {}
 ---@return string? reason
 function fiverunner.connect(identity) end
 
---- What the server printed, line by line, as `[channel] text`, without colors.
+--- What the server printed, line by line, as `[channel] text`, without colors, from line `from` on, when given.
+---@param from? integer
 ---@return string[]
-function fiverunner.output() end
+function fiverunner.output(from) end
 
 --- The events that the resources of the server handle, in the order they first registered for them, those of tests left out.
 ---@return { name: string, resources: string[] }[]

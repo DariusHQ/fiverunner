@@ -237,6 +237,29 @@ AddEventHandler('bank:audit', function() end)`),
     expect(outcomes(result)).toEqual([['lists', 'passed']])
   })
 
+  it('give what the server and clients printed from a line on', async () => {
+    const result = await run(`it('reads', function()
+    local before = #fiverunner.output()
+    print('one')
+    print('two')
+    expect(fiverunner.output(before + 2)).toEqual({ '[script:fiverunner] two' })
+    expect(fiverunner.output(before + 3)).toEqual({})
+    local ann = fiverunner.connect({ name = 'Ann' })
+    local seen = #ann:output()
+    ann:run("print('three')")
+    expect(ann:output(seen + 1)).toEqual({ '[script:fiverunner] three' })
+end)
+it('reads from no line', function() fiverunner.output('1') end)`)
+    expect(outcomes(result)).toEqual([
+      ['reads', 'passed'],
+      [
+        'reads from no line',
+        'failed',
+        "@fiverunner/tests/x.test.lua:12: bad argument #1 to 'fiverunner.output' (number expected, got string)",
+      ],
+    ])
+  })
+
   it('waits for checks to come true', async () => {
     const result = await run(`it('waits', function()
     local runs = 0

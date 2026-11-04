@@ -105,7 +105,7 @@ Every field is optional. Players without `identifiers` get a `license:` of their
 | `player:run(code, ...)`                    | Runs the Lua code `code` in the client of the player, with `...` as its arguments, and returns what it returns. Raises what it raises                                                                                                                                 |
 | `player:emit(event, ...)`                  | Triggers `event` on the server from the client, with `...`, and returns once the server got it                                                                                                                                                                        |
 | `player:received(event)`                   | The arguments of each `event` that the client got from the server, in the order they came                                                                                                                                                                             |
-| `player:output()`                          | What the client printed, line by line, as `[channel] text`, without colors                                                                                                                                                                                            |
+| `player:output(from)`                      | What the client printed, line by line, as `[channel] text`, without colors, from its `from`th line on, when given                                                                                                                                                     |
 | `player:disconnect(reason)`                | Disconnects the player, as players quit, and returns once the server dropped it                                                                                                                                                                                       |
 | `player:nuiMessages(resource)`             | What the client sent the NUI frame of `resource` with `SendNUIMessage`, as tables, in the order it sent them                                                                                                                                                          |
 | `player:nuiCallback(resource, name, data)` | Calls the NUI callback `name` of `resource`, as its page does, with `data` as JSON, and returns what it answered, read as JSON, and the status                                                                                                                        |
@@ -122,7 +122,7 @@ local x, y = ann:run('local a, b = ... return a + b, GetCurrentResourceName()', 
 
 ## Helpers
 
-- `fiverunner.output()` gives what the server printed, line by line, as `[channel] text`, without colors.
+- `fiverunner.output(from)` gives what the server printed, line by line, as `[channel] text`, without colors: from its `from`th line on, when given, so a test can read only what came after it last read.
 - `fiverunner.events()` gives the events that the resources of the server handle, as `{ name, resources }`, in the order they first registered for them, without those of tests. Those that `RegisterNetEvent` marked are the ones that clients can trigger.
 - `fiverunner.waitFor(check, timeout)` calls `check` at each tick until it returns something truthy, and returns that. With a `timeout`, in milliseconds, it fails the test once that much time went by.
 
