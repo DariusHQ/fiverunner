@@ -1024,31 +1024,53 @@ function character(
   context.fillStyle = 'rgba(0, 0, 0, 0.13)'
   context.fillRect(side ? -7 * flip : 2, -20, side ? 6 * flip : 5, 13)
   context.restore()
+  // Long hair falls behind the head to the shoulders, round the face or at the back of the head, under the arms.
+  if (long && facing !== 'back') {
+    const behind = new Path2D()
+    if (side) behind.roundRect(flip > 0 ? -10.6 : 0.6, -31, 10, 14, 4)
+    else {
+      // A lock at each side of the face, with none under the chin.
+      behind.roundRect(-10.6, -31, 6.6, 13.5, 3.3)
+      behind.roundRect(4, -31, 6.6, 13.5, 3.3)
+    }
+    inked(context, behind, hair, 1.4)
+  }
   inked(context, arms, shade(shirt, -0.08), 1.4)
   // The head, its hair, and the face that it turns as it faces.
   const head = new Path2D()
   head.arc(0, -27.5, 9, 0, Math.PI * 2)
   inked(context, head, skin, 1.4)
+  // The hair on the head, of ellipses, as many as its facing shows, which stop above the eyes, or they would be lost in it.
+  const parts: readonly (readonly [x: number, y: number, width: number, height: number])[] =
+    facing === 'back'
+      ? [[0, -31.5, 11.5, 9.5]]
+      : side
+        ? [
+            [-2.5 * flip, -34.2, 10, 6.5],
+            [-5.5 * flip, -29.5, 5.5, 8.5],
+          ]
+        : [[0, -35.6, 11, 6.6]]
   context.save()
   context.clip(head)
+  // Each part is a path of its own, as parts of one path that wind against each other leave a hole where they overlap.
+  // Their edges, darker, go under the fills of all, so that only the edge where the hair meets the skin shows, which tells them apart when their colours are near.
+  context.strokeStyle = shade(hair, -0.35)
+  context.lineWidth = 2
   context.fillStyle = hair
-  context.beginPath()
-  if (facing === 'back') context.rect(-10, -40, 20, 16)
-  else if (side) {
-    context.ellipse(-3 * flip, -32, 9.5, 6.5, 0, 0, Math.PI * 2)
-    context.rect(-10 * flip, -36, 7 * flip, 12)
-  } else context.ellipse(0, -33.5, 11, 6.5, 0, 0, Math.PI * 2)
-  context.fill()
+  for (const paint of ['stroke', 'fill'] as const) {
+    for (const [x, y, width, height] of parts) {
+      context.beginPath()
+      context.ellipse(x, y, width, height, 0, 0, Math.PI * 2)
+      context[paint]()
+    }
+  }
   context.restore()
-  if (long && facing !== 'front') {
-    context.fillStyle = hair
-    context.strokeStyle = MEADOW.ink
-    context.lineWidth = 1.4
-    context.beginPath()
-    context.roundRect(side ? -9 * flip - 2.5 : -7, -28, 5, 10, 2.5)
-    if (!side) context.roundRect(2, -28, 5, 10, 2.5)
-    context.fill()
-    context.stroke()
+  // From behind, long hair covers the head and falls over the back.
+  if (long && facing === 'back') {
+    const fall = new Path2D()
+    fall.arc(0, -27.5, 9, 0, Math.PI * 2)
+    fall.roundRect(-7.6, -27.5, 15.2, 11, 4.5)
+    inked(context, fall, hair, 1.4)
   }
   if (facing !== 'back') {
     const blink = (time + seed * 977) % 3800 < 130
