@@ -37,7 +37,7 @@ Events: 111, of which clients may trigger 19. Findings: 2 high, 0 medium, 1 low.
 
 For each event, it tells the arguments that did the most, and what they did:
 
-- **High**: the player gained money of an account, items, a job, a gang or a group of its framework, or the right to run every command, and paid nothing. Any client can do the same on your server. Money counts only when the same arguments bring more again, as pay that comes on its own, such as paychecks, would come at the time of some event, so a bonus that comes once does not show.
+- **High**: the player gained money of an account, items, a job, a gang or a group of its framework, or the right to run every command, and paid nothing. Any client can do the same on your server. Money counts only when the same arguments bring more again, as pay that comes on its own, such as paychecks, would come at the time of some event, so a bonus that comes once does not show. What an event gives after it waited, such as items that a loop gives one by one, counts for that event once the player holds the same for a second, as `later:`, rather than for the next event.
 - **Medium**: the player gained something and paid money for it, such as an item of a shop, rows of the database changed, or the server created entities. Many events do this on purpose, such as those that save a character, but they take what clients send. The audit reads the database once all the arguments of an event went, as reading it takes long, so it tells no arguments for a change of the database.
 - **Low**: a script failed on the arguments. A client can make the event fail as often as it likes.
 

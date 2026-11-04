@@ -156,17 +156,18 @@ local function has(changes, kind)
     return false
 end
 
---- What `player` holds once it stays the same for 2 seconds, within 10, as
---- frameworks give new characters their starter items a moment after they
---- log in: QBCore once its other resources had a second to load the player.
-local function settled(player)
+--- What `player` holds once it stays the same for `reads` reads, half a
+--- second apart, within 10 seconds: 4 after it logs in, as frameworks give
+--- new characters their starter items a moment after, such as QBCore once
+--- its other resources had a second to load the player.
+local function settled(player, reads)
     local before, stable = holdings(player), 0
     for _ = 1, 20 do
         Wait(500)
         local now = holdings(player)
         local gained, lost = diff(before, now)
         stable = (#gained == 0 and #lost == 0) and stable + 1 or 0
-        if stable == 4 then return now end
+        if stable == (reads or 4) then return now end
         before = now
     end
     return before
@@ -335,6 +336,30 @@ it('audits the events that clients may trigger', function()
                 held, rows, count = settled(player), tables(), entities()
                 seen = seen + #fiverunner.output(seen + 1)
                 break
+            end
+        end
+        -- What comes after the last arguments, such as items that a loop of the
+        -- event gives one by one with waits, is the event's, not the next one's.
+        -- Money that comes then may be pay that comes on its own, such as
+        -- paychecks, so only the rest counts.
+        if open and present(player) then
+            local later = settled(player, 2)
+            local gained, lost = diff(held, later)
+            held = later
+            local effects = {}
+            for _, gain in ipairs(gained) do
+                if gain.kind ~= 'money' then effects[#effects + 1] = 'later: ' .. gain.text end
+            end
+            if #effects > 0 then
+                local severity = #lost > 0 and 'medium' or 'high'
+                for _, loss in ipairs(lost) do effects[#effects + 1] = 'later: ' .. loss end
+                if worst and RANK[worst.severity] >= RANK[severity] then
+                    for _, effect in ipairs(effects) do worst.effects[#worst.effects + 1] = effect end
+                else
+                    -- Which arguments it came of is not known: the event's, as a whole.
+                    for _, effect in ipairs(worst and worst.effects or {}) do effects[#effects + 1] = effect end
+                    worst = { severity = severity, effects = effects }
+                end
             end
         end
         -- The rows of the database, once all the arguments went, as reading them

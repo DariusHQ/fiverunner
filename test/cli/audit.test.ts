@@ -130,6 +130,11 @@ exports('buy', function(id, item, price)
     found.money = found.money - price
     found.items[item] = (found.items[item] or 0) + 1
 end)
+
+exports('addItem', function(id, item)
+    local found = data(id)
+    if found then found.items[item] = (found.items[item] or 0) + 1 end
+end)
 `,
   'resources/shop/fxmanifest.lua': `fx_version 'cerulean'
 game 'gta5'
@@ -152,6 +157,18 @@ end)
 RegisterNetEvent('shop:buy', function()
     exports.es_extended:buy(source, 'water', 50)
 end)
+
+-- Gives two bread, one at a time, as loops of scripts do.
+RegisterNetEvent('shop:farm', function()
+    local id = source
+    for _ = 1, 2 do
+        Wait(300)
+        exports.es_extended:addItem(id, 'bread')
+    end
+end)
+
+-- Gives nothing: the bread that comes late is shop:farm's.
+RegisterNetEvent('shop:look', function() end)
 `,
 }
 
@@ -163,11 +180,12 @@ describe('fiverunner audit', () => {
 
 High: what any client gains
   shop  shop:pay(1000000)  money +1000000
+  shop  shop:farm(-1000000)  item bread +1; later: item bread +6
 
 Medium: what any client changes
   shop  shop:buy()  item water +1; money -50
 
-Events: 8, of which clients may trigger 3. Findings: 1 high, 1 medium, 0 low.
+Events: 11, of which clients may trigger 5. Findings: 2 high, 1 medium, 0 low.
 `)
   }, 60000)
 
