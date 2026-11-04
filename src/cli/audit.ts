@@ -85,8 +85,9 @@ export async function audit(args: readonly string[], host: CliHost): Promise<num
     const record = recordOf(line)
     if (record?.type === 'start') {
       open = record.open
+      const which = open === 1 ? 'event' : `${open} events`
       host.stderr(
-        `Triggering the ${open} events that clients may trigger, of the ${record.events} that the server handles\n`,
+        `Triggering the ${which} that clients may trigger, of the ${record.events} that the server handles\n`,
       )
     } else if (record?.type === 'event' && record.open && ++tried % 10 === 0 && tried < open) {
       host.stderr(`  ${tried} of ${open}\n`)
