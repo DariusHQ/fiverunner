@@ -54,3 +54,7 @@ It finds what its arguments reveal, so no finding is no proof that an event is s
 - It triggers events from one player, so what one player does to others, such as fining them or teleporting them, does not show.
 
 Everything runs in FiveRunner, on your machine: no event reaches your server, and scripts send no HTTP requests.
+
+## What it finds in the resources of others
+
+Tell their authors privately first, and give them time to fix it before anyone talks about it in public, as [SECURITY.md](../SECURITY.md) says.

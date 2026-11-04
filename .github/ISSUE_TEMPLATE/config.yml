@@ -3,3 +3,6 @@ contact_links:
   - name: Questions
     url: https://github.com/DariusHQ/fiverunner/discussions
     about: How to test or develop your resources with FiveRunner.
+  - name: Security
+    url: https://github.com/DariusHQ/fiverunner/blob/main/SECURITY.md
+    about: Report a vulnerability privately, and what to do with what the audit finds in the resources of others.
