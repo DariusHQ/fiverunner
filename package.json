@@ -5,15 +5,22 @@
   "keywords": [
     "fivem",
     "cfx",
+    "fxserver",
+    "txadmin",
     "gta5",
     "qbcore",
     "qbox",
     "esx",
+    "ox_lib",
+    "oxmysql",
     "lua",
     "nui",
     "emulator",
     "testing",
-    "ci"
+    "ci",
+    "audit",
+    "security",
+    "mcp"
   ],
   "homepage": "https://github.com/DariusHQ/fiverunner#readme",
   "bugs": "https://github.com/DariusHQ/fiverunner/issues",
