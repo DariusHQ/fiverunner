@@ -508,9 +508,10 @@ async function recordPatched(project: string, chromePath: string): Promise<Timel
     await director.cut(() =>
       page.until(`document.getElementById('status').textContent === 'Running'`, undefined, 60000),
     )
+    // The story moves between the map and the screens of players right under it, as the dev UI had them before its inspector came between them.
     await page.evaluate(`(() => {
       const style = document.createElement('style')
-      style.textContent = 'html { scrollbar-width: none; scroll-behavior: smooth; }'
+      style.textContent = 'html { scrollbar-width: none; scroll-behavior: smooth; } .inspector { display: none; }'
       document.head.append(style)
     })()`)
     await story(director, page)
