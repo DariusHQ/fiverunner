@@ -13,7 +13,7 @@ No. It is a clean-room implementation: none of the code of the FiveM platform is
 Most do:
 
 - The recipes of Qbox, QBCore and ESX for txAdmin boot in its CI on every change, and their tests pass.
-- Of the 80 most starred FiveM repositories of GitHub, 69 had resources that FiveRunner could lay out. 53 of those pass the test that `fiverunner init` writes, which starts the server, connects a player and fails on any script error.
+- Of the 80 most starred FiveM repositories of GitHub, 69 had resources that FiveRunner could lay out. 53 of those pass the tests that `fiverunner init` writes, which start the server, connect a player, log it in with a character where the server runs Qbox, QBCore or ESX, and fail on any script error.
 
 Try yours in the [playground](https://dariushq.github.io/fiverunner/) with `?gh=owner/repo`. If it does not run, [tell us](https://github.com/DariusHQ/fiverunner/issues/new?template=compatibility.yml).
 

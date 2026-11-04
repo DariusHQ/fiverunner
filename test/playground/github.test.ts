@@ -404,15 +404,20 @@ exports.ox_target:addGlobalPed({})
   })
 
   it('run ox_inventory with the framework of Qbox when nothing brings one', async () => {
+    const repositories = {
+      'overextended/ox_inventory': { 'fxmanifest.lua': MANIFEST },
+      'Qbox-project/qbx_core': { 'fxmanifest.lua': `${MANIFEST}provide 'qb-core'\n` },
+      'Qbox-project/qbx_vehicles': { 'fxmanifest.lua': MANIFEST },
+      'someone/appearance': {
+        'fxmanifest.lua': MANIFEST,
+        'sql/playerskins.sql': 'CREATE TABLE IF NOT EXISTS `playerskins` (id INT);',
+      },
+    }
     const project = await loadProject(
       parseRepository('overextended/ox_inventory')!,
       [],
       () => {},
-      github({
-        'overextended/ox_inventory': { 'fxmanifest.lua': MANIFEST },
-        'Qbox-project/qbx_core': { 'fxmanifest.lua': `${MANIFEST}provide 'qb-core'\n` },
-        'Qbox-project/qbx_vehicles': { 'fxmanifest.lua': MANIFEST },
-      }),
+      github(repositories),
     )
     expect(project.loaded).toEqual([
       'overextended/ox_inventory',
@@ -420,6 +425,19 @@ exports.ox_target:addGlobalPed({})
       'Qbox-project/qbx_vehicles',
     ])
     expect(project.files['server.cfg']).toContain('setr inventory:framework "qbx"\n')
+    // The table of skins that qbx_core reads as its menu shows characters, but where a resource creates it.
+    expect(project.files['resources/playerskins.sql']).toContain(
+      'CREATE TABLE IF NOT EXISTS playerskins',
+    )
+    const dressed = await loadProject(
+      parseRepository('overextended/ox_inventory')!,
+      [parseRepository('someone/appearance')!],
+      () => {},
+      github(repositories),
+    )
+    expect(Object.keys(dressed.files).filter((path) => path.endsWith('.sql'))).toEqual([
+      'resources/appearance/sql/playerskins.sql',
+    ])
   })
 
   it('read no sources of the pages that repositories do not have built', async () => {
@@ -453,6 +471,7 @@ exports.ox_target:addGlobalPed({})
         'esx-framework/esx_core': {
           '[core]/es_extended/fxmanifest.lua': MANIFEST,
           '[core]/es_extended/es_extended.sql': 'CREATE TABLE users (identifier VARCHAR(60));',
+          '[core]/skinchanger/fxmanifest.lua': `${MANIFEST}client_script '@es_extended/locale.lua'\n`,
           '[SQL]/legacy.sql': 'CREATE TABLE users (identifier VARCHAR(60), skin LONGTEXT);',
         },
       }),
@@ -461,7 +480,12 @@ exports.ox_target:addGlobalPed({})
       'someone/job',
       'esx-framework/esx_core/[core]/es_extended',
       'esx-framework/esx_core/[SQL]',
+      'esx-framework/esx_core/[core]/skinchanger',
     ])
+    // ESX spawns players once skinchanger has loaded their skins.
+    expect(esx.files['server.cfg']).toContain(
+      'ensure "skinchanger"\nensure "es_extended"\nensure "job"\n',
+    )
     // The tables of the recipe take the place of those of es_extended, as the recipe runs only its own.
     expect(Object.keys(esx.files).filter((path) => path.endsWith('.sql'))).toEqual([
       'resources/legacy.sql',

@@ -55,6 +55,7 @@ export const KNOWN: Readonly<Record<string, string>> = {
   qbx_vehicles: 'Qbox-project/qbx_vehicles',
   es_extended: 'esx-framework/esx_core/[core]/es_extended',
   esx_lib: 'esx-framework/esx_core/[core]/esx_lib',
+  skinchanger: 'esx-framework/esx_core/[core]/skinchanger',
   PolyZone: 'mkafrin/PolyZone',
 }
 
@@ -69,6 +70,21 @@ const WITH: Readonly<Record<string, { readonly repository: string; readonly repl
     replaces: 'es_extended.sql',
   },
 }
+
+/**
+ * The table of the skins of characters, which qbx_core reads as its menu
+ * shows them, and which Qbox's recipe creates for its appearance resource,
+ * which the playground does not load.
+ */
+const SKINS = `-- Written by the playground: the table of skins that qbx_core reads as its menu shows characters.
+CREATE TABLE IF NOT EXISTS playerskins (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  citizenid VARCHAR(255) NOT NULL,
+  model VARCHAR(255) NOT NULL,
+  skin TEXT NOT NULL,
+  active TINYINT NOT NULL DEFAULT 1
+);
+`
 
 /**
  * What the playground puts where a resource has its page, when its
@@ -111,6 +127,8 @@ const SETTINGS: Readonly<Record<string, readonly string[]>> = {
 /** What the known resources need that their manifests do not say, such as the modules of others that their scripts require. */
 const IMPLIED: Readonly<Record<string, readonly string[]>> = {
   qbx_core: ['ox_inventory', 'qbx_vehicles'],
+  // ESX spawns players once skinchanger has loaded their skins.
+  es_extended: ['skinchanger'],
   'qb-target': ['qb-core'],
   'qb-menu': ['qb-core'],
 }
@@ -624,6 +642,13 @@ export async function loadProject(
       ...ensured.map((name) => `ensure "${name}"`),
       '',
     ].join('\n')
+    const skins = Object.entries(files).some(
+      ([path, data]) =>
+        path.endsWith('.sql') &&
+        typeof data === 'string' &&
+        /CREATE TABLE (IF NOT EXISTS )?`?playerskins`?/i.test(data),
+    )
+    if (names.has('qbx_core') && !skins) files['resources/playerskins.sql'] = SKINS
   }
   return {
     name: main.path === '' ? main.name : lastPart(main.path),
