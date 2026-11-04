@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.3.0](https://github.com/DariusHQ/fiverunner/releases/tag/v1.3.0) - 2026-11-04
+
+`fiverunner audit` triggers the events of a server that clients may trigger, as cheaters do, with a character logged in for Qbox, QBCore and ESX, and tells what any client gains, such as money, items or a job, what it changes in the database, and what breaks, exiting with 1 for CI when a client gains anything. Tests list the events that resources handle and read output from a line on, and the guide of tests shows how players log in to frameworks. Links of the playground tell their visitors to connect a player.
+
 ## [1.2.2](https://github.com/DariusHQ/fiverunner/releases/tag/v1.2.2) - 2026-11-04
 
 Players of Qbox join without a warning for each of its 901 vehicles, as FiveRunner names vehicle models by their hashes, which Qbox gives labels to. Links of the playground run ESX with the tables of its recipe, give QBCore, Qbox, ESX and ox_lib the commands that their recipes give them, keep the link when the forms under its card are used, and tell why reading a repository failed.
