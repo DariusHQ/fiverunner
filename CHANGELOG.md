@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.5.3](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.3) - 2026-11-04
+
+The maps of the dev UI and of the playground, and the worlds behind the screens of players, start as the cartoon, as the README and the demo show them. Players of ESX join without warnings of natives: what peds wear streams in at once, and the HUD, the traffic, the look of players, the pattern of plates and the list of the models of GTA V do nothing quietly.
+
 ## [1.5.2](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.2) - 2026-11-04
 
 Servers with hundreds of convars, as the recipes of txAdmin set, start faster: a test of the Stable recipe of Qbox starts 20% sooner. `fiverunner mcp` names Codex among the assistants that it serves, and [docs/mcp.md](docs/mcp.md) sets it up in Codex, with the time that its first start, big servers and audits need.
