@@ -15,7 +15,9 @@ const FAMILIES: readonly RegExp[] = [
   /^(Begin|End)TextCommand(Display|Print|Is|Thefeed|Scaleform|GetWidth|LineCount|Clear|Over)/,
   /ScaleformMovie(Method|Function)|^(Push|Pop|Call|Begin|End)Scaleform/,
   /^(Add|Remove)(Replace)?Texture|^CreateRuntimeT|^SetMinimap|^SetRadarZoom|^SetBigmap/,
-  /^(Lock|Unlock)Minimap|MpGamerTag/,
+  /^(Lock|Unlock)Minimap|MpGamerTag|HudComponent/,
+  // The traffic and the people of the streets, which FiveRunner has none of.
+  /^Set[A-Za-z]*(Density|Range)MultiplierThisFrame$/,
   /^(ShowHeadingIndicator|ShowNumber|HideNumber)OnBlip$|^PulseBlip$|^SetBlip(Show|Bright|Flash|High)/,
   // Effects on the screen and of the camera.
   /ParticleFx|Ptfx|^Animpostfx|Timecycle|^(Set)?Nightvision|^(Set)?Seethrough|^SetFlash$/,
@@ -43,6 +45,7 @@ const FAMILIES: readonly RegExp[] = [
 const NAMES: readonly string[] = [
   // Vehicles, of what no one sees.
   'SetVehicleHasBeenOwnedByPlayer',
+  'SetDefaultVehicleNumberPlateTextPattern',
   'SetVehicleNeedsToBeHotwired',
   'SetVehicleDeformationFixed',
   'WashDecalsFromVehicle',
@@ -74,6 +77,7 @@ const NAMES: readonly string[] = [
   'NetworkIsInSpectatorMode',
   // Players and peds.
   'SetPoliceIgnorePlayer',
+  'NetworkSetLocalPlayerSyncLookAt',
   'SetEveryoneIgnorePlayer',
   'RestorePlayerStamina',
   'SetPlayerSprint',
@@ -112,6 +116,8 @@ const NAMES: readonly string[] = [
   'ClearAreaOfObjects',
   'ClearAreaOfVehicles',
   'GetModelDimensions',
+  // FiveRunner has no list of the models of GTA V.
+  'GetAllVehicleModels',
   'GetZoneAtCoords',
   'StartScriptFire',
   'RemoveScriptFire',

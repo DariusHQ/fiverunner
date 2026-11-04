@@ -117,4 +117,22 @@ print(GetShapeTestResult(StartShapeTestRay(0.0, 0.0, 0.0, 1.0, 1.0, 1.0, -1, 0, 
     expect(silentNative(hashOf('TaskGoStraightToCoord'))).toBe(false)
     expect(silentNative(hashOf('GetVehicleCauseOfDestruction'))).toBe(false)
   })
+
+  it('says nothing of the HUD, the traffic and the models of the game, which FiveRunner has none of, as ESX asks of them as it starts', () => {
+    const hashOf = (name: string) =>
+      catalogNatives('client').find((native) => native.luaName === name)!.hash
+    expect(
+      [
+        'SetHudComponentPosition',
+        'SetHudComponentSize',
+        'HideHudComponentThisFrame',
+        'SetAmbientVehicleRangeMultiplierThisFrame',
+        'SetVehicleDensityMultiplierThisFrame',
+        'SetPedDensityMultiplierThisFrame',
+        'NetworkSetLocalPlayerSyncLookAt',
+        'SetDefaultVehicleNumberPlateTextPattern',
+        'GetAllVehicleModels',
+      ].filter((name) => !silentNative(hashOf(name))),
+    ).toEqual([])
+  })
 })

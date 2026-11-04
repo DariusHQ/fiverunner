@@ -413,10 +413,11 @@ SetPedArmour(2, 1)`),
     expect(client.diagnostics).toEqual([])
   })
 
-  it('have the config flags that scripts set, handcuffs among them, and stand still, as nothing moves them', async () => {
+  it('have the config flags that scripts set, handcuffs among them, stand still, as nothing moves them, and have what they wear streamed in at once', async () => {
     const { run, client } = await clientOf()
     expect(
       run(`local ped = PlayerPedId()
+print(HaveAllStreamingRequestsCompleted(ped), HaveAllStreamingRequestsCompleted(2))
 SetPedConfigFlag(ped, 184, true)
 SetPedConfigFlag(ped, 35, true)
 SetPedConfigFlag(ped, 35, false)
@@ -427,6 +428,7 @@ print(IsPedCuffed(ped), GetPedConfigFlag(ped, 120, true))
 SetEnableHandcuffs(ped, false)
 print(IsPedCuffed(ped), IsPedCuffed(2))`),
     ).toEqual([
+      '1\tfalse',
       '1\tfalse\tfalse',
       'false\tfalse\tfalse\t1\tfalse\tfalse\t0.0',
       '1\t1',

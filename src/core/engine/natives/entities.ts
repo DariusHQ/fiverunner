@@ -548,6 +548,19 @@ function clientEntityNatives(): NativeDefinition<NativeContext>[] {
     ).map(([name, hash]) =>
       defineNative({ name, hash, result: 'BOOL', params: ['Ped ped'] }, () => false),
     ),
+    // What peds wear streams in at once, as FiveRunner has none of the models of their clothes to load.
+    defineNative(
+      {
+        name: 'HAVE_ALL_STREAMING_REQUESTS_COMPLETED',
+        hash: 0x7350823473013c02n,
+        result: 'BOOL',
+        params: ['Ped ped'],
+      },
+      (ctx: NativeContext, ped) => {
+        const found = clientEntityOf(ctx, ped)
+        return found !== undefined && entityTypeOf(found.type) === EntityType.ped
+      },
+    ),
     // Resurrected peds get all their health back.
     defineNative(
       { name: 'RESURRECT_PED', hash: 0x71bc8e838b9c6035n, result: 'void', params: ['Ped ped'] },
