@@ -34,6 +34,9 @@ body:
         - fiverunner test
         - fiverunner dev
         - fiverunner init
+        - fiverunner audit
+        - fiverunner mcp
+        - The playground
     validations:
       required: true
   - type: input

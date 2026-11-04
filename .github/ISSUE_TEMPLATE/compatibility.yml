@@ -1,0 +1,47 @@
+name: Compatibility
+description: A script or a server that does not run on FiveRunner, in the playground or on your machine.
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying it. A link that shows the problem is the fastest way to a fix: the [playground](https://dariushq.github.io/fiverunner/) runs any repository of GitHub with `?gh=owner/repo`, and [docs/differences.md](https://github.com/DariusHQ/fiverunner/blob/main/docs/differences.md) lists where FiveRunner differs from FiveM on purpose.
+  - type: input
+    id: script
+    attributes:
+      label: The script
+      description: A link to the playground with `?gh=owner/repo`, to its repository, or the name of a release and its version.
+      placeholder: https://dariushq.github.io/fiverunner/?gh=owner/repo
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it does not run
+      options:
+        - The playground
+        - fiverunner dev
+        - fiverunner test
+        - fiverunner audit
+        - fiverunner mcp
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happens
+      description: What FiveRunner printed, such as a script error or a native that it does not implement, or what does not show.
+    validations:
+      required: true
+  - type: input
+    id: framework
+    attributes:
+      label: Framework
+      description: QBCore, Qbox, ESX or another, if the script needs one, and the resources that it needs, if you know them.
+  - type: input
+    id: version
+    attributes:
+      label: Version of FiveRunner
+      description: What `npx fiverunner --version` says, or the playground.
+    validations:
+      required: true
