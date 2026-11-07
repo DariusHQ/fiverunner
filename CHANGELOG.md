@@ -2,6 +2,10 @@
 
 What each release brought, in short. Its notes on [GitHub](https://github.com/DariusHQ/fiverunner/releases) tell all of it.
 
+## [1.5.4](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.4) - 2026-11-08
+
+Under the screen of each player, the dev UI and the playground show the keys that resources bound with `RegisterKeyMapping`, with what they do, and a click presses one. The test that `fiverunner init` writes for a server fails when one of its resources does not start, as when it needs a resource that the server lacks, which printed no script error. Links of the playground load more of what popular scripts need: jim_bridge for the scripts of jimathy, screencapture for screenshot-basic, as npwd needs, pma-voice, ps_lib, it_bridge, httpmanager, duff and iblips. 46 of the 69 most starred FiveM repositories that the playground lays out start all of their resources, where 40 did.
+
 ## [1.5.3](https://github.com/DariusHQ/fiverunner/releases/tag/v1.5.3) - 2026-11-04
 
 The maps of the dev UI and of the playground, and the worlds behind the screens of players, start as the cartoon, as the README and the demo show them. Players of ESX join without warnings of natives: what peds wear streams in at once, and the HUD, the traffic, the look of players, the pattern of plates and the list of the models of GTA V do nothing quietly.
