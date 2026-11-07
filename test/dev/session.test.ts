@@ -626,6 +626,22 @@ RegisterKeyMapping('open', 'Opens the bank', 'keyboard', 'f5')`,
     expect(session.inspect(9)).toBeUndefined()
   })
 
+  it('tell the keys of the keyboard that resources of clients bound, for the dev UI to press', async () => {
+    const { session, told } = await sessionOf(
+      '',
+      `RegisterKeyMapping('open', 'Opens the bank', 'keyboard', 'f5')
+RegisterKeyMapping('+aim', 'Aims', 'mouse_button', 'MOUSE_RIGHT')
+RegisterKeyMapping('later', 'Has no key until the player binds one', 'keyboard', '')
+RegisterKeyMapping('+walk', 'Walks', 'keyboard', 'lmenu')`,
+    )
+    await session.connect({ name: 'Ann' })
+    session.advance(1000)
+    expect(states(told()).at(-1)!.players[0]!.keys).toEqual([
+      { key: 'F5', description: 'Opens the bank', command: 'open', resource: 'bank' },
+      { key: 'LMENU', description: 'Walks', command: '+walk', resource: 'bank' },
+    ])
+  })
+
   it('run code in the resources of processes, as their scripts would, and print what it gives', async () => {
     const { session, told } = await sessionOf(`Balance = 5`, `Greeting = 'hi'`)
     const client = await session.connect({ name: 'Ann' })

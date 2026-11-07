@@ -416,6 +416,23 @@ describe.skipIf(missing && process.env.CI === undefined)('The dev UI in Chrome',
     expect(console).toContain('[script:bank] bank menu opened')
   })
 
+  it('shows the keys that resources bound under the screens of players, as buttons that press them', async () => {
+    // Those of the first player, as each player has its own.
+    const buttons = `[...document.querySelector('.player').querySelectorAll('.keys button')]`
+    const keys = await page.until<string[]>(
+      `${buttons}.length >= 2 && ${buttons}.map((button) => button.querySelector('kbd').textContent + ' ' + button.querySelector('span').textContent)`,
+    )
+    expect(keys).toEqual(['F6 Tells where the player is', 'F5 Opens the bank'])
+    await page.evaluate(
+      `${buttons}.find((button) => button.textContent.includes('Opens the bank')).click()`,
+    )
+    // The key went down and up, as the previous test pressed it, so the menu opened and closed once more.
+    const console = await page.until<string>(
+      `document.querySelector('.player .console').innerText.split('bank menu closed').length === 3 && document.querySelector('.player .console').innerText`,
+    )
+    expect(console.split('bank menu opened')).toHaveLength(3)
+  })
+
   it('runs the players whose screens have the focus where their keys say', async () => {
     const position = () =>
       page.evaluate<number[]>(

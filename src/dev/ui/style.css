@@ -506,6 +506,46 @@ main {
   flex: 1;
 }
 
+/* The keys that resources bound, in one row that scrolls, as servers bind dozens. */
+.player .keys {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.player .keys[hidden] {
+  display: none;
+}
+
+.player .keys button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  max-width: 260px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.player .keys span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player .keys kbd {
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--background);
+}
+
 .screen {
   position: relative;
   aspect-ratio: 16 / 9;

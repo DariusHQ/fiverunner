@@ -48,6 +48,28 @@ export function keyName(code: string): string | undefined {
   return KEY_NAMES[code]
 }
 
+/** How keyboards label the keys whose names in FiveM's keyboard mapper are not their labels. */
+const KEY_LABELS: Readonly<Record<string, string>> = {
+  ESCAPE: 'Esc',
+  RETURN: 'Enter',
+  BACK: 'Backspace',
+  CAPITAL: 'Caps Lock',
+  LSHIFT: 'Shift',
+  RSHIFT: 'Right Shift',
+  LCONTROL: 'Ctrl',
+  RCONTROL: 'Right Ctrl',
+  LMENU: 'Alt',
+  RMENU: 'Right Alt',
+  PAGEUP: 'Page Up',
+  PAGEDOWN: 'Page Down',
+}
+
+/** The label of a key that FiveM's keyboard mapper names, as keyboards have it. */
+export function keyLabel(name: string): string {
+  if (/^NUMPAD\d$/.test(name)) return `Num ${name.slice(6)}`
+  return KEY_LABELS[name] ?? name
+}
+
 /** What a screen needs of the dev UI. */
 export interface ScreenHost {
   /** Where a frame shows the page that FiveM has at `url`. */

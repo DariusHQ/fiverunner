@@ -11,14 +11,14 @@ import './style.css'
 import type { OutputLine } from '../../runner/output.ts'
 import type { Answer } from '../answers.ts'
 import type { FromWorker, ToWorker } from '../protocol.ts'
-import type { DevPlayer, DevState, NuiEvent } from '../session.ts'
+import type { DevKey, DevPlayer, DevState, NuiEvent } from '../session.ts'
 import { cardForm } from './card.ts'
 import { Console, keepHistory } from './console.ts'
 import { Events, showBags } from './inspect.ts'
 import { Inspector } from './inspector.ts'
 import { WorldMap } from './map.ts'
 import type { Platform } from './platform.ts'
-import { Screen } from './screen.ts'
+import { keyLabel, Screen } from './screen.ts'
 
 /** The element with the id `id`, which the page has. */
 function byId<T extends HTMLElement>(id: string): T {
@@ -74,8 +74,10 @@ export function startApp({ worker, frames, project: given, watch }: Platform): v
     readonly info: HTMLElement
     readonly card: HTMLElement
     readonly screen: Screen
+    readonly keys: HTMLElement
     readonly console: Console
     cardJson: string | undefined
+    keysJson: string | undefined
   }
 
   const players = new Map<number, PlayerView>()
@@ -122,13 +124,49 @@ export function startApp({ worker, frames, project: given, watch }: Platform): v
       cursor: (x, y) => send({ type: 'cursor', client, x, y }),
       key: (name, down) => send({ type: 'key', client, key: name, down }),
     })
+    const keys = document.createElement('div')
+    keys.className = 'keys'
+    keys.hidden = true
     const output = document.createElement('div')
     output.className = 'console small'
-    element.append(header, screen.element, card, output)
+    element.append(header, screen.element, keys, card, output)
     playerList.append(element)
-    view = { element, info, card, screen, console: new Console(output), cardJson: undefined }
+    view = {
+      element,
+      info,
+      card,
+      screen,
+      keys,
+      console: new Console(output),
+      cardJson: undefined,
+      keysJson: undefined,
+    }
     players.set(client, view)
     return view
+  }
+
+  /** Shows the keys that resources bound for the player, as buttons that press them, so that what a resource does is a click away. */
+  function showKeys(client: number, view: PlayerView, keys: readonly DevKey[]): void {
+    const json = JSON.stringify(keys)
+    if (view.keysJson === json) return
+    view.keysJson = json
+    view.keys.hidden = keys.length === 0
+    view.keys.replaceChildren(
+      ...keys.map(({ key, description, command, resource }) => {
+        const button = document.createElement('button')
+        const label = document.createElement('kbd')
+        label.textContent = keyLabel(key)
+        const what = document.createElement('span')
+        what.textContent = description || command
+        button.append(label, what)
+        button.title = `${resource}: ${command}`
+        button.addEventListener('click', () => {
+          send({ type: 'key', client, key, down: true })
+          send({ type: 'key', client, key, down: false })
+        })
+        return button
+      }),
+    )
   }
 
   /** Shows the deferral card of a player as a form, or as JSON, with a box for what its Action.Submit gives, if it has what the dev UI does not know. */
@@ -196,6 +234,7 @@ export function startApp({ worker, frames, project: given, watch }: Platform): v
       view.screen.world.show(state.map, state.players)
       view.screen.fade(player.fade ?? 0)
       view.screen.blur(player.blurred === true)
+      showKeys(player.client, view, gone ? [] : (player.keys ?? []))
       showCard(player.client, view, player)
     }
   }

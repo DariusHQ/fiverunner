@@ -57,6 +57,17 @@ export interface DevPlayer {
   readonly fade?: number
   /** Whether scripts blurred the screen of the game of the player, while they did. */
   readonly blurred?: boolean
+  /** The keys of the keyboard that resources of the client bound to commands, in the order they bound them, while there are any. */
+  readonly keys?: readonly DevKey[]
+}
+
+/** A key of the keyboard that a resource of a client bound to a command, as RegisterKeyMapping binds them. */
+export interface DevKey {
+  /** The key, by the name that FiveM's keyboard mapper gives it, such as F5. */
+  readonly key: string
+  readonly description: string
+  readonly command: string
+  readonly resource: string
 }
 
 /** A state bag of the server, with its keys and their values, as describe writes them. */
@@ -384,6 +395,15 @@ export class DevSession {
       resources: [...this.#engine.server.resources].map(({ name, state }) => ({ name, state })),
       players: this.#clients.map(({ player, manager }, index) => {
         const fade = Math.round((manager.world?.screen.level(manager.time()) ?? 0) * 100) / 100
+        // The keys that the dev UI can press: those of the keyboard that have a key, as players may bind the others.
+        const keys = [...(manager.world?.input.mappings.values() ?? [])]
+          .filter(({ mapper, key }) => mapper === 'keyboard' && key !== '')
+          .map(({ key, description, command, resource }) => ({
+            key,
+            description,
+            command,
+            resource,
+          }))
         return {
           client: index + 1,
           name: player.name,
@@ -394,6 +414,7 @@ export class DevSession {
           ...(player.rejection === undefined ? {} : { rejection: player.rejection }),
           ...(fade > 0 ? { fade } : {}),
           ...(manager.world?.screenBlurred === true ? { blurred: true } : {}),
+          ...(keys.length > 0 ? { keys } : {}),
         }
       }),
       bags: bags.map((bag) => ({
