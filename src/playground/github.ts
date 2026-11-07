@@ -57,6 +57,7 @@ export const KNOWN: Readonly<Record<string, string>> = {
   esx_lib: 'esx-framework/esx_core/[core]/esx_lib',
   skinchanger: 'esx-framework/esx_core/[core]/skinchanger',
   PolyZone: 'mkafrin/PolyZone',
+  jim_bridge: 'jimathy/jim_bridge',
 }
 
 /**
@@ -131,10 +132,23 @@ const IMPLIED: Readonly<Record<string, readonly string[]>> = {
   es_extended: ['skinchanger'],
   'qb-target': ['qb-core'],
   'qb-menu': ['qb-core'],
+  // jim_bridge loads ox_lib into the scripts on it, once ox_lib started.
+  jim_bridge: ['ox_lib'],
 }
 
 /** The frameworks of servers, by the names of their resources. */
 const FRAMEWORKS: readonly string[] = ['qb-core', 'qbx_core', 'es_extended', 'ox_core', 'ND_Core']
+
+/**
+ * Resources that run on whichever framework a server has, but need one:
+ * without any, ox_inventory takes ESX's bridge and fails on its tables,
+ * and the scripts on jim_bridge have no players, items or jobs to use.
+ * They run with Qbox's, as Qbox's recipe runs ox_inventory.
+ */
+const ON_A_FRAMEWORK: readonly string[] = ['ox_inventory', 'jim_bridge']
+
+/** Resources that look for the framework of the server as they start, which so start after it. */
+const AFTER_FRAMEWORK: readonly string[] = ['jim_bridge']
 
 /**
  * What scripts use through exports without their manifests saying so, in
@@ -625,15 +639,19 @@ export async function loadProject(
     if (
       pending.length === 0 &&
       !own &&
-      names.has('ox_inventory') &&
+      ON_A_FRAMEWORK.some((name) => names.has(name)) &&
       !FRAMEWORKS.some((name) => names.has(name) || needs.has(name))
     ) {
-      // With no framework, ox_inventory takes ESX's bridge and fails on its tables: it runs with Qbox's, as in Qbox's recipe.
       needs.add('qbx_core')
       pending = stillNeeded()
     }
   }
   if (!own) {
+    const frameworks = FRAMEWORKS.filter((name) => names.has(name))
+    for (const name of AFTER_FRAMEWORK) {
+      const needed = started.get(name)
+      if (needed !== undefined) started.set(name, [...needed, ...frameworks])
+    }
     const ensured = startOrder(started, providers)
     const framework = Object.keys(INVENTORY_FRAMEWORKS).find((name) => names.has(name))
     files['server.cfg'] = [

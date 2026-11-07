@@ -440,6 +440,39 @@ exports.ox_target:addGlobalPed({})
     ])
   })
 
+  it('load jim_bridge for the scripts that need it, with the framework of Qbox when nothing brings one', async () => {
+    const project = await loadProject(
+      parseRepository('jimathy/jim-mining')!,
+      [],
+      () => {},
+      github({
+        'jimathy/jim-mining': { 'fxmanifest.lua': `${MANIFEST}dependency 'jim_bridge'\n` },
+        'jimathy/jim_bridge': { 'fxmanifest.lua': MANIFEST },
+        'overextended/ox_lib': { 'fxmanifest.lua': MANIFEST },
+        'Qbox-project/qbx_core': { 'fxmanifest.lua': `${MANIFEST}provide 'qb-core'\n` },
+        'Qbox-project/qbx_vehicles': { 'fxmanifest.lua': MANIFEST },
+        'overextended/ox_inventory': { 'fxmanifest.lua': MANIFEST },
+      }),
+    )
+    expect(project.loaded).toEqual([
+      'jimathy/jim-mining',
+      'jimathy/jim_bridge',
+      'overextended/ox_lib',
+      'Qbox-project/qbx_core',
+      'overextended/ox_inventory',
+      'Qbox-project/qbx_vehicles',
+    ])
+    // jim_bridge looks for ox_lib and the framework as it starts, and the scripts on it for jim_bridge.
+    const config = project.files['server.cfg'] as string
+    const order = [...config.matchAll(/^ensure "(.+)"$/gm)].map(([, name]) => name)
+    const at = (name: string) => order.indexOf(name)
+    expect([
+      at('ox_lib') < at('jim_bridge'),
+      at('qbx_core') < at('jim_bridge'),
+      at('jim_bridge') < at('jim-mining'),
+    ]).toEqual([true, true, true])
+  })
+
   it('read no sources of the pages that repositories do not have built', async () => {
     const asked: string[] = []
     const read = await readRepository(
