@@ -58,6 +58,14 @@ export const KNOWN: Readonly<Record<string, string>> = {
   skinchanger: 'esx-framework/esx_core/[core]/skinchanger',
   PolyZone: 'mkafrin/PolyZone',
   jim_bridge: 'jimathy/jim_bridge',
+  // screencapture provides screenshot-basic, as in Qbox's recipe, whose own needs yarn and webpack to build.
+  'screenshot-basic': 'itschip/screencapture',
+  'pma-voice': 'AvarianKnight/pma-voice',
+  ps_lib: 'Project-Sloth/ps_lib',
+  it_bridge: 'it-scripts/it_bridge',
+  httpmanager: 'kibook/httpmanager',
+  duff: 'DonHulieo/duff',
+  iblips: 'DonHulieo/iblips',
 }
 
 /**
@@ -142,13 +150,14 @@ const FRAMEWORKS: readonly string[] = ['qb-core', 'qbx_core', 'es_extended', 'ox
 /**
  * Resources that run on whichever framework a server has, but need one:
  * without any, ox_inventory takes ESX's bridge and fails on its tables,
- * and the scripts on jim_bridge have no players, items or jobs to use.
- * They run with Qbox's, as Qbox's recipe runs ox_inventory.
+ * duff calls the framework invalid, and the scripts on jim_bridge have no
+ * players, items or jobs to use. They run with Qbox's, as Qbox's recipe
+ * runs ox_inventory.
  */
-const ON_A_FRAMEWORK: readonly string[] = ['ox_inventory', 'jim_bridge']
+const ON_A_FRAMEWORK: readonly string[] = ['ox_inventory', 'jim_bridge', 'duff']
 
 /** Resources that look for the framework of the server as they start, which so start after it. */
-const AFTER_FRAMEWORK: readonly string[] = ['jim_bridge']
+const AFTER_FRAMEWORK: readonly string[] = ['jim_bridge', 'duff']
 
 /**
  * What scripts use through exports without their manifests saying so, in

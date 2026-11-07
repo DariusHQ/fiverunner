@@ -440,6 +440,20 @@ exports.ox_target:addGlobalPed({})
     ])
   })
 
+  it('load screencapture for the scripts that need screenshot-basic, which it provides', async () => {
+    const project = await loadProject(
+      parseRepository('someone/phone')!,
+      [],
+      () => {},
+      github({
+        'someone/phone': { 'fxmanifest.lua': `${MANIFEST}dependency 'screenshot-basic'\n` },
+        'itschip/screencapture': { 'fxmanifest.lua': `${MANIFEST}provide 'screenshot-basic'\n` },
+      }),
+    )
+    expect(project.loaded).toEqual(['someone/phone', 'itschip/screencapture'])
+    expect(project.files['server.cfg']).toContain('ensure "screencapture"\nensure "phone"\n')
+  })
+
   it('load jim_bridge for the scripts that need it, with the framework of Qbox when nothing brings one', async () => {
     const project = await loadProject(
       parseRepository('jimathy/jim-mining')!,
