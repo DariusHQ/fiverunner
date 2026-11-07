@@ -497,16 +497,27 @@ describe('fiverunner init', () => {
     ])
   })
 
-  it('adds a test that fails on scripts that do not load, and on the client scripts of players', async () => {
+  it('adds a test that fails on scripts that do not load, on resources that do not start, and on the client scripts of players', async () => {
     const syntax = write('syntax', { 'fxmanifest.lua': MANIFEST, 'server.lua': 'local = 1' })
     const client = write('client', {
       'fxmanifest.lua': `${MANIFEST}\nclient_script 'client.lua'`,
       'server.lua': `print('server')`,
       'client.lua': `error('broken')`,
     })
+    // A resource of a server that needs one that the server lacks, which prints no script error.
+    const missing = write('missing', {
+      'resources/shop/fxmanifest.lua': `${MANIFEST}\ndependency 'bank'`,
+      'resources/shop/server.lua': `print('shop')`,
+      'server.cfg': 'ensure shop',
+    })
     await init(syntax)
     await init(client)
-    expect([(await test(syntax)).code, (await test(client)).code]).toEqual([1, 1])
+    await init(missing)
+    expect([
+      (await test(syntax)).code,
+      (await test(client)).code,
+      (await test(missing)).code,
+    ]).toEqual([1, 1, 1])
   })
 
   it('adds a test that logs a player in with a character on servers of Qbox, QBCore and ESX', async () => {

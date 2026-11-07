@@ -10,11 +10,11 @@ import typesSource from './types.lua?raw'
 const USAGE = `Usage: fiverunner init
 
 Adds tests to the project in this directory: a test file, which checks
-that the project starts without script errors, and on servers of Qbox,
-QBCore or ESX that a player logs in with a character, what the Lua language
-server needs to know the functions of tests, and, at the root of a git
-repository, a GitHub Actions workflow that runs the tests on each push.
-It writes over nothing that is there.
+that the project starts all of its resources without script errors, and
+on servers of Qbox, QBCore or ESX that a player logs in with a character,
+what the Lua language server needs to know the functions of tests, and,
+at the root of a git repository, a GitHub Actions workflow that runs the
+tests on each push. It writes over nothing that is there.
 
 Options:
   -h, --help  Show this help
@@ -154,7 +154,8 @@ ${login.code}        -- Scripts load the character a moment after it logs in.
 local function errors(output)
     local found = {}
     for _, line in ipairs(output) do
-        if line:find('SCRIPT ERROR', 1, true) or line:find('Failed to load script', 1, true) then
+        if line:find('SCRIPT ERROR', 1, true) or line:find('Failed to load script', 1, true)
+            or line:find("Couldn't start resource", 1, true) then
             found[#found + 1] = line
         end
     end
