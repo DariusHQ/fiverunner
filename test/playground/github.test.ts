@@ -489,6 +489,30 @@ exports.ox_target:addGlobalPed({})
     )
   })
 
+  it('send once more each request that the network drops, and tell of what it drops twice', async () => {
+    const repositories = {
+      'someone/mine': { 'fxmanifest.lua': MANIFEST, 'server.lua': `print('mine')` },
+    }
+    const real = github(repositories)
+    const tried = new Map<string, number>()
+    // The network drops the first request for each URL, and every request for server.lua in `lossy`.
+    const flaky =
+      (lossy: boolean): Fetcher =>
+      async (url, init) => {
+        const count = (tried.get(url) ?? 0) + 1
+        tried.set(url, count)
+        if (count === 1 || (lossy && url.endsWith('/server.lua')))
+          throw new TypeError('Failed to fetch')
+        return real(url, init)
+      }
+    const project = await loadProject(parseRepository('someone/mine')!, [], () => {}, flaky(false))
+    expect(project.files['resources/mine/server.lua']).toBe(`print('mine')`)
+    tried.clear()
+    await expect(
+      loadProject(parseRepository('someone/mine')!, [], () => {}, flaky(true)),
+    ).rejects.toThrow('GitHub could not be reached for server.lua of someone/mine.')
+  })
+
   it('load screencapture for the scripts that need screenshot-basic, which it provides', async () => {
     const project = await loadProject(
       parseRepository('someone/phone')!,

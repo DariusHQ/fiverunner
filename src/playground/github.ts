@@ -624,10 +624,12 @@ export async function loadProject(
   let left = 0
   // The directories of a repository, such as those of esx_core, share its tree, which GitHub counts against the hour once, as they share its listing of ungh.cc.
   const trees = new Map<string, Promise<Response>>()
+  // Of the hundreds of requests that a link sends, a network may drop one, as those of VPNs do: it goes once more.
+  const again: Fetcher = (url, init) => request(url, init).catch(() => request(url, init))
   const shared: Fetcher = (url, init) => {
     if (!url.startsWith('https://api.github.com/') && !url.startsWith('https://ungh.cc/'))
-      return request(url, init)
-    if (!trees.has(url)) trees.set(url, request(url, init))
+      return again(url, init)
+    if (!trees.has(url)) trees.set(url, again(url, init))
     return trees.get(url)!.then((response) => response.clone())
   }
 
