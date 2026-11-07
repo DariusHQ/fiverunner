@@ -106,6 +106,50 @@ const UNBUILT = `<!doctype html>
 <!-- FiveRunner's playground: this resource builds its page from sources, which its repository has, but not the page. -->
 `
 
+/**
+ * Repositories whose releases have their pages built, but not their trees,
+ * whose built pages the playground serves itself, from their latest
+ * releases, by the names of the directories that it serves them from:
+ * scripts/vendor-pages.ts puts them there as the playground deploys.
+ */
+export const BUILT_PAGES: Readonly<Record<string, string>> = {
+  'overextended/ox_lib': 'ox_lib',
+  'overextended/ox_inventory': 'ox_inventory',
+  'overextended/ox_doorlock': 'ox_doorlock',
+}
+
+/**
+ * The built pages of a repository of BUILT_PAGES, from `pages`, the URL of
+ * the directory that the playground serves them from, by their paths in the
+ * directory of the page: files.json lists them, and build/ has them. None if
+ * the repository is not one of them, or they could not all be read.
+ */
+async function builtPages(
+  repository: Repository,
+  pages: string,
+  request: Fetcher,
+): Promise<Map<string, string | Uint8Array> | undefined> {
+  const directory = BUILT_PAGES[`${repository.owner}/${repository.name}`]
+  if (directory === undefined) return undefined
+  try {
+    const listing = await request(`${pages}${directory}/files.json`)
+    if (!listing.ok) return undefined
+    const { files } = (await listing.json()) as { files: string[] }
+    const built = new Map<string, string | Uint8Array>()
+    await Promise.all(
+      files.map(async (file) => {
+        const response = await request(`${pages}${directory}/build/${encodePath(file)}`)
+        if (!response.ok) throw new Error(`${file}: ${response.status}`)
+        built.set(file, decodeFile(file, new Uint8Array(await response.arrayBuffer())))
+      }),
+    )
+    return built
+  } catch {
+    // What could not be read leaves the page as it would be without it: a page that shows nothing.
+    return undefined
+  }
+}
+
 /** The names that ox_inventory knows the frameworks it runs with by, which txAdmin's recipes set it. */
 const INVENTORY_FRAMEWORKS: Readonly<Record<string, string>> = {
   qbx_core: 'qbx',
@@ -604,12 +648,15 @@ export async function readRepository(
  * knows of, then lays them out as a server: the files of each, and a
  * server.cfg that starts them, the needed ones first, unless the repository
  * of the link is a server with one of its own, which needs nothing else.
+ * `pages` is the URL of the built pages of BUILT_PAGES, which the playground
+ * serves; without it, their pages show nothing.
  */
 export async function loadProject(
   main: Repository,
   also: readonly Repository[],
   progress: (label: string, read: number, of: number) => void,
   request: Fetcher = fetch,
+  pages?: string,
 ): Promise<Project> {
   const files: Record<string, string | Uint8Array> = {}
   const names = new Set<string>(BUILT_IN)
@@ -680,8 +727,14 @@ export async function loadProject(
       }
       const at = page === undefined ? undefined : directory === '' ? page : `${directory}/${page}`
       if (at !== undefined && !read.files.has(at)) {
-        files[place(at)] = UNBUILT
-        unbuilt.push(name)
+        const built = pages === undefined ? undefined : await builtPages(repository, pages, shared)
+        if (built === undefined) {
+          files[place(at)] = UNBUILT
+          unbuilt.push(name)
+        } else {
+          const base = at.slice(0, at.lastIndexOf('/') + 1)
+          for (const [file, data] of built) files[place(base + file)] = data
+        }
       }
     }
     if (extra !== undefined) await load(parseRepository(extra.repository)!)

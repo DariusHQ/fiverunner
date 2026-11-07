@@ -513,6 +513,42 @@ exports.ox_target:addGlobalPed({})
     ).rejects.toThrow('GitHub could not be reached for server.lua of someone/mine.')
   })
 
+  it('serve the built pages of resources whose repositories have only their sources, as the playground has them', async () => {
+    const real = github({
+      'overextended/ox_lib': {
+        'fxmanifest.lua': `${MANIFEST}ui_page 'web/build/index.html'\n`,
+        'web/src/main.tsx': 'the source of the page',
+      },
+    })
+    const built: Record<string, string> = {
+      'https://playground/vendor/ox_lib/build/index.html': '<!doctype html><title>ox_lib</title>',
+      'https://playground/vendor/ox_lib/build/assets/index.js': 'console.log(1)',
+    }
+    const served: Fetcher = async (url, init) => {
+      if (url === 'https://playground/vendor/ox_lib/files.json') {
+        return Response.json({ files: ['assets/index.js', 'index.html'] })
+      }
+      return built[url] === undefined ? real(url, init) : new Response(built[url])
+    }
+    const project = await loadProject(
+      parseRepository('overextended/ox_lib')!,
+      [],
+      () => {},
+      served,
+      'https://playground/vendor/',
+    )
+    expect([
+      project.files['resources/ox_lib/web/build/index.html'],
+      project.files['resources/ox_lib/web/build/assets/index.js'],
+      project.files['resources/ox_lib/web/src/main.tsx'],
+    ]).toEqual(['<!doctype html><title>ox_lib</title>', 'console.log(1)', undefined])
+    // Without them, as in tests and sweeps, the page shows nothing.
+    const plain = await loadProject(parseRepository('overextended/ox_lib')!, [], () => {}, real)
+    expect(plain.files['resources/ox_lib/web/build/index.html']).toContain(
+      '<title>Not built</title>',
+    )
+  })
+
   it('load screencapture for the scripts that need screenshot-basic, which it provides', async () => {
     const project = await loadProject(
       parseRepository('someone/phone')!,

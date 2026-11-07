@@ -109,9 +109,16 @@ export function confirmAndLoad(parent: HTMLElement, link: Link): Promise<Project
       run.disabled = true
       status.classList.remove('error')
       try {
-        const project = await loadProject(link.main, link.also, (label, read, of) => {
-          status.textContent = `Reading ${label} from GitHub: ${read} of ${of} files`
-        })
+        const project = await loadProject(
+          link.main,
+          link.also,
+          (label, read, of) => {
+            status.textContent = `Reading ${label} from GitHub: ${read} of ${of} files`
+          },
+          undefined,
+          // The built pages of resources whose repositories have only their sources, which the playground serves.
+          new URL('vendor/', location.href).href,
+        )
         shown.remove()
         resolve(project)
       } catch (error) {

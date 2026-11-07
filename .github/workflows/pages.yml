@@ -31,6 +31,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:playground
+      # ox_lib, ox_inventory and ox_doorlock build their pages in their releases, not in their repositories.
+      - name: Add the built pages of their latest releases
+        run: node scripts/vendor-pages.ts dist-playground/vendor
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist-playground
