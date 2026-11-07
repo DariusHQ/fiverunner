@@ -440,6 +440,55 @@ exports.ox_target:addGlobalPed({})
     ])
   })
 
+  it('list repositories through ungh.cc once the hour of GitHub is used, and read their files at the commit that it listed', async () => {
+    const files: Record<string, string> = {
+      'fxmanifest.lua': MANIFEST,
+      'server.lua': `print('mine')`,
+    }
+    const used = () =>
+      new Response('{"message":"API rate limit exceeded"}', {
+        status: 403,
+        headers: {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + 600),
+        },
+      })
+    const limited: Fetcher = async (url) => {
+      if (url.startsWith('https://api.github.com/')) return used()
+      if (url === 'https://ungh.cc/repos/someone/mine/files/HEAD') {
+        return Response.json({
+          meta: { sha: 'c0ffee' },
+          files: [
+            ...Object.keys(files).map((path) => ({ path, mode: '100644', size: 12 })),
+            // A submodule, which GitHub serves no raw files of.
+            { path: 'vendor', mode: '160000', size: 0 },
+          ],
+        })
+      }
+      if (url.startsWith('https://ungh.cc/')) return new Response('{"error":true}', { status: 404 })
+      const raw = /^https:\/\/raw\.githubusercontent\.com\/someone\/mine\/c0ffee\/(.+)$/.exec(url)
+      const data = raw === null ? undefined : files[raw[1]!]
+      return data === undefined
+        ? new Response('404: Not Found', { status: 404 })
+        : new Response(data)
+    }
+    const read = await readRepository(parseRepository('someone/mine')!, () => {}, limited)
+    expect([...read.files.keys()]).toEqual(['fxmanifest.lua', 'server.lua'])
+    await expect(
+      readRepository(parseRepository('someone/gone')!, () => {}, limited),
+    ).rejects.toThrow(
+      'GitHub has no public repository someone/gone with files on its default branch.',
+    )
+    // Once ungh.cc lists nothing either, the visitor learns when GitHub lists again.
+    const nowhere: Fetcher = async (url) =>
+      url.startsWith('https://api.github.com/') ? used() : new Response('', { status: 503 })
+    await expect(
+      readRepository(parseRepository('someone/mine')!, () => {}, nowhere),
+    ).rejects.toThrow(
+      "GitHub lets a visitor list 60 repositories an hour without signing in, and this hour's are used: try again in 10 minutes.",
+    )
+  })
+
   it('load screencapture for the scripts that need screenshot-basic, which it provides', async () => {
     const project = await loadProject(
       parseRepository('someone/phone')!,

@@ -35,11 +35,11 @@ Node 22 or later: no FXServer, no MySQL, no Docker. oxmysql's exports run on a d
 
 ## Does it send anything anywhere?
 
-No. FiveRunner has no telemetry. In tests and audits, scripts send no HTTP requests. In `fiverunner dev`, scripts send theirs, as they would on a server. The playground reads repositories from GitHub, in your browser.
+No. FiveRunner has no telemetry. In tests and audits, scripts send no HTTP requests. In `fiverunner dev`, scripts send theirs, as they would on a server. The playground reads repositories from GitHub, in your browser. When GitHub refuses to list one, as it does once your address used its hour, the playground asks [ungh.cc](https://github.com/unjs/ungh), a public proxy of GitHub's API, for the list of its files, which tells ungh.cc the name of the repository.
 
 ## Why does the playground say I used my 60 repositories of the hour?
 
-GitHub lets a visitor list 60 repositories an hour without signing in, and the playground reads each repository that a link needs through it. A link to Qbox reads about six. Try again in the hour that it tells you.
+GitHub lets a visitor list 60 repositories an hour without signing in, and the playground reads each repository that a link needs through it. A link to Qbox reads about six. Addresses that many people share, such as those of VPNs, use the hour up fast. The playground then lists the repositories through [ungh.cc](https://github.com/unjs/ungh), a public proxy of GitHub's API, and reads their files from GitHub at the commit that it listed, so it says this only when ungh.cc cannot list them either. Try again in the hour that it tells you.
 
 ## Is `fiverunner audit` an anti-cheat?
 

@@ -418,6 +418,51 @@ export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 /** The path of a file in a URL, each of its parts encoded. */
 const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/')
 
+/** A file of the tree of a repository, as GitHub lists them. */
+interface TreeEntry {
+  readonly path: string
+  readonly type: string
+  readonly size?: number | undefined
+}
+
+/**
+ * Lists the files of a repository through ungh.cc, a public proxy of
+ * GitHub's API for pages, for visitors whose address used up GitHub's hour,
+ * as those of VPNs, which many share, often do. Returns the commit that it
+ * listed, whose files GitHub serves raw without counting them, 'missing'
+ * if the repository or its ref is not there, or nothing if it could not
+ * list it.
+ */
+async function listThroughUngh(
+  owner: string,
+  name: string,
+  ref: string,
+  request: Fetcher,
+): Promise<{ sha: string; entries: TreeEntry[] } | 'missing' | undefined> {
+  try {
+    const response = await request(
+      `https://ungh.cc/repos/${owner}/${name}/files/${encodeURIComponent(ref)}`,
+    )
+    if (response.status === 404) return 'missing'
+    if (!response.ok) return undefined
+    const { meta, files } = (await response.json()) as {
+      meta?: { sha?: string }
+      files?: { path: string; mode?: string; size?: number }[]
+    }
+    if (meta?.sha === undefined || files === undefined) return undefined
+    return {
+      sha: meta.sha,
+      // Submodules are commits of other repositories, which GitHub serves no raw files of.
+      entries: files
+        .filter(({ mode }) => mode !== '160000')
+        .map(({ path, size }) => ({ path, type: 'blob', size })),
+    }
+  } catch {
+    // ungh.cc could not be reached, or did not answer with a listing.
+    return undefined
+  }
+}
+
 /**
  * Reads the files of a directory of a repository: its tree at its ref, of
  * GitHub's API, then each file that it keeps, raw, a few at once, telling
@@ -442,27 +487,33 @@ export async function readRepository(
   } catch {
     throw new RepositoryError(`GitHub could not be reached for ${label}.`)
   }
+  const missing = `GitHub has no public repository ${owner}/${name} with ${ref === 'HEAD' ? 'files on its default branch' : `the ref ${ref}`}.`
+  let entries: readonly TreeEntry[]
+  /** The ref whose files it reads raw: the commit that ungh.cc listed, if it listed them. */
+  let at = ref
   if (!response.ok && response.headers.get('x-ratelimit-remaining') === '0') {
-    const reset = Number(response.headers.get('x-ratelimit-reset') ?? 0) * 1000
-    const minutes = Math.max(1, Math.ceil((reset - Date.now()) / 60000))
-    throw new RepositoryError(
-      `GitHub lets a visitor list 60 repositories an hour without signing in, and this hour's are used: try again in ${minutes} minutes.`,
-    )
-  }
-  if (response.status === 404 || response.status === 409 || response.status === 422) {
-    throw new RepositoryError(
-      `GitHub has no public repository ${owner}/${name} with ${ref === 'HEAD' ? 'files on its default branch' : `the ref ${ref}`}.`,
-    )
-  }
-  if (!response.ok) throw new RepositoryError(`GitHub answered ${response.status} for ${label}.`)
-  const tree = (await response.json()) as {
-    truncated?: boolean
-    tree?: { path: string; type: string; size?: number }[]
-  }
-  if (tree.truncated === true || tree.tree === undefined) {
-    throw new RepositoryError(
-      `${owner}/${name} has more files than GitHub lists at once: link to the directory of a resource in it.`,
-    )
+    const listed = await listThroughUngh(owner, name, ref, request)
+    if (listed === 'missing') throw new RepositoryError(missing)
+    if (listed === undefined) {
+      const reset = Number(response.headers.get('x-ratelimit-reset') ?? 0) * 1000
+      const minutes = Math.max(1, Math.ceil((reset - Date.now()) / 60000))
+      throw new RepositoryError(
+        `GitHub lets a visitor list 60 repositories an hour without signing in, and this hour's are used: try again in ${minutes} minutes.`,
+      )
+    }
+    ;({ sha: at, entries } = listed)
+  } else {
+    if (response.status === 404 || response.status === 409 || response.status === 422) {
+      throw new RepositoryError(missing)
+    }
+    if (!response.ok) throw new RepositoryError(`GitHub answered ${response.status} for ${label}.`)
+    const tree = (await response.json()) as { truncated?: boolean; tree?: TreeEntry[] }
+    if (tree.truncated === true || tree.tree === undefined) {
+      throw new RepositoryError(
+        `${owner}/${name} has more files than GitHub lists at once: link to the directory of a resource in it.`,
+      )
+    }
+    entries = tree.tree
   }
   const prefix = path === '' ? '' : `${path}/`
   const wanted: string[] = []
@@ -470,7 +521,7 @@ export async function readRepository(
   const empty = new Set<string>()
   let left = 0
   let bytes = 0
-  for (const entry of tree.tree) {
+  for (const entry of entries) {
     if (entry.type !== 'blob' || !entry.path.startsWith(prefix)) continue
     const relative = entry.path.slice(prefix.length)
     if (leftOut(relative, entry.size ?? 0) !== undefined) {
@@ -501,7 +552,7 @@ export async function readRepository(
           progress(files.size, total)
           continue
         }
-        const url = `https://raw.githubusercontent.com/${owner}/${name}/${encodeURIComponent(ref)}/${encodePath(prefix + file)}`
+        const url = `https://raw.githubusercontent.com/${owner}/${name}/${encodeURIComponent(at)}/${encodePath(prefix + file)}`
         let got: Response
         try {
           got = await request(url)
@@ -571,10 +622,11 @@ export async function loadProject(
   const unbuilt: string[] = []
   let own = false
   let left = 0
-  // The directories of a repository, such as those of esx_core, share its tree, which GitHub counts against the hour once.
+  // The directories of a repository, such as those of esx_core, share its tree, which GitHub counts against the hour once, as they share its listing of ungh.cc.
   const trees = new Map<string, Promise<Response>>()
   const shared: Fetcher = (url, init) => {
-    if (!url.startsWith('https://api.github.com/')) return request(url, init)
+    if (!url.startsWith('https://api.github.com/') && !url.startsWith('https://ungh.cc/'))
+      return request(url, init)
     if (!trees.has(url)) trees.set(url, request(url, init))
     return trees.get(url)!.then((response) => response.clone())
   }
