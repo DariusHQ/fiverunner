@@ -52,6 +52,10 @@ export function scriptingNatives(side: Side): NativeDefinition<NativeContext>[] 
     defineNative({ name: 'GET_GAME_NAME', result: 'char*', params: [] }, (ctx: NativeContext) =>
       ctx.manager.side === 'server' ? 'fxserver' : 'fivem',
     ),
+    // The game, where GetGameName tells the platform: FiveRunner's clients run GTA V's.
+    ...(side === 'client'
+      ? [defineNative({ name: 'GET_CURRENT_GAME_NAME', result: 'char*', params: [] }, () => 'gta5')]
+      : []),
     defineNative(
       { name: 'FORMAT_STACK_TRACE', result: 'char*', params: ['object traceData'] },
       (ctx: NativeContext, traceData) => ctx.manager.formatStackTrace(traceData),

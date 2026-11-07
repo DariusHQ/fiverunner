@@ -84,6 +84,7 @@ export function streamingNatives(side: Side): NativeDefinition<NativeContext>[] 
       { name: 'HAS_PTFX_ASSET_LOADED', hash: 0xca7d9b86eca7481bn, result: 'BOOL', params: [] },
       () => true,
     ),
+    defineNative({ name: 'ROPE_ARE_TEXTURES_LOADED', result: 'BOOL', params: [] }, () => true),
     ...(
       [
         ['REQUEST_AMBIENT_AUDIO_BANK', 0xfe02ffbed8ca9d99n],

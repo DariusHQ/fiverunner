@@ -145,13 +145,14 @@ end)`),
     expect(test.client.diagnostics).toEqual([])
   })
 
-  it('include interiors, audio banks and headshots, which are ready at once', async () => {
+  it('include interiors, audio banks, the textures of ropes and headshots, which are ready at once', async () => {
     const { run, client } = await clientOf()
     expect(
-      run(`print(IsInteriorReady(0), RequestAmbientAudioBank('DLC', false), HasPtfxAssetLoaded())
+      run(`RopeLoadTextures()
+print(IsInteriorReady(0), RequestAmbientAudioBank('DLC', false), HasPtfxAssetLoaded(), RopeAreTexturesLoaded())
 local shot = RegisterPedheadshot(PlayerPedId())
 print(IsPedheadshotReady(shot), IsPedheadshotValid(shot), GetPedheadshotTxdString(shot))`),
-    ).toEqual(['1\t1\t1', '1\t1\tCHAR_DEFAULT'])
+    ).toEqual(['1\t1\t1\t1', '1\t1\tCHAR_DEFAULT'])
     expect(client.diagnostics).toEqual([])
   })
 })

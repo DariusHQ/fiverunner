@@ -655,6 +655,12 @@ CreateThread(function() print(GetCurrentResourceName(), GetInvokingResource()) e
     }
   })
 
+  it('name the game that clients run, GTA V', async () => {
+    const proc = await createProcess({ side: 'client' })
+    proc.add('a', { 'main.lua': `print(GetCurrentGameName())` }).start()
+    expect(proc.take()[1]).toBe('[script:a] gta5')
+  })
+
   it('count milliseconds since the process started: as an int on clients, a long on servers', async () => {
     for (const [side, timer] of [
       ['client', -(2 ** 31) + 5],
